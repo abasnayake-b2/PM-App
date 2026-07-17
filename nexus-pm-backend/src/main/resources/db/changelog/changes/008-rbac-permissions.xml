@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="008-rbac-permissions" author="dfnpm">
+    <sql>
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000037', 'Excel import — View', 'IMPORT_VIEW', 'IMPORT', 'VIEW'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'IMPORT_VIEW');
+
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000038', 'Excel import — Run', 'IMPORT_CREATE', 'IMPORT', 'CREATE'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'IMPORT_CREATE');
+
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000039', 'Releases — View', 'RELEASES_VIEW', 'RELEASES', 'VIEW'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'RELEASES_VIEW');
+
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000040', 'Releases — Create', 'RELEASES_CREATE', 'RELEASES', 'CREATE'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'RELEASES_CREATE');
+
+      UPDATE permission SET name = 'User accounts — View' WHERE code = 'USERS_VIEW';
+      UPDATE permission SET name = 'User accounts — Create' WHERE code = 'USERS_CREATE';
+      UPDATE permission SET name = 'User accounts — Update' WHERE code = 'USERS_UPDATE';
+      UPDATE permission SET name = 'User accounts — Delete' WHERE code = 'USERS_DELETE';
+      UPDATE permission SET name = 'Planning — View' WHERE code = 'PROJECTS_VIEW';
+      UPDATE permission SET name = 'Planning — Create' WHERE code = 'PROJECTS_CREATE';
+      UPDATE permission SET name = 'Planning — Update' WHERE code = 'PROJECTS_UPDATE';
+      UPDATE permission SET name = 'Planning — Delete' WHERE code = 'PROJECTS_DELETE';
+      UPDATE permission SET name = 'Backlog — View' WHERE code = 'ISSUES_VIEW';
+      UPDATE permission SET name = 'Backlog — Create' WHERE code = 'ISSUES_CREATE';
+      UPDATE permission SET name = 'Backlog — Update' WHERE code = 'ISSUES_UPDATE';
+      UPDATE permission SET name = 'Backlog — Delete' WHERE code = 'ISSUES_DELETE';
+
+      INSERT INTO role (id, name, code)
+      SELECT '11111111-1111-1111-1111-111111111104', 'Employee', 'EMPLOYEE'
+      WHERE NOT EXISTS (SELECT 1 FROM role WHERE code = 'EMPLOYEE');
+
+      DELETE rp FROM role_permission rp
+      INNER JOIN role r ON r.id = rp.role_id
+      INNER JOIN permission p ON p.id = rp.permission_id
+      WHERE r.code = 'MANAGER' AND p.code = 'USERS_VIEW';
+
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT r.id, p.id FROM role r CROSS JOIN permission p
+      WHERE r.code IN ('SUPER_ADMIN', 'ADMIN')
+        AND p.code IN ('IMPORT_VIEW', 'IMPORT_CREATE', 'RELEASES_VIEW', 'RELEASES_CREATE')
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+        );
+
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT r.id, p.id FROM role r CROSS JOIN permission p
+      WHERE r.code = 'MANAGER'
+        AND p.code IN (
+          'PROJECTS_UPDATE', 'ISSUES_DELETE', 'ALLOCATIONS_DELETE',
+          'IMPORT_VIEW', 'IMPORT_CREATE', 'RELEASES_VIEW', 'RELEASES_CREATE'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+        );
+
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT r.id, p.id FROM role r CROSS JOIN permission p
+      WHERE r.code = 'EMPLOYEE'
+        AND p.code IN (
+          'PROJECTS_VIEW',
+          'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_UPDATE',
+          'ALLOCATIONS_VIEW', 'ALLOCATIONS_CREATE', 'ALLOCATIONS_UPDATE',
+          'REPORTS_VIEW',
+          'IMPORT_VIEW', 'IMPORT_CREATE',
+          'RELEASES_VIEW'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+        );
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

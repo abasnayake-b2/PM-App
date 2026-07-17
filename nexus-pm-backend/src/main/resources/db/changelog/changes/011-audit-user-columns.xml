@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Bootstrap runner also ensures these columns when Liquibase is disabled. -->
+    <changeSet id="011-audit-user-columns-region" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="region"/>
+                <not><columnExists tableName="region" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="region">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-country" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="country"/>
+                <not><columnExists tableName="country" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="country">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-client" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="client"/>
+                <not><columnExists tableName="client" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="client">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-department" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="department"/>
+                <not><columnExists tableName="department" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="department">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-stream" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="stream"/>
+                <not><columnExists tableName="stream" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="stream">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-work-type" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="work_type"/>
+                <not><columnExists tableName="work_type" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="work_type">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-skill" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="skill"/>
+                <not><columnExists tableName="skill" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="skill">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-designation" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="designation"/>
+                <not><columnExists tableName="designation" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="designation">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-org-level" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="org_level"/>
+                <not><columnExists tableName="org_level" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="org_level">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-role" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="role"/>
+                <not><columnExists tableName="role" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="role">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-permission" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="permission"/>
+                <not><columnExists tableName="permission" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="permission">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-employee" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="employee"/>
+                <not><columnExists tableName="employee" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="employee">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-team-management" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="team_management"/>
+                <not><columnExists tableName="team_management" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="team_management">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-team-import-batch" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="team_import_batch"/>
+                <not><columnExists tableName="team_import_batch" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="team_import_batch">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-project" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="project"/>
+                <not><columnExists tableName="project" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="project">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-budget" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="budget"/>
+                <not><columnExists tableName="budget" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="budget">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-release" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="release"/>
+                <not><columnExists tableName="release" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="release">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-rd-issue" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="rd_issue"/>
+                <not><columnExists tableName="rd_issue" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="rd_issue">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-allocation" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="allocation"/>
+                <not><columnExists tableName="allocation" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="allocation">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="011-audit-user-columns-time-log" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="time_log"/>
+                <not><columnExists tableName="time_log" columnName="created_by"/></not>
+            </and>
+        </preConditions>
+        <addColumn tableName="time_log">
+            <column name="created_by" type="CHAR(36)"/>
+            <column name="updated_by" type="CHAR(36)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

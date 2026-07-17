@@ -1,0 +1,33 @@
+# Copy to application-local.yml and edit as needed.
+# Activate with: mvn spring-boot:run "-Dspring-boot.run.profiles=dev,local"
+#
+# Schema is applied with sql/build.sql + sql/seed.sql — keep Liquibase disabled.
+
+spring:
+  liquibase:
+    enabled: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/dfn_pm?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: change_me
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+dfnpm:
+  cors:
+    allowed-origins: http://localhost:5173
+  security:
+    swagger-enabled: true
+    cookie-secure: false
+    # Set true when Redis/Memurai is running
+    redis-enabled: false
+    rate-limit-enabled: false
+
+management:
+  health:
+    mail:
+      enabled: false
+    redis:
+      enabled: false

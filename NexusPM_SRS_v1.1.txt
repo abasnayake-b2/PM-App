@@ -1,0 +1,1504 @@
+﻿DFN PM
+Software Requirements Specification
+Project & Resource Management System
+Version
+1.1
+Date
+June 2025
+Status
+Draft
+Classification
+Confidential
+Prepared by
+Nexus PM Team
+Table of Contents
+Table of Contents1
+1. Introduction1
+1.1 Document Purpose1
+1.2 Project Overview1
+1.3 Scope1
+1.4 Definitions and Acronyms1
+2. Stakeholders & System Actors1
+2.1 Stakeholder Register1
+2.2 User Role Definitions1
+Super Admin1
+Admin1
+Manager1
+Employee1
+3. System Architecture1
+3.1 Architecture Overview1
+3.2 Technology Stack1
+3.3 Backend Module Structure1
+3.4 Frontend Application Structure1
+4. Data Model Summary1
+4.1 Entity Overview1
+4.2 Key Relationships1
+5. Authentication & Authorisation1
+5.1 Authentication Mechanism1
+5.2 JWT Token Claims1
+5.3 Security Filter Chain1
+5.4 Role Permission Matrix1
+6. Epics1
+7. User Stories1
+EP-01 — Authentication & Security1
+EP-03 — Project Management1
+EP-05 — Issue & Task Tracking1
+EP-06 — Resource Allocation1
+EP-09 — Reporting & Dashboards1
+8. Use Cases1
+UC-01: Employee Login1
+UC-02: Create Resource Allocation1
+UC-03: Issue SLA Breach Detection1
+UC-04: Project-Level Resource Utilisation Drill-Down1
+9. Sequence Flows1
+9.1 Authentication — Login & Token Refresh1
+9.2 Create Issue with SLA Computation1
+9.3 Resource Allocation with Over-allocation Check1
+10. API Design1
+10.1 API Conventions1
+10.2 Endpoint Summary1
+11. UI/UX Design & Interactive Prototype1
+11.1 Design Approach1
+11.2 Theming — Dark & Light Mode1
+11.3 Project Detail — Resource Utilisation View1
+11.4 Prototype Coverage Summary1
+12. Non-Functional Requirements1
+13. Implementation Phases1
+14. Project Folder Structure1
+14.1 Spring Boot Backend1
+14.2 React Frontend1
+15. Future SaaS Readiness1
+16. Appendix1
+16.1 Default Seed Data1
+Priorities1
+Issue Statuses1
+Issue Types1
+16.2 Revision History1
+1. Introduction
+1.1 Document Purpose
+This Software Requirements Specification (SRS) defines the complete functional and non-functional requirements for DFN PM — a web-based project and resource management system. It serves as the contractual reference between stakeholders and the development team and provides the basis for system design, implementation, testing, and future enhancement.
+1.2 Project Overview
+Nexus PM is a modular, full-stack project management platform built to manage the complete software delivery lifecycle across multiple clients and projects. The system handles the hierarchy from geographic regions down to individual tasks, with resource allocation, issue tracking, SLA monitoring, time logging, and role-based access control for four distinct user roles.
+System Identity
+System Name:       DFN PM
+System Type:       Web-based project & resource management platform
+Architecture:      Modular monolith (Spring Boot) + React SPA
+Database:          MySQL 8.0 with Liquibase migrations
+Authentication:    JWT with role-based access control
+Target Users:      Super Admin, Admin, Manager, Employee
+1.3 Scope
+Nexus PM covers the following functional domains:
+Organisation management (Region → Country → Client → Project)
+Release and sprint planning
+Issue and task tracking with priority, SLA, and workflow management
+Resource allocation with capacity planning and over-allocation detection
+Time logging and utilisation reporting
+Role-based access control with four hierarchical roles
+Notifications, audit logging, and reporting dashboards
+1.4 Definitions and Acronyms
+Term
+Definition
+SRS
+Software Requirements Specification
+RBAC
+Role-Based Access Control
+JWT
+JSON Web Token — used for stateless authentication
+SLA
+Service Level Agreement — response/resolution time targets
+RD/Issue
+Requirement Definition or Issue raised against a Release
+RAG
+Red/Amber/Green — project health status indicator
+DTO
+Data Transfer Object — API request/response payload
+API
+Application Programming Interface
+MFA
+Multi-Factor Authentication (2FA via TOTP)
+TDD
+Test-Driven Development
+CI/CD
+Continuous Integration / Continuous Deployment
+2. Stakeholders & System Actors
+2.1 Stakeholder Register
+Stakeholder
+Role
+Interest in System
+Executive / Business Owner
+Sponsor
+Project health, resource utilisation, delivery performance
+Resource Manager
+Primary user (Manager role)
+Team allocation, capacity planning, over-allocation alerts
+Project Manager
+Primary user (Manager role)
+Release planning, issue tracking, SLA compliance
+Developer / QA / BA
+Primary user (Employee role)
+Task assignment, time logging, issue updates
+IT Administrator
+Admin role
+User management, system configuration, role assignment
+System Owner
+Super Admin role
+Full system control, audit logs, platform settings
+Client Representative
+External stakeholder
+Project progress, release dates, issue resolution
+2.2 User Role Definitions
+Super Admin
+The Super Admin has unrestricted access to all system functions. This role manages the platform itself — system settings, all users across all departments, global audit logs, and role assignment. There must always be at least one Super Admin account. Super Admins can impersonate any user for support purposes.
+Admin
+Admins manage their organisation's configuration. They create and archive projects, manage clients, configure lookup tables (priorities, statuses, issue types, SLA thresholds), manage all users within their scope, and access all reports. Admins cannot change system-level settings.
+Manager
+Managers oversee their team's work. They create and edit issues, manage releases and sprints, set and view resource allocations for their team, and access team-level reports. Managers cannot create new users or modify organisation-level configuration.
+Employee
+Employees are the individual contributors. They view their own allocations and assigned issues, log time against tasks, update the status of their assigned items, and add comments. Employees have read-only access to other team members' data.
+3. System Architecture
+3.1 Architecture Overview
+Nexus PM follows a modular monolith architecture. The backend is a single deployable Spring Boot JAR, internally structured as independent modules (packages) with well-defined boundaries. Each module owns its own controllers, services, repositories, DTOs, and entities. Modules communicate only through service interfaces — never directly through another module's repository. This design allows future extraction to microservices without rewriting business logic.
+Architecture Decision: Modular Monolith vs Microservices
+Decision:  Modular monolith chosen over microservices for this phase.
+Rationale: Single deployment, single DB connection pool, simple transactions,
+           no network overhead between modules, easier debugging and testing.
+Future:    Module boundaries are designed so individual modules can be
+           extracted to independent services when traffic or team size demands.
+3.2 Technology Stack
+Layer
+Technology
+Version
+Purpose
+Frontend
+React
+18.x
+UI framework — component-based SPA
+Frontend
+Vite
+5.x
+Build tool and dev server
+Frontend
+React Router
+6.x
+Client-side routing with protected routes
+Frontend
+Zustand
+4.x
+Global auth state management
+Frontend
+React Query (TanStack)
+5.x
+Server state, caching, background refresh
+Frontend
+Axios
+1.x
+HTTP client with JWT interceptor
+Frontend
+Tailwind CSS
+3.x
+Utility-first styling
+Frontend
+Shadcn/ui
+latest
+Pre-built accessible UI components
+Backend
+Spring Boot
+3.2.x
+Application framework
+Backend
+Spring Security
+6.x
+Authentication and authorisation
+Backend
+Spring Data JPA
+3.2.x
+ORM and data access layer
+Backend
+Spring Validation
+3.2.x
+Request payload validation
+Backend
+Spring Mail
+3.2.x
+Email notification delivery
+Backend
+JJWT
+0.12.x
+JWT creation, signing and validation
+Backend
+MapStruct
+1.6.x
+Entity ↔ DTO mapping (compile-time)
+Backend
+Lombok
+1.18.x
+Boilerplate reduction (getters/setters)
+Backend
+Springdoc OpenAPI
+2.x
+Swagger UI and OpenAPI 3 spec generation
+Database
+MySQL
+8.0
+Primary relational database
+Database
+Liquibase
+4.x
+Database schema version control and migrations
+Cache
+Redis
+7.x
+JWT blacklisting and query result caching
+DevOps
+Docker + Compose
+latest
+Containerised local and production deployment
+DevOps
+GitHub Actions
+N/A
+CI pipeline: build, test, lint, deploy
+DevOps
+Nginx
+1.25
+Reverse proxy and static asset serving
+Testing
+JUnit 5
+5.x
+Unit and integration tests
+Testing
+Mockito
+5.x
+Mock objects for unit tests
+Testing
+Testcontainers
+1.x
+Integration tests with real MySQL/Redis
+Testing
+Vitest + RTL
+latest
+React component unit tests
+3.3 Backend Module Structure
+The Spring Boot application is organised under com.nexuspm with the following top-level packages:
+Module Package
+Responsibilities
+Key Entities
+auth
+Login, JWT issuance, token refresh, logout, password reset
+UserAuth, RefreshToken
+user
+Employee CRUD, role assignment, department, designation
+Employee, Role, Department, Designation
+organisation
+Region, Country, Client management
+Region, Country, Client
+project
+Project CRUD, budget, RAG status, project access control
+Project, Budget, ProjectAccess
+release
+Release and version management
+Release
+sprint
+Sprint planning, backlog management
+Sprint
+issue
+RD/Issue lifecycle, linking, SLA computation
+RdIssue, IssueLink, SlaBreachLog
+task
+Task CRUD, dependency management, status transitions
+Task, TaskDependency
+resource
+Allocation CRUD, over-allocation check, snapshots
+Allocation, AllocationSnapshot
+timelog
+Time entry logging, weekly summaries
+TimeLog
+notification
+In-app alerts, email dispatch, templates
+Notification, NotificationTemplate
+report
+SLA reports, velocity, burndown, RAG history
+ProjectHealthLog
+admin
+System settings, audit log, workflow rules, holidays
+AuditLog, SystemSettings, HolidayCalendar
+lookup
+Priority, IssueType, IssueStatus — shared reference data
+Priority, IssueType, IssueStatus
+3.4 Frontend Application Structure
+The React application is structured as follows:
+src/pages/ — one folder per route (Dashboard, Projects, Resources, Issues, Team, etc.)
+src/components/ — shared reusable components (AllocationBar, IssueCard, StatusPill, etc.)
+src/store/ — Zustand stores (useAuthStore, useUIStore)
+src/hooks/ — React Query custom hooks (useProjects, useIssues, useAllocation, etc.)
+src/api/ — Axios instance with interceptors and per-module API functions
+src/router/ — Route definitions and ProtectedRoute HOC
+src/types/ — TypeScript interfaces for all API models
+src/utils/ — Date formatting, SLA calculation, validation helpers
+4. Data Model Summary
+4.1 Entity Overview
+The system is built on 39 database tables organised across 8 functional domains. All primary keys use UUID (CHAR(36)) for portability. All tables include created_at and updated_at timestamps managed by Hibernate auditing.
+Domain
+Tables
+Description
+Geography
+REGION, COUNTRY
+Geographic hierarchy above client
+Client & Project
+CLIENT, PROJECT, BUDGET, PROJECT_ACCESS
+Core commercial entities
+Delivery
+RELEASE, SPRINT
+Release and sprint planning
+Issues & Tasks
+RD_ISSUE, TASK, ISSUE_LINK, TASK_DEPENDENCY, ATTACHMENT, COMMENT
+Issue tracking core
+People & Org
+EMPLOYEE, DEPARTMENT, DESIGNATION, MANAGER, VP, EMPLOYEE_LEAVE, EMPLOYEE_KNOWLEDGE, EMPLOYEE_ROLE
+Org structure and HR
+Resource
+ALLOCATION, ALLOCATION_SNAPSHOT
+Capacity and allocation management
+Activity
+TIME_LOG, NOTIFICATION, AUDIT_LOG
+Operational activity records
+Lookup & Config
+PRIORITY, ISSUE_TYPE, ISSUE_STATUS, PRODUCT, KNOWLEDGE, ROLE, PERMISSION, HOLIDAY_CALENDAR, WORKFLOW_RULE, NOTIFICATION_TEMPLATE, SYSTEM_SETTINGS
+Reference and configuration data
+Security
+USER_AUTH, PROJECT_HEALTH_LOG, SLA_BREACH_LOG
+Auth and monitoring
+4.2 Key Relationships
+REGION (1) → (N) COUNTRY → (N) CLIENT → (N) PROJECT — the core delivery spine
+PROJECT (1) → (N) RELEASE → (N) RD_ISSUE → (N) TASK — work breakdown hierarchy
+RELEASE (1) → (N) SPRINT; RD_ISSUE optionally scoped to a SPRINT
+PRIORITY, ISSUE_TYPE, ISSUE_STATUS are lookups FK-ed from RD_ISSUE
+PRIORITY is at RD_ISSUE level — Tasks inherit urgency from parent Issue
+EMPLOYEE many-to-many PROJECT via ALLOCATION (with percentage + date range)
+EMPLOYEE self-references via manager_id for the org hierarchy
+EMPLOYEE_KNOWLEDGE junction table links employees to KNOWLEDGE areas with proficiency
+ALLOCATION_SNAPSHOT is a weekly denormalised copy for fast historical reporting
+5. Authentication & Authorisation
+5.1 Authentication Mechanism
+Nexus PM uses stateless JWT-based authentication. No server-side session state is maintained. All authentication state lives in signed JWT tokens.
+Token Type
+TTL
+Storage
+Usage
+Access Token
+15 minutes
+Memory (JS variable)
+Sent as Authorization: Bearer header on every API call
+Refresh Token
+7 days
+HttpOnly cookie
+Used to obtain a new access token when it expires
+On logout, the refresh token is revoked in the database and the access token is blacklisted in Redis with a TTL matching the token's remaining validity. This prevents reuse of stolen tokens.
+5.2 JWT Token Claims
+Claim
+Value
+Purpose
+sub
+employee UUID
+Subject — identifies the user
+email
+user@company.com
+User email for display
+role
+MANAGER
+Primary role for authorisation checks
+name
+John Silva
+Display name
+dept
+department UUID
+Department scoping for queries
+iat
+Unix timestamp
+Issued at
+exp
+Unix timestamp
+Expiry
+5.3 Security Filter Chain
+Every inbound HTTP request passes through the following Spring Security filter chain:
+CorsFilter — applies CORS policy (allowed origins from application.yml)
+TenantResolutionFilter — resolves and sets tenant context (reserved for future SaaS)
+JwtAuthenticationFilter — extracts JWT from Authorization header, validates signature and expiry, checks Redis blacklist, loads UserDetails, sets SecurityContextHolder
+@PreAuthorize method-level guard — checks role claim against required roles
+Controller executes business logic
+GlobalExceptionHandler — maps exceptions to RFC 7807 problem+json responses
+5.4 Role Permission Matrix
+Feature / Action
+Super Admin
+Admin
+Manager
+Employee
+View all tenants / system settings
+Y
+N
+N
+N
+Create / deactivate users
+Y
+Y
+N
+N
+Assign roles
+Y
+Y
+N
+N
+Create / archive projects
+Y
+Y
+N
+N
+Create / edit clients
+Y
+Y
+N
+N
+Configure priorities, SLA, statuses
+Y
+Y
+N
+N
+Create / close releases and sprints
+Y
+Y
+Y
+N
+Create / edit issues
+Y
+Y
+Y
+N
+Assign issues to employees
+Y
+Y
+Y
+N
+Manage team allocations
+Y
+Y
+Y
+N
+View team allocation dashboard
+Y
+Y
+Y
+N (own only)
+Update own task / issue status
+Y
+Y
+Y
+Y
+Log time against tasks
+Y
+Y
+Y
+Y
+Add comments
+Y
+Y
+Y
+Y
+View own allocations
+Y
+Y
+Y
+Y
+View all reports
+Y
+Y
+Y (team)
+N
+Access audit log
+Y
+Y (own org)
+N
+N
+6. Epics
+The system is decomposed into 10 epics, each representing a major functional area.
+Epic ID
+Epic Name
+Description
+Priority
+EP-01
+Authentication & Security
+Login, JWT, refresh, logout, password reset, RBAC enforcement
+Critical
+EP-02
+Organisation Management
+Region, Country, Client, Department, Designation hierarchy
+High
+EP-03
+Project Management
+Project CRUD, budget, RAG status, project access, team assignment
+Critical
+EP-04
+Release & Sprint Planning
+Release lifecycle, sprint management, backlog, velocity
+High
+EP-05
+Issue & Task Tracking
+Issue CRUD, priorities, SLA, workflow transitions, comments, attachments
+Critical
+EP-06
+Resource Allocation
+Allocation CRUD, capacity view, over-allocation detection, snapshots
+Critical
+EP-07
+Time Logging
+Time entry, weekly summaries, allocation vs actuals comparison
+High
+EP-08
+Notifications & Alerts
+In-app alerts, email templates, SLA breach notifications
+Medium
+EP-09
+Reporting & Dashboards
+SLA reports, burndown, velocity, RAG history, utilisation
+High
+EP-10
+Admin & Configuration
+System settings, audit log, holiday calendar, workflow rules
+Medium
+7. User Stories
+EP-01 — Authentication & Security
+Story ID
+As a...
+I want to...
+So that...
+Acceptance Criteria
+US-01-01
+Any user
+log in with email and password
+I can access the system securely
+Valid credentials return access + refresh tokens. Invalid credentials return 401. Account locks after 5 failed attempts.
+US-01-02
+Any user
+have my session auto-refreshed
+I am not logged out mid-work
+Access token silently refreshes via refresh token. Expired refresh token redirects to login.
+US-01-03
+Any user
+log out from any device
+my session is immediately invalidated
+Logout blacklists access token in Redis and revokes refresh token in DB.
+US-01-04
+Any user
+reset my password via email link
+I can regain access if I forget it
+Reset link expires in 1 hour. Link is single-use. New password must meet complexity rules.
+US-01-05
+Super Admin
+assign and change user roles
+I can control what each person can do
+Role changes take effect on next login. Current sessions maintain old role until token expires.
+EP-03 — Project Management
+Story ID
+As a...
+I want to...
+So that...
+Acceptance Criteria
+US-03-01
+Admin
+create a new project for a client
+we can track work against it
+Project requires name, client, lead employee, start/end date. Status defaults to Active. Budget is optional.
+US-03-02
+Manager
+view all projects I have access to
+I know what work is happening
+Project list shows name, client, RAG status, progress %, team size. Filterable by client, status, region.
+US-03-03
+Manager
+update the RAG status of a project
+stakeholders know the health at a glance
+RAG change logged to PROJECT_HEALTH_LOG with timestamp and notes. History viewable in timeline.
+US-03-04
+Admin
+assign employees to a project
+they can access project issues and tasks
+Project access table updated. Employee can now see and work on project. Access level (view/edit/admin) specified.
+US-03-05
+Manager
+archive a completed project
+it is removed from active views but retained
+Archived projects hidden from default lists. All data retained. Archive is reversible by Admin.
+EP-05 — Issue & Task Tracking
+Story ID
+As a...
+I want to...
+So that...
+Acceptance Criteria
+US-05-01
+Manager
+create an issue against a release
+it is tracked and assigned correctly
+Issue requires title, release, issue type, priority. SLA due date auto-calculated from priority.sla_resolve_hrs. Reported_by defaults to current user.
+US-05-02
+Manager
+set priority on an issue
+the team knows what to work on first
+Priority is Critical/High/Medium/Low. SLA countdown starts on creation. Priority change recalculates SLA due date.
+US-05-03
+Employee
+update the status of my assigned issue
+the team knows progress
+Valid transitions enforced by workflow. In Progress → In Review → Done. Cannot skip to Done from Open.
+US-05-04
+Any user
+add a comment to an issue
+we can collaborate in context
+Comment stored with author and timestamp. Watchers notified. Comments are editable by author within 15 min.
+US-05-05
+Manager
+link issues as blocks/duplicates/relates-to
+dependencies are visible
+ISSUE_LINK created with link_type. Both directions shown on issue detail. Blocked issues highlighted.
+US-05-06
+Manager
+create tasks under an issue
+we can break work into assignable units
+Task inherits priority from parent issue. Assigned to an employee. Has its own status independent of issue.
+US-05-07
+Manager
+see issues breaching their SLA
+I can escalate before it is too late
+Dashboard shows SLA status: Within / At Risk (<2h) / Breached. Breach logged to SLA_BREACH_LOG. Email alert sent.
+US-05-08
+Employee
+upload attachments to issues and tasks
+supporting evidence is accessible
+Files stored securely. Size limit 25MB per file. Supported types: PDF, image, ZIP, Office docs.
+EP-06 — Resource Allocation
+Story ID
+As a...
+I want to...
+So that...
+Acceptance Criteria
+US-06-01
+Manager
+allocate an employee to a project with a percentage
+I can plan capacity accurately
+Allocation requires employee, project, percentage, from_date, to_date (nullable). Role on project specified. Billable flag set.
+US-06-02
+Manager
+be warned if an allocation would exceed 100%
+I do not over-commit a team member
+System checks total allocation for employee over the date range. Returns 400 with details if total would exceed 100%.
+US-06-03
+Manager
+see where each team member is allocated right now
+I know who is free for new work
+Card view shows stacked bar per employee with colour-coded project segments. Free capacity shown as number and hours/week.
+US-06-04
+Manager
+view the full team allocation for a date range
+I can plan future staffing
+Timeline view shows each employee as a row with allocation bars across months. Filterable by department.
+US-06-05
+Manager
+see which employees are on bench
+I can assign them quickly
+Employees with <20% allocation or bench_status=bench appear in Available Resources list with available_from date.
+US-06-06
+Manager
+compare allocated hours vs logged hours weekly
+I can spot gaps between plan and reality
+Report shows planned hours (allocation%) vs actual TIME_LOG hours per employee per week. Variance highlighted if >20%.
+US-06-07
+Manager
+drill into a single project and see its resource utilisation
+I can manage staffing at the project level, not just globally
+Clicking a project opens a detail view with: total capacity donut, billable/internal breakdown, per-member cards (allocation %, hrs planned vs actual, open tasks/issues), and a project-scoped allocation timeline.
+EP-09 — Reporting & Dashboards
+Story ID
+As a...
+I want to...
+So that...
+Acceptance Criteria
+US-09-01
+Any user
+switch between dark and light theme
+I can use the system comfortably in any lighting condition or per personal preference
+Toggle available on login screen and in-app sidebar. Theme applies instantly to all surfaces, text, and status colours. Preference persists for the session.
+8. Use Cases
+UC-01: Employee Login
+Field
+Detail
+Use Case ID
+UC-01
+Name
+Employee Login
+Actor
+Any user (unauthenticated)
+Trigger
+User navigates to /login and submits credentials
+Preconditions
+User account exists and is active. Account is not locked.
+Main Flow
+1. User enters email and password 2. System validates credentials against USER_AUTH table (bcrypt compare) 3. System checks account is not locked (failed_attempts < 5) 4. System generates access token (15 min, includes role, email, name, dept claims) 5. System generates refresh token (7 days), stores hash in DB 6. Access token returned in response body; refresh token set as HttpOnly cookie 7. Frontend stores access token in memory; redirects to Dashboard
+Alternative Flow
+A1 (Invalid credentials): Return 401. Increment failed_attempts. If failed_attempts = 5, lock account and send unlock email. A2 (Inactive account): Return 403 "Account inactive. Contact administrator." A3 (Account locked): Return 423 "Account locked. Check email for unlock link."
+Postconditions
+User is authenticated. SecurityContext holds user principal with role claims. Audit log entry created for login event.
+Business Rules
+Passwords stored as bcrypt hash (rounds=12). JWT signed with RS256 (asymmetric). Refresh token stored as SHA-256 hash only.
+UC-02: Create Resource Allocation
+Field
+Detail
+Use Case ID
+UC-02
+Name
+Create Resource Allocation
+Actor
+Manager or Admin
+Trigger
+Manager opens allocation form and submits a new allocation entry
+Preconditions
+Actor has MANAGER or ADMIN role. Target employee exists and is active. Target project exists and is active.
+Main Flow
+1. Manager selects employee, project, role on project, percentage, from_date, to_date 2. System queries existing allocations for employee across the date range 3. System calculates total existing + new percentage 4. If total ≤ 100%: save allocation record 5. System checks for leave conflicts (EMPLOYEE_LEAVE overlaps) 6. If leave conflict exists: show warning (not block) 7. Return 201 with allocation record 8. Notification sent to employee about new allocation
+Alternative Flow
+A1 (Over-allocation): If total > 100%, return 400 with breakdown:    "John Silva would be at 110% during Jul-Aug.    Current: FinCore 50%, RetailHub 30%, Internal 10%.    Adding: HealthTrack 30% = 120% total." A2 (Date conflict — same project): Return 400 "Allocation already exists for this employee on this project in that period."
+Postconditions
+Allocation record created. Employee notified. Weekly snapshot job will include this on next run. Audit log entry created.
+Business Rules
+to_date may be null (open-ended). Percentage must be 1-100. Allocation is billable by default. Over-allocation check considers EMPLOYEE_LEAVE as unavailable days.
+UC-03: Issue SLA Breach Detection
+Field
+Detail
+Use Case ID
+UC-03
+Name
+SLA Breach Detection and Alert
+Actor
+System (scheduled job) + Manager
+Trigger
+Scheduled job runs every 15 minutes. Also triggered on issue status change.
+Preconditions
+Issue exists with a non-terminal status and a priority with SLA hours configured.
+Main Flow
+1. Scheduler queries all open issues where sla_due_at is approaching or passed 2. For each issue: compare NOW() against sla_due_at (adjusted for HOLIDAY_CALENDAR) 3. Compute status: Within SLA / At Risk (< 2 hours remaining) / Breached 4. If status changed since last check: update issue SLA status flag 5. If Breached: insert record into SLA_BREACH_LOG with breach_mins calculated 6. If Breached: send notification to assigned employee and their manager 7. Dashboard SLA widget updates on next poll
+Alternative Flow
+A1 (Issue resolved before breach): No breach log entry. SLA status marked as Resolved Within SLA. A2 (No assignee): Notification sent to project manager.
+Postconditions
+SLA_BREACH_LOG populated. Notifications sent. Dashboard reflects current SLA status.
+Business Rules
+SLA clock pauses when issue status = "Waiting for Client". Holiday calendar deducted from business hours. SLA breach is irreversible even if issue subsequently resolved.
+UC-04: Project-Level Resource Utilisation Drill-Down
+Field
+Detail
+Use Case ID
+UC-04
+Name
+View Resource Utilisation for a Single Project
+Actor
+Manager or Admin
+Trigger
+User clicks a project row from the Dashboard, Projects list, or search results.
+Preconditions
+Actor has access to the project (PROJECT_ACCESS record exists). Project has at least one active allocation.
+Main Flow
+1. User clicks a project card or row 2. System navigates to the project detail view, defaulting to the Resource Utilisation tab 3. System fetches all ALLOCATION records for the project where to_date is null or in the future 4. System computes: average allocation % across team (total capacity donut), billable vs internal split, hrs planned vs hrs logged this week per member 5. System renders one card per team member showing avatar, role, allocation %, progress bar, planned vs actual hours, open task count, open issue count 6. System renders a 4-month allocation timeline scoped to this project only 7. User may click any member card to open the full Person Detail panel
+Alternative Flow
+A1 (No allocations on project): Show empty state "No one is allocated to this project yet" with a "+ Allocate" call to action. A2 (User lacks access): Return 403 and redirect to Projects list with an access-denied toast.
+Postconditions
+User has full visibility into who is working on the project, at what capacity, and whether actual hours match the plan — without needing to cross-reference the global Resources page.
+Business Rules
+Utilisation % uses the same calculation as the global Resource Allocation dashboard (UC-02) but is filtered to project_id. Variance colour coding: green if actual is within 80-110% of planned, amber if 110-130%, red if actual is below 80% (under-delivery) or above 130% (significant overrun).
+9. Sequence Flows
+9.1 Authentication — Login & Token Refresh
+The following describes the message sequence for user authentication:
+Login Sequence
+Browser          → POST /api/auth/login {email, password}
+                 → AuthController.login()
+                 → AuthService.authenticate()
+                 → UserAuthRepository.findByEmail()
+                 → PasswordEncoder.matches(raw, hash)
+                 → JwtService.generateAccessToken(user, claims)
+                 → JwtService.generateRefreshToken()
+                 → RefreshTokenRepository.save(hash, userId, expiry)
+                 → AuditLogService.logLogin(userId, ip)
+Browser          ← 200 { accessToken } + Set-Cookie: refreshToken=...; HttpOnly
+Token Refresh Sequence (silent, triggered by Axios 401 interceptor):
+Browser          → POST /api/auth/refresh (cookie sent automatically)
+                 → AuthService.refreshToken()
+                 → RefreshTokenRepository.findByToken(hash)
+                 → Validate: not revoked, not expired
+                 → JwtService.generateAccessToken(user)
+Browser          ← 200 { newAccessToken }
+If refresh token is expired or revoked:
+Browser          ← 401 → Frontend clears memory → Redirect to /login
+9.2 Create Issue with SLA Computation
+Create Issue Sequence
+Frontend         → POST /api/issues {title, releaseId, priorityId, issueTypeId, assignedTo}
+                 → JwtAuthFilter validates token, sets SecurityContext
+                 → @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+                 → IssueController.createIssue(CreateIssueRequest)
+                 → IssueMapper.toEntity(request)
+                 → IssueService.create(issue)
+                    → PriorityRepository.findById(priorityId)
+                    → Compute sla_due_at = NOW() + priority.sla_resolve_hrs
+                    →   Deduct HOLIDAY_CALENDAR non-working days
+                    → RdIssueRepository.save(issue)
+                    → NotificationService.notifyAssignee(issue)
+                    → AuditLogService.log(CREATE, ISSUE, issueId)
+                 → IssueMapper.toResponse(savedIssue)
+Frontend         ← 201 { issue: { id, title, sla_due_at, status, ... } }
+9.3 Resource Allocation with Over-allocation Check
+Allocation Sequence
+Frontend         → POST /api/allocations {employeeId, projectId, percentage, from, to}
+                 → @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+                 → AllocationController.create(AllocationRequest)
+                 → AllocationService.create(request)
+                    → AllocationRepository.findOverlapping(employeeId, from, to)
+                    → Calculate existingTotal = sum of overlapping percentages
+                    → If existingTotal + newPct > 100:
+                       throw OverAllocationException(existingTotal, breakdown)
+                    → EmployeeLeaveRepository.findConflicts(employeeId, from, to)
+                    → If leaveConflict: add warning to response (not block)
+                    → AllocationRepository.save(allocation)
+                    → NotificationService.notifyEmployee(allocation)
+                    → AuditLogService.log(CREATE, ALLOCATION)
+Frontend         ← 201 { allocation } OR
+Frontend         ← 400 { error: "OVER_ALLOCATION", breakdown: [...], totalWouldBe: 110 }
+10. API Design
+10.1 API Conventions
+Base URL: /api/v1
+All responses: JSON (application/json)
+Auth: Authorization: Bearer {accessToken} header on all protected endpoints
+Error format: RFC 7807 Problem Details { type, title, status, detail, timestamp }
+Pagination: ?page=0&size=20&sort=createdAt,desc
+Filtering: query params ?status=OPEN&priority=HIGH&assignedTo={uuid}
+Timestamps: ISO 8601 (2025-06-19T10:30:00Z)
+IDs: UUID strings
+10.2 Endpoint Summary
+Method
+Endpoint
+Description
+Min Role
+POST
+/auth/login
+Authenticate and receive tokens
+Public
+POST
+/auth/refresh
+Refresh access token using cookie
+Public
+POST
+/auth/logout
+Invalidate current session
+Any
+POST
+/auth/password-reset/request
+Send password reset email
+Public
+POST
+/auth/password-reset/confirm
+Confirm reset with token
+Public
+GET
+/users
+List all employees (paginated)
+Admin
+POST
+/users
+Create new employee
+Admin
+GET
+/users/{id}
+Get employee detail
+Manager
+PUT
+/users/{id}
+Update employee
+Admin
+PATCH
+/users/{id}/role
+Change user role
+Admin
+GET
+/projects
+List accessible projects
+Manager
+POST
+/projects
+Create project
+Admin
+GET
+/projects/{id}
+Get project detail
+Manager
+PUT
+/projects/{id}
+Update project
+Manager
+PATCH
+/projects/{id}/rag
+Update RAG status
+Manager
+GET
+/projects/{id}/health-log
+Get RAG history
+Manager
+GET
+/releases
+List releases by project
+Employee
+POST
+/releases
+Create release
+Manager
+GET
+/sprints
+List sprints by release
+Employee
+POST
+/sprints
+Create sprint
+Manager
+PATCH
+/sprints/{id}/start
+Start a sprint
+Manager
+PATCH
+/sprints/{id}/close
+Close a sprint
+Manager
+GET
+/issues
+List issues (filterable)
+Employee
+POST
+/issues
+Create issue
+Manager
+GET
+/issues/{id}
+Get issue detail
+Employee
+PUT
+/issues/{id}
+Update issue
+Manager
+PATCH
+/issues/{id}/status
+Transition issue status
+Employee
+POST
+/issues/{id}/comments
+Add comment
+Employee
+POST
+/issues/{id}/links
+Link to another issue
+Manager
+POST
+/issues/{id}/attachments
+Upload attachment
+Employee
+GET
+/tasks
+List tasks by issue
+Employee
+POST
+/tasks
+Create task
+Manager
+PATCH
+/tasks/{id}/status
+Update task status
+Employee
+POST
+/allocations
+Create allocation
+Manager
+GET
+/allocations
+List allocations (by employee/project/date range)
+Manager
+PUT
+/allocations/{id}
+Update allocation
+Manager
+DELETE
+/allocations/{id}
+Remove allocation
+Manager
+GET
+/allocations/team-view
+Full team allocation dashboard
+Manager
+GET
+/allocations/availability
+List available/bench employees
+Manager
+POST
+/timelog
+Log time entry
+Employee
+GET
+/timelog/weekly
+Get weekly time summary
+Manager
+GET
+/reports/sla
+SLA compliance report
+Manager
+GET
+/reports/velocity
+Sprint velocity chart data
+Manager
+GET
+/reports/burndown/{sprintId}
+Burndown chart data
+Manager
+GET
+/reports/utilisation
+Resource utilisation report
+Manager
+GET
+/projects/{id}/utilisation
+Project-scoped resource utilisation (donut, member cards, timeline)
+Manager
+GET
+/notifications
+Get user notifications
+Employee
+PATCH
+/notifications/{id}/read
+Mark notification as read
+Employee
+GET
+/admin/audit-log
+View audit log
+Admin
+GET
+/admin/settings
+Get system settings
+Admin
+PUT
+/admin/settings
+Update system settings
+Super Admin
+GET
+/lookup/priorities
+List priorities
+Employee
+GET
+/lookup/issue-types
+List issue types
+Employee
+GET
+/lookup/statuses
+List issue statuses
+Employee
+11. UI/UX Design & Interactive Prototype
+11.1 Design Approach
+A fully interactive HTML/CSS/JS prototype was built ahead of backend implementation to validate navigation flows, information density, and the resource allocation experience with stakeholders. The prototype covers the complete primary user journey: login, dashboard, project drill-down, resource allocation (cards and timeline views), issue tracking, team management, sprints, time logging, reports, and notifications.
+11.2 Theming — Dark & Light Mode
+The interface supports both dark and light themes, switchable instantly from a toggle on the login screen and from the application sidebar. Theme state is implemented via a single data-theme attribute on the document root, with all colours defined as CSS custom properties that resolve differently per theme. This means no component markup changes between themes — only the underlying token values change.
+Token
+Dark Theme
+Light Theme
+Usage
+--bg
+#0f1117
+#f5f6fa
+Page background
+--bg2
+#161b26
+#ffffff
+Card and panel surfaces
+--bg3
+#1e2535
+#f0f1f5
+Recessed surfaces (input fields, table stripes)
+--text
+#e8eaf0
+#1a1d2e
+Primary text
+--text2
+#8b92a8
+#5a5f7a
+Secondary / muted text
+--border
+#2a3348
+#e2e4ec
+Default borders and dividers
+--accent
+#4f8ef7
+#3a7af0
+Primary actions, links, active states
+--green / --amber / --red
+semantic, ~12% opacity bg
+semantic, ~8% opacity bg
+Status, RAG, SLA, allocation-health colour coding
+Status semantics (success, warning, danger) deliberately use the same hue family across both themes so that a red allocation badge always means "over-allocated" regardless of theme — only the surrounding chrome changes.
+11.3 Project Detail — Resource Utilisation View
+Clicking any project (from the Dashboard, the Projects list, or search) opens a dedicated project detail page. This view directly supports the core resource-management requirement: knowing not just who is allocated company-wide, but specifically who is working on this project and how that compares to plan.
+The view is organised into four tabs:
+Resource Utilisation (default) — total capacity donut chart, billable/internal capacity breakdown, this-week-vs-plan variance per member, a card grid with one card per team member (allocation %, planned vs actual hours, open tasks, open issues), and a project-scoped 4-month allocation timeline.
+Issues — the issue list filtered to this project only, reusing the same issue row component and detail panel as the global Issues page.
+Releases — release cards showing Live / Active / Planned status with target dates and issue counts.
+Timeline — a larger Gantt-style view of every team member's allocation across the project's active months.
+Clicking any member card opens the same Person Detail slide-panel used elsewhere in the system, keeping the allocation editing experience consistent whether reached from the project view, the global Resources page, or the Team page.
+11.4 Prototype Coverage Summary
+Screen
+Key Elements
+Status
+Login
+Email/password form, theme toggle, demo credentials hint
+Complete
+Dashboard
+Stat cards, recent issues, team allocation mini-bars, project health, SLA widget
+Complete
+Projects (list)
+RAG status, progress bar, member avatars, click-through to detail
+Complete
+Project Detail
+Resource Utilisation / Issues / Releases / Timeline tabs
+Complete
+Resources
+Card view + Timeline view toggle, over-allocation alert banner, filters
+Complete
+Issue Detail
+Status, priority, SLA countdown, comment thread, quick actions
+Complete
+Team
+Grid of team members with allocation %, click-through to Person Detail
+Complete
+Sprints
+Active sprint progress, backlog placeholder for next sprint
+Complete
+Time Log
+Weekly grid per team member
+Complete
+Reports
+Six report category cards (utilisation, SLA, velocity, burndown, RAG, time-vs-plan)
+Navigable; charts not yet wired to data
+Notifications
+SLA breach, over-allocation, status change, sprint close, bench availability alerts
+Complete
+12. Non-Functional Requirements
+Category
+Requirement
+Target
+Performance
+API response time (p95)
+< 300ms for standard queries
+Performance
+API response time (p95) — report endpoints
+< 2s
+Performance
+Frontend initial load (LCP)
+< 2.5s on 4G connection
+Performance
+Concurrent users supported
+200 simultaneous without degradation
+Availability
+System uptime SLA
+99.5% monthly (excluding planned maintenance)
+Availability
+Planned maintenance window
+Sundays 02:00–04:00 UTC
+Scalability
+Horizontal scaling
+Multiple Spring Boot instances behind load balancer
+Scalability
+Database read replicas
+Report queries routed to read replica
+Security
+Password hashing
+bcrypt with cost factor 12
+Security
+JWT signing algorithm
+RS256 (asymmetric key pair)
+Security
+Failed login lockout
+Lock after 5 failed attempts; unlock via email
+Security
+HTTPS
+TLS 1.2+ enforced on all endpoints
+Security
+SQL injection prevention
+Parameterised queries via JPA only — no native SQL with string concat
+Security
+XSS prevention
+All user content HTML-escaped; CSP headers set
+Auditability
+Audit log retention
+7 years minimum
+Auditability
+Audit log coverage
+All CREATE, UPDATE, DELETE operations on core entities
+Data Integrity
+Referential integrity
+Enforced at DB level via FK constraints
+Data Integrity
+Optimistic locking
+All entities include @Version for concurrent update safety
+Maintainability
+Code coverage — unit tests
+≥ 80% line coverage on service layer
+Maintainability
+Code coverage — integration tests
+All API endpoints covered
+Maintainability
+API documentation
+Swagger UI auto-generated from OpenAPI 3 annotations
+13. Implementation Phases
+Phase
+Name
+Deliverables
+Duration
+1
+Foundation
+Spring Boot project scaffold + pom.xml MySQL schema (all 39 tables) + Liquibase changelogs Auth module (login, JWT, refresh, logout, password reset) User + Role + Department entities and APIs React scaffold (Vite + Router + Zustand + Axios) Login page + ProtectedRoute HOC Docker Compose (api + mysql + redis)
+2 weeks
+2
+Org & Project Core
+Region / Country / Client CRUD APIs Project CRUD + budget + RAG + project access Release API React: Project list + project detail pages Role guards on all endpoints (@PreAuthorize) Liquibase migrations for lookup seed data
+2 weeks
+3
+Issue Tracker
+Issue + Task APIs with full lifecycle SLA computation on issue create/update Priority / IssueType / IssueStatus lookup APIs Comments + Attachments (local file storage) Issue list page with filters Issue detail slide-panel Sprint management APIs
+2 weeks
+4
+Resource Allocation
+Allocation CRUD with over-allocation validation Allocation snapshot scheduled job (weekly) Team allocation dashboard (cards + timeline) Employee detail with allocation breakdown Availability / bench list Allocation vs time log comparison endpoint
+2 weeks
+5
+Time Logging & Notifications
+Time log CRUD APIs Weekly time summary report In-app notification system SLA breach detection scheduled job (15 min) Email notification via Spring Mail Notification page + bell icon with unread count
+2 weeks
+6
+Reporting & Dashboards
+Dashboard stats API SLA compliance report Sprint velocity chart data Burndown chart data Project health RAG history Resource utilisation report Audit log API and admin page
+2 weeks
+7
+Polish & Deploy
+Docker production Compose with Nginx GitHub Actions CI pipeline Swagger / OpenAPI documentation Unit test coverage ≥ 80% on services Integration tests for all API endpoints Frontend E2E tests (Playwright) Performance testing and query optimisation
+2 weeks
+14. Project Folder Structure
+14.1 Spring Boot Backend
+The following package structure maps each module to its responsibilities:
+Backend Package Layout
+nexus-pm-backend/
+├── src/main/java/com/nexuspm/
+│   ├── NexusPmApplication.java
+│   ├── auth/
+│   │   ├── AuthController.java
+│   │   ├── AuthService.java
+│   │   ├── JwtService.java
+│   │   ├── JwtAuthenticationFilter.java
+│   │   ├── SecurityConfig.java
+│   │   ├── dto/ (LoginRequest, TokenResponse, RefreshRequest)
+│   │   └── entity/ (UserAuth, RefreshToken)
+│   ├── user/
+│   │   ├── EmployeeController.java
+│   │   ├── EmployeeService.java
+│   │   ├── EmployeeRepository.java
+│   │   ├── dto/ (CreateEmployeeRequest, EmployeeResponse)
+│   │   ├── entity/ (Employee, Role, Department, Designation)
+│   │   └── mapper/ (EmployeeMapper.java)
+│   ├── project/  [same structure per module]
+│   ├── release/
+│   ├── sprint/
+│   ├── issue/
+│   ├── task/
+│   ├── resource/
+│   ├── timelog/
+│   ├── notification/
+│   ├── report/
+│   ├── admin/
+│   └── shared/
+│       ├── exception/ (GlobalExceptionHandler, BusinessException)
+│       ├── audit/ (AuditableEntity, AuditLogService)
+│       └── config/ (RedisConfig, OpenApiConfig, SchedulerConfig)
+├── src/main/resources/
+│   ├── application.yml
+│   ├── application-dev.yml
+│   ├── application-prod.yml
+│   └── db/changelog/ (Liquibase XMLs)
+├── src/test/  [mirrors main structure]
+├── Dockerfile
+└── pom.xml
+14.2 React Frontend
+Frontend Folder Layout
+nexus-pm-frontend/
+├── src/
+│   ├── main.tsx
+│   ├── App.tsx
+│   ├── router/
+│   │   ├── index.tsx          (route definitions)
+│   │   └── ProtectedRoute.tsx  (role-based guard)
+│   ├── pages/
+│   │   ├── Login/
+│   │   ├── Dashboard/
+│   │   ├── Projects/
+│   │   ├── ProjectDetail/
+│   │   ├── Issues/
+│   │   ├── IssueDetail/
+│   │   ├── Resources/
+│   │   ├── Team/
+│   │   ├── Sprints/
+│   │   ├── TimeLog/
+│   │   ├── Reports/
+│   │   ├── Notifications/
+│   │   └── Admin/
+│   ├── components/
+│   │   ├── AllocationBar/
+│   │   ├── IssueCard/
+│   │   ├── StatusPill/
+│   │   ├── PriorityBadge/
+│   │   ├── SLACountdown/
+│   │   ├── RAGIndicator/
+│   │   ├── DataTable/
+│   │   ├── CommentThread/
+│   │   └── layout/ (Sidebar, Topbar, PageShell)
+│   ├── store/
+│   │   ├── useAuthStore.ts
+│   │   └── useUIStore.ts
+│   ├── hooks/
+│   │   ├── useProjects.ts
+│   │   ├── useIssues.ts
+│   │   ├── useAllocation.ts
+│   │   └── useTeam.ts
+│   ├── api/
+│   │   ├── axios.ts           (instance + interceptors)
+│   │   ├── auth.api.ts
+│   │   ├── projects.api.ts
+│   │   ├── issues.api.ts
+│   │   └── allocation.api.ts
+│   ├── types/
+│   │   └── index.ts           (all TypeScript interfaces)
+│   └── utils/
+│       ├── sla.ts             (SLA calculation helpers)
+│       ├── date.ts
+│       └── format.ts
+├── index.html
+├── vite.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+└── package.json
+15. Future SaaS Readiness
+Although this delivery is a single-tenant system, the architecture has been designed to be SaaS-ready. The following decisions have been made now to minimise the cost of the SaaS migration when the time comes:
+Decision Made Now
+Future SaaS Benefit
+UUID primary keys on all tables
+No integer collision when merging tenant data
+Shared module boundaries
+Modules can be extracted to microservices per tenant load
+Stateless JWT auth
+Multiple API instances share no session state — horizontal scale is trivial
+Redis for blacklisting
+Shared Redis supports multi-instance deployment with no changes
+Liquibase for migrations
+Changelogs run per schema for schema-per-tenant SaaS model
+Environment-based config
+application-prod.yml injects secrets from environment — no code changes for SaaS deploy
+Audit log on all mutations
+Already compliant with SOC 2 audit trail requirements
+Role system is table-driven
+New TENANT_ADMIN role added to DB without code changes
+Module-level service interfaces
+Adding TenantContext threading to each service interface is a contained change
+When SaaS migration is initiated, the primary code changes will be: (1) add tenant_id CHAR(36) to all 39 tables via Liquibase, (2) implement TenantContext + TenantResolutionFilter, (3) add Hibernate @FilterDef on all entities, (4) add TENANT table and provisioning service, (5) add Stripe billing module. All business logic remains unchanged.
+16. Appendix
+16.1 Default Seed Data
+The following reference data is seeded by Liquibase on first run:
+Priorities
+Label
+Level
+SLA Response (hrs)
+SLA Resolve (hrs)
+Colour
+Critical
+1
+1
+4
+#E24B4A
+High
+2
+4
+24
+#BA7517
+Medium
+3
+8
+72
+#185FA5
+Low
+4
+24
+240 (10 days)
+#888780
+Issue Statuses
+Name
+Sequence
+Terminal?
+Colour
+Open
+1
+No
+#888780
+In Progress
+2
+No
+#185FA5
+In Review
+3
+No
+#534AB7
+Resolved
+4
+No
+#3B6D11
+Closed
+5
+Yes
+#0F6E56
+Rejected
+6
+Yes
+#A32D2D
+Deferred
+7
+Yes
+#854F0B
+Issue Types
+Name
+Workflow Code
+Description
+Bug
+BUG
+A defect or unexpected behaviour in the system
+Feature
+FEATURE
+A new capability requested by the client
+Change Request
+CHANGE
+A modification to existing agreed scope
+Task
+TASK
+An internal technical task not tied to client scope
+Improvement
+IMPROVE
+Enhancement to existing functionality
+16.2 Revision History
+Version
+Date
+Author
+Changes
+1.0
+June 2025
+Nexus PM Team
+Initial specification — complete first draft covering all epics, use cases, architecture and API design
+1.1
+June 2025
+Nexus PM Team
+Added US-06-07 (project-level utilisation drill-down) and US-09-01 (theme toggle); added UC-04 (project resource utilisation); added new section 11 "UI/UX Design & Interactive Prototype" documenting dark/light theming and the project detail resource utilisation view; added /projects/{id}/utilisation API endpoint; renumbered sections 11-15 to 12-16

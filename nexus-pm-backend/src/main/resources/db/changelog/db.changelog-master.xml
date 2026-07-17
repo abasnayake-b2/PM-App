@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <include file="db/changelog/changes/001-schema.xml"/>
+    <include file="db/changelog/changes/002-seed-data.xml"/>
+    <include file="db/changelog/changes/003-project-product.xml"/>
+    <include file="db/changelog/changes/004-trim-issue-types.xml"/>
+    <include file="db/changelog/changes/005-issue-parent.xml"/>
+    <include file="db/changelog/changes/006-rd-issue-statuses.xml"/>
+    <include file="db/changelog/changes/007-password-changed-at.xml"/>
+    <include file="db/changelog/changes/008-rbac-permissions.xml"/>
+    <include file="db/changelog/changes/009-skill.xml"/>
+    <include file="db/changelog/changes/010-employee-skills-experience.xml"/>
+    <include file="db/changelog/changes/011-audit-user-columns.xml"/>
+    <include file="db/changelog/changes/012-drop-project-vp-management.xml"/>
+    <include file="db/changelog/changes/013-permission-menu-labels.xml"/>
+    <include file="db/changelog/changes/014-issue-custom-fields.xml"/>
+    <include file="db/changelog/changes/015-employee-profile-picture.xml"/>
+
+</databaseChangeLog>

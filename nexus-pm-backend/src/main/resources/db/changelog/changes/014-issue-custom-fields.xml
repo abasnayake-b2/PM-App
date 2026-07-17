@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="014-issue-custom-fields-tables" author="dfnpm">
+    <preConditions onFail="MARK_RAN">
+      <not><tableExists tableName="issue_field_definition"/></not>
+    </preConditions>
+    <sql>
+      CREATE TABLE issue_field_definition (
+          id              CHAR(36)     NOT NULL PRIMARY KEY,
+          field_key       VARCHAR(80)  NOT NULL,
+          label           VARCHAR(120) NOT NULL,
+          data_type       VARCHAR(20)  NOT NULL,
+          max_length      INT          NULL,
+          required        TINYINT(1)   NOT NULL DEFAULT 0,
+          active          TINYINT(1)   NOT NULL DEFAULT 1,
+          system_field    TINYINT(1)   NOT NULL DEFAULT 0,
+          section_code    VARCHAR(40)  NULL,
+          display_order   INT          NOT NULL DEFAULT 0,
+          options_json    TEXT         NULL,
+          help_text       VARCHAR(255) NULL,
+          created_by      CHAR(36)     NULL,
+          updated_by      CHAR(36)     NULL,
+          created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_issue_field_key (field_key),
+          KEY idx_issue_field_order (active, display_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+      CREATE TABLE issue_field_value (
+          id                   CHAR(36)      NOT NULL PRIMARY KEY,
+          issue_id             CHAR(36)      NOT NULL,
+          field_definition_id  CHAR(36)      NOT NULL,
+          value_text           TEXT          NULL,
+          value_number         DECIMAL(14,2) NULL,
+          value_date           DATE          NULL,
+          value_bool           TINYINT(1)    NULL,
+          created_by           CHAR(36)      NULL,
+          updated_by           CHAR(36)      NULL,
+          created_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_issue_field_value (issue_id, field_definition_id),
+          CONSTRAINT fk_ifv_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE,
+          CONSTRAINT fk_ifv_def   FOREIGN KEY (field_definition_id) REFERENCES issue_field_definition(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    </sql>
+  </changeSet>
+
+  <changeSet id="014-issue-custom-fields-seed" author="dfnpm">
+    <preConditions onFail="MARK_RAN">
+      <sqlCheck expectedResult="0">SELECT COUNT(*) FROM issue_field_definition</sqlCheck>
+    </preConditions>
+    <sql>
+      INSERT INTO issue_field_definition
+      (id, field_key, label, data_type, max_length, required, active, system_field, section_code, display_order, options_json)
+      VALUES
+      ('c1000001-0000-0000-0000-000000000001', 'sow', 'SOW', 'TEXT', 255, 0, 1, 1, 'GENERAL', 10, NULL),
+      ('c1000001-0000-0000-0000-000000000002', 'covered_in_existing_resources', 'Covered in Existing Resources', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 20, '["Yes","No"]'),
+      ('c1000001-0000-0000-0000-000000000003', 'major_cr', 'Major CR', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 30, '["Yes","No"]'),
+      ('c1000001-0000-0000-0000-000000000004', 'delivery_quarter', 'Delivery Quarter', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 40, '["Q1","Q2","Q3","Q4"]'),
+      ('c1000001-0000-0000-0000-000000000005', 'delivery_year', 'Delivery Year', 'YEAR', NULL, 0, 1, 1, 'GENERAL', 50, NULL),
+      ('c1000001-0000-0000-0000-000000000006', 'percentage_completion', 'Percentage Completion', 'TEXT', 50, 0, 1, 1, 'GENERAL', 60, NULL),
+      ('c1000001-0000-0000-0000-000000000010', 'requirement_initiated_date', 'Requirement Initiated Date', 'DATE', NULL, 0, 1, 1, 'DATES', 110, NULL),
+      ('c1000001-0000-0000-0000-000000000011', 'brd_requested_date', 'BRD Requested Date', 'DATE', NULL, 0, 1, 1, 'DATES', 120, NULL),
+      ('c1000001-0000-0000-0000-000000000012', 'brd_received_date', 'BRD Received Date', 'DATE', NULL, 0, 1, 1, 'DATES', 130, NULL),
+      ('c1000001-0000-0000-0000-000000000013', 'ba_ballpark_effort', 'BA Ballpark Effort', 'NUMBER', NULL, 0, 1, 1, 'DATES', 140, NULL),
+      ('c1000001-0000-0000-0000-000000000014', 'bp_effort_eta', 'BP Effort ETA', 'DATE', NULL, 0, 1, 1, 'DATES', 150, NULL),
+      ('c1000001-0000-0000-0000-000000000015', 'bp_effort', 'BP Effort', 'NUMBER', NULL, 0, 1, 1, 'DATES', 160, NULL),
+      ('c1000001-0000-0000-0000-000000000016', 'bp_effort_accepted_date', 'BP Effort Accepted Date', 'DATE', NULL, 0, 1, 1, 'DATES', 170, NULL),
+      ('c1000001-0000-0000-0000-000000000017', 'total_effort_eta', 'Total Effort ETA', 'DATE', NULL, 0, 1, 1, 'DATES', 180, NULL),
+      ('c1000001-0000-0000-0000-000000000018', 'rd_start_date', 'RD Start Date', 'DATE', NULL, 0, 1, 1, 'DATES', 190, NULL),
+      ('c1000001-0000-0000-0000-000000000019', 'rd_delivery_eta', 'RD Delivery ETA', 'DATE', NULL, 0, 1, 1, 'DATES', 200, NULL),
+      ('c1000001-0000-0000-0000-000000000020', 'rd_sign_off_date', 'RD Sign Off Date', 'DATE', NULL, 0, 1, 1, 'DATES', 210, NULL),
+      ('c1000001-0000-0000-0000-000000000030', 'costing_done', 'Costing Done?', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 310, '["Yes","No","Pending","Onhold"]'),
+      ('c1000001-0000-0000-0000-000000000031', 'quote_done', 'Quote Done?', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 320, '["Yes","No"]'),
+      ('c1000001-0000-0000-0000-000000000032', 'quotation', 'Quotation', 'NUMBER', NULL, 0, 1, 1, 'FINANCIALS', 330, NULL),
+      ('c1000001-0000-0000-0000-000000000033', 'quotation_shared_date', 'Quotation Shared Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 340, NULL),
+      ('c1000001-0000-0000-0000-000000000034', 'quotation_approved_date', 'Quotation Approved Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 350, NULL),
+      ('c1000001-0000-0000-0000-000000000035', 'deal_desk_approval_status', 'Deal Desk Approval Status', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 360, '["Approved","Not Approved","Reject"]'),
+      ('c1000001-0000-0000-0000-000000000036', 'payment_status', 'Payment Status', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 370, '["Open","Completed"]'),
+      ('c1000001-0000-0000-0000-000000000040', 'md_planned', 'Man-days Planned', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 410, NULL),
+      ('c1000001-0000-0000-0000-000000000041', 'md_additional', 'Man-days Additional', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 420, NULL),
+      ('c1000001-0000-0000-0000-000000000042', 'md_total', 'Man-days Total', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 430, NULL),
+      ('c1000001-0000-0000-0000-000000000043', 'md_actually_utilized', 'Man-days Actually Utilized', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 440, NULL),
+      ('c1000001-0000-0000-0000-000000000044', 'md_remaining', 'Man-days Remaining', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 450, NULL),
+      ('c1000001-0000-0000-0000-000000000050', 'dev_start_date', 'Dev Start Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 510, NULL),
+      ('c1000001-0000-0000-0000-000000000051', 'dev_end_date', 'Dev End Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 520, NULL),
+      ('c1000001-0000-0000-0000-000000000052', 'sit_start_date', 'SIT Start Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 530, NULL),
+      ('c1000001-0000-0000-0000-000000000053', 'sit_end_date', 'SIT End Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 540, NULL),
+      ('c1000001-0000-0000-0000-000000000054', 'uat_start_date', 'UAT Start Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 550, NULL),
+      ('c1000001-0000-0000-0000-000000000055', 'uat_end_date', 'UAT End Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 560, NULL),
+      ('c1000001-0000-0000-0000-000000000056', 'prod_date', 'Prod Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 570, NULL),
+      ('c1000001-0000-0000-0000-000000000060', 'risk_description', 'Risk Description', 'TEXT', 2000, 0, 1, 1, 'RISK', 610, NULL),
+      ('c1000001-0000-0000-0000-000000000061', 'risk_created_date', 'Risk Created Date', 'DATE', NULL, 0, 1, 1, 'RISK', 620, NULL),
+      ('c1000001-0000-0000-0000-000000000062', 'risk_owner', 'Risk Owner', 'TEXT', 120, 0, 1, 1, 'RISK', 630, NULL),
+      ('c1000001-0000-0000-0000-000000000063', 'risk_status', 'Risk Status', 'DROPDOWN', NULL, 0, 1, 1, 'RISK', 640, '["Open","Closed","Hold","Rejected"]'),
+      ('c1000001-0000-0000-0000-000000000064', 'risk_impact', 'Risk Impact', 'DROPDOWN', NULL, 0, 1, 1, 'RISK', 650, '["Low","Mid","High"]'),
+      ('c1000001-0000-0000-0000-000000000065', 'risk_closed_date', 'Risk Closed Date', 'DATE', NULL, 0, 1, 1, 'RISK', 660, NULL),
+      ('c1000001-0000-0000-0000-000000000066', 'risk_mitigation', 'Risk Mitigation', 'TEXT', 2000, 0, 1, 1, 'RISK', 670, NULL),
+      ('c1000001-0000-0000-0000-000000000070', 'notes', 'Notes', 'TEXT', 4000, 0, 1, 1, 'OTHER', 710, NULL);
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

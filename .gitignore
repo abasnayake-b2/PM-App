@@ -1,0 +1,35 @@
+# Backend
+nexus-pm-backend/target/
+nexus-pm-backend/.mvn/wrapper/maven-wrapper.jar
+nexus-pm-backend/keys/*.pem
+!nexus-pm-backend/keys/.gitkeep
+nexus-pm-backend/logs/
+nexus-pm-backend/Pic/
+nexus-pm-backend/src/main/resources/application-local.yml
+logs/
+Pic/
+
+# Frontend
+nexus-pm-frontend/node_modules/
+nexus-pm-frontend/dist/
+nexus-pm-frontend/.env.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# SQL recovery / temp dumps
+sql/_recovery_tmp/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+data/

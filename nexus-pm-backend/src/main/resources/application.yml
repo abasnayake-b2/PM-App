@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: dfn-planix
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:dfn_pm}?useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY:true}&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: ${MAX_UPLOAD_SIZE:10MB}
+      max-request-size: ${MAX_UPLOAD_SIZE:10MB}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        type:
+          preferred_uuid_jdbc_type: CHAR
+  liquibase:
+    enabled: false
+    change-log: classpath:db/changelog/db.changelog-master.xml
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+dfnpm:
+  jwt:
+    private-key-path: ${JWT_PRIVATE_KEY_PATH:classpath:keys/private.pem}
+    public-key-path: ${JWT_PUBLIC_KEY_PATH:classpath:keys/public.pem}
+    access-token-ttl-minutes: 15
+    refresh-token-ttl-days: 7
+    require-persistent-keys: false
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  app:
+    base-url: ${APP_BASE_URL:http://localhost:5173}
+    password-reset-ttl-hours: 1
+    max-failed-login-attempts: 5
+    password-max-age-days: 90
+  security:
+    swagger-enabled: ${SWAGGER_ENABLED:true}
+    cookie-secure: ${COOKIE_SECURE:false}
+    cookie-same-site: ${COOKIE_SAME_SITE:Lax}
+    redis-enabled: ${REDIS_ENABLED:true}
+    rate-limit-enabled: ${RATE_LIMIT_ENABLED:true}
+    max-upload-bytes: ${MAX_UPLOAD_BYTES:10485760}
+    login-rate-limit:
+      max-requests: ${LOGIN_RATE_LIMIT_MAX:10}
+      window-seconds: ${LOGIN_RATE_LIMIT_WINDOW:60}
+    password-reset-rate-limit:
+      max-requests: ${PASSWORD_RESET_RATE_LIMIT_MAX:5}
+      window-seconds: ${PASSWORD_RESET_RATE_LIMIT_WINDOW:3600}
+  storage:
+    pic-dir: ${PIC_DIR:Pic}
+    max-pic-bytes: ${MAX_PIC_BYTES:2097152}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    enabled: ${dfnpm.security.swagger-enabled}
+    path: /api-docs
+  swagger-ui:
+    enabled: ${dfnpm.security.swagger-enabled}
+    path: /swagger-ui.html
+
+logging:
+  file:
+    name: ${LOG_FILE:logs/dfn-pm-api.log}
+  logback:
+    rollingpolicy:
+      max-file-size: ${LOG_MAX_FILE_SIZE:10MB}
+      max-history: ${LOG_MAX_HISTORY:30}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:1GB}
+  level:
+    com.nexuspm: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.hibernate.type.descriptor.sql: WARN

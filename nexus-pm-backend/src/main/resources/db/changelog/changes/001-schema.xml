@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="001-geography" author="dfnpm">
+    <createTable tableName="region">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="code" type="VARCHAR(10)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="country">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="region_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_country_region" references="region(id)"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="code" type="VARCHAR(10)"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="002-org-lookup" author="dfnpm">
+    <createTable tableName="department">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="designation">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="role">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(50)"><constraints nullable="false" unique="true"/></column>
+      <column name="code" type="VARCHAR(30)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="permission">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="code" type="VARCHAR(50)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="role_permission">
+      <column name="role_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_rp_role" references="role(id)"/></column>
+      <column name="permission_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_rp_permission" references="permission(id)"/></column>
+    </createTable>
+    <addPrimaryKey tableName="role_permission" columnNames="role_id, permission_id"/>
+  </changeSet>
+
+  <changeSet id="003-employee" author="dfnpm">
+    <createTable tableName="employee">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="email" type="VARCHAR(255)"><constraints nullable="false" unique="true"/></column>
+      <column name="first_name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="last_name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="department_id" type="CHAR(36)"><constraints foreignKeyName="fk_employee_dept" references="department(id)"/></column>
+      <column name="designation_id" type="CHAR(36)"><constraints foreignKeyName="fk_employee_designation" references="designation(id)"/></column>
+      <column name="manager_id" type="CHAR(36)"/>
+      <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE"><constraints nullable="false"/></column>
+      <column name="bench_status" type="VARCHAR(20)" defaultValue="ASSIGNED"/>
+      <column name="available_from" type="DATE"/>
+      <column name="version" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <addForeignKeyConstraint baseTableName="employee" baseColumnNames="manager_id"
+                             referencedTableName="employee" referencedColumnNames="id"
+                             constraintName="fk_employee_manager"/>
+    <createTable tableName="employee_role">
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_er_employee" references="employee(id)"/></column>
+      <column name="role_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_er_role" references="role(id)"/></column>
+    </createTable>
+    <addPrimaryKey tableName="employee_role" columnNames="employee_id, role_id"/>
+    <createTable tableName="employee_leave">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_leave_employee" references="employee(id)"/></column>
+      <column name="from_date" type="DATE"><constraints nullable="false"/></column>
+      <column name="to_date" type="DATE"><constraints nullable="false"/></column>
+      <column name="leave_type" type="VARCHAR(30)"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="knowledge">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="employee_knowledge">
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_ek_employee" references="employee(id)"/></column>
+      <column name="knowledge_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_ek_knowledge" references="knowledge(id)"/></column>
+      <column name="proficiency" type="VARCHAR(20)"/>
+    </createTable>
+    <addPrimaryKey tableName="employee_knowledge" columnNames="employee_id, knowledge_id"/>
+  </changeSet>
+
+  <changeSet id="004-auth" author="dfnpm">
+    <createTable tableName="user_auth">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" unique="true" foreignKeyName="fk_auth_employee" references="employee(id)"/></column>
+      <column name="password_hash" type="VARCHAR(255)"><constraints nullable="false"/></column>
+      <column name="failed_attempts" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+      <column name="locked_until" type="TIMESTAMP"/>
+      <column name="active" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="refresh_token">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_rt_employee" references="employee(id)"/></column>
+      <column name="token_hash" type="VARCHAR(64)"><constraints nullable="false" unique="true"/></column>
+      <column name="expires_at" type="TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="revoked" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="password_reset_token">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_prt_employee" references="employee(id)"/></column>
+      <column name="token_hash" type="VARCHAR(64)"><constraints nullable="false" unique="true"/></column>
+      <column name="expires_at" type="TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="used" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="005-client-project" author="dfnpm">
+    <createTable tableName="client">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="country_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_client_country" references="country(id)"/></column>
+      <column name="name" type="VARCHAR(200)"><constraints nullable="false"/></column>
+      <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="project">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="client_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_project_client" references="client(id)"/></column>
+      <column name="name" type="VARCHAR(200)"><constraints nullable="false"/></column>
+      <column name="lead_employee_id" type="CHAR(36)"><constraints foreignKeyName="fk_project_lead" references="employee(id)"/></column>
+      <column name="architect_employee_id" type="CHAR(36)"><constraints foreignKeyName="fk_project_architect" references="employee(id)"/></column>
+      <column name="vp_management_id" type="CHAR(36)"><constraints foreignKeyName="fk_project_vp" references="team_management(id)"/></column>
+      <column name="engineering_manager_management_id" type="CHAR(36)"><constraints foreignKeyName="fk_project_em" references="team_management(id)"/></column>
+      <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE"><constraints nullable="false"/></column>
+      <column name="rag_status" type="VARCHAR(10)" defaultValue="GREEN"/>
+      <column name="progress_pct" type="INT" defaultValueNumeric="0"/>
+      <column name="start_date" type="DATE"/>
+      <column name="end_date" type="DATE"/>
+      <column name="archived" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="version" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="budget">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="project_id" type="CHAR(36)"><constraints nullable="false" unique="true" foreignKeyName="fk_budget_project" references="project(id)"/></column>
+      <column name="amount" type="DECIMAL(15,2)"/>
+      <column name="currency" type="VARCHAR(3)" defaultValue="USD"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="project_access">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="project_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_pa_project" references="project(id)"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_pa_employee" references="employee(id)"/></column>
+      <column name="access_level" type="VARCHAR(20)" defaultValue="VIEW"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <addUniqueConstraint tableName="project_access" columnNames="project_id, employee_id"/>
+    <createTable tableName="project_health_log">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="project_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_phl_project" references="project(id)"/></column>
+      <column name="rag_status" type="VARCHAR(10)"><constraints nullable="false"/></column>
+      <column name="notes" type="TEXT"/>
+      <column name="changed_by" type="CHAR(36)"><constraints foreignKeyName="fk_phl_employee" references="employee(id)"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="006-delivery-lookup" author="dfnpm">
+    <createTable tableName="priority">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="label" type="VARCHAR(30)"><constraints nullable="false" unique="true"/></column>
+      <column name="level" type="INT"><constraints nullable="false"/></column>
+      <column name="sla_response_hrs" type="INT"><constraints nullable="false"/></column>
+      <column name="sla_resolve_hrs" type="INT"><constraints nullable="false"/></column>
+      <column name="colour" type="VARCHAR(10)"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="issue_type">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(50)"><constraints nullable="false" unique="true"/></column>
+      <column name="workflow_code" type="VARCHAR(30)"><constraints nullable="false"/></column>
+      <column name="description" type="VARCHAR(255)"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="issue_status">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(50)"><constraints nullable="false" unique="true"/></column>
+      <column name="sequence" type="INT"><constraints nullable="false"/></column>
+      <column name="terminal" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="colour" type="VARCHAR(10)"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="product">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false" unique="true"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="release">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="project_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_release_project" references="project(id)"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="version" type="VARCHAR(50)"/>
+      <column name="status" type="VARCHAR(20)" defaultValue="PLANNED"><constraints nullable="false"/></column>
+      <column name="target_date" type="DATE"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="sprint">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="release_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_sprint_release" references="release(id)"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="status" type="VARCHAR(20)" defaultValue="PLANNED"><constraints nullable="false"/></column>
+      <column name="start_date" type="DATE"/>
+      <column name="end_date" type="DATE"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="007-issues-tasks" author="dfnpm">
+    <createTable tableName="rd_issue">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="release_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_issue_release" references="release(id)"/></column>
+      <column name="sprint_id" type="CHAR(36)"><constraints foreignKeyName="fk_issue_sprint" references="sprint(id)"/></column>
+      <column name="title" type="VARCHAR(255)"><constraints nullable="false"/></column>
+      <column name="description" type="TEXT"/>
+      <column name="issue_type_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_issue_type" references="issue_type(id)"/></column>
+      <column name="priority_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_issue_priority" references="priority(id)"/></column>
+      <column name="status_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_issue_status" references="issue_status(id)"/></column>
+      <column name="reported_by" type="CHAR(36)"><constraints foreignKeyName="fk_issue_reporter" references="employee(id)"/></column>
+      <column name="assigned_to" type="CHAR(36)"><constraints foreignKeyName="fk_issue_assignee" references="employee(id)"/></column>
+      <column name="sla_due_at" type="TIMESTAMP"/>
+      <column name="sla_status" type="VARCHAR(20)" defaultValue="WITHIN"/>
+      <column name="version" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="task">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="issue_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_task_issue" references="rd_issue(id)"/></column>
+      <column name="title" type="VARCHAR(255)"><constraints nullable="false"/></column>
+      <column name="description" type="TEXT"/>
+      <column name="assigned_to" type="CHAR(36)"><constraints foreignKeyName="fk_task_assignee" references="employee(id)"/></column>
+      <column name="status_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_task_status" references="issue_status(id)"/></column>
+      <column name="version" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="issue_link">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="source_issue_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_il_source" references="rd_issue(id)"/></column>
+      <column name="target_issue_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_il_target" references="rd_issue(id)"/></column>
+      <column name="link_type" type="VARCHAR(30)"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="task_dependency">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="task_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_td_task" references="task(id)"/></column>
+      <column name="depends_on_task_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_td_depends" references="task(id)"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="comment">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="issue_id" type="CHAR(36)"><constraints foreignKeyName="fk_comment_issue" references="rd_issue(id)"/></column>
+      <column name="task_id" type="CHAR(36)"><constraints foreignKeyName="fk_comment_task" references="task(id)"/></column>
+      <column name="author_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_comment_author" references="employee(id)"/></column>
+      <column name="body" type="TEXT"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="attachment">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="issue_id" type="CHAR(36)"><constraints foreignKeyName="fk_attach_issue" references="rd_issue(id)"/></column>
+      <column name="task_id" type="CHAR(36)"><constraints foreignKeyName="fk_attach_task" references="task(id)"/></column>
+      <column name="uploaded_by" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_attach_uploader" references="employee(id)"/></column>
+      <column name="file_name" type="VARCHAR(255)"><constraints nullable="false"/></column>
+      <column name="file_path" type="VARCHAR(500)"><constraints nullable="false"/></column>
+      <column name="file_size" type="BIGINT"><constraints nullable="false"/></column>
+      <column name="content_type" type="VARCHAR(100)"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="sla_breach_log">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="issue_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_sbl_issue" references="rd_issue(id)"/></column>
+      <column name="breach_mins" type="INT"><constraints nullable="false"/></column>
+      <column name="breached_at" type="TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="008-resource-activity" author="dfnpm">
+    <createTable tableName="allocation">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_alloc_employee" references="employee(id)"/></column>
+      <column name="project_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_alloc_project" references="project(id)"/></column>
+      <column name="role_on_project" type="VARCHAR(50)"/>
+      <column name="percentage" type="INT"><constraints nullable="false"/></column>
+      <column name="from_date" type="DATE"><constraints nullable="false"/></column>
+      <column name="to_date" type="DATE"/>
+      <column name="billable" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+      <column name="version" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="allocation_snapshot">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_as_employee" references="employee(id)"/></column>
+      <column name="project_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_as_project" references="project(id)"/></column>
+      <column name="week_start" type="DATE"><constraints nullable="false"/></column>
+      <column name="percentage" type="INT"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="time_log">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_tl_employee" references="employee(id)"/></column>
+      <column name="task_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_tl_task" references="task(id)"/></column>
+      <column name="log_date" type="DATE"><constraints nullable="false"/></column>
+      <column name="hours" type="DECIMAL(5,2)"><constraints nullable="false"/></column>
+      <column name="notes" type="TEXT"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="notification">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints nullable="false" foreignKeyName="fk_notif_employee" references="employee(id)"/></column>
+      <column name="title" type="VARCHAR(200)"><constraints nullable="false"/></column>
+      <column name="body" type="TEXT"/>
+      <column name="type" type="VARCHAR(50)"/>
+      <column name="read_flag" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="audit_log">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="employee_id" type="CHAR(36)"><constraints foreignKeyName="fk_audit_employee" references="employee(id)"/></column>
+      <column name="action" type="VARCHAR(30)"><constraints nullable="false"/></column>
+      <column name="entity_type" type="VARCHAR(50)"><constraints nullable="false"/></column>
+      <column name="entity_id" type="CHAR(36)"/>
+      <column name="details" type="TEXT"/>
+      <column name="ip_address" type="VARCHAR(45)"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="009-config" author="dfnpm">
+    <createTable tableName="holiday_calendar">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+      <column name="holiday_date" type="DATE"><constraints nullable="false"/></column>
+      <column name="country_id" type="CHAR(36)"><constraints foreignKeyName="fk_holiday_country" references="country(id)"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="workflow_rule">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="issue_type_id" type="CHAR(36)"><constraints foreignKeyName="fk_wr_type" references="issue_type(id)"/></column>
+      <column name="from_status_id" type="CHAR(36)"><constraints foreignKeyName="fk_wr_from" references="issue_status(id)"/></column>
+      <column name="to_status_id" type="CHAR(36)"><constraints foreignKeyName="fk_wr_to" references="issue_status(id)"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="notification_template">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="code" type="VARCHAR(50)"><constraints nullable="false" unique="true"/></column>
+      <column name="subject" type="VARCHAR(200)"><constraints nullable="false"/></column>
+      <column name="body_template" type="TEXT"><constraints nullable="false"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+    <createTable tableName="system_settings">
+      <column name="id" type="CHAR(36)"><constraints primaryKey="true"/></column>
+      <column name="setting_key" type="VARCHAR(100)"><constraints nullable="false" unique="true"/></column>
+      <column name="setting_value" type="TEXT"/>
+      <column name="updated_by" type="CHAR(36)"><constraints foreignKeyName="fk_ss_employee" references="employee(id)"/></column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+
+</databaseChangeLog>

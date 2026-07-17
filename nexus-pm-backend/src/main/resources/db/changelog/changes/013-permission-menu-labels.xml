@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <!-- Align permission display names with current nav menus; ensure Org structure exists. -->
+  <changeSet id="013-permission-menu-labels" author="dfnpm">
+    <sql>
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000041', 'Org structure — View', 'ORG_STRUCTURE_VIEW', 'ORG_STRUCTURE', 'VIEW'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'ORG_STRUCTURE_VIEW');
+
+      UPDATE permission SET name = 'User accounts — View' WHERE code = 'USERS_VIEW';
+      UPDATE permission SET name = 'User accounts — Create' WHERE code = 'USERS_CREATE';
+      UPDATE permission SET name = 'User accounts — Update' WHERE code = 'USERS_UPDATE';
+      UPDATE permission SET name = 'User accounts — Delete' WHERE code = 'USERS_DELETE';
+
+      UPDATE permission SET name = 'Projects — View' WHERE code = 'PROJECTS_VIEW';
+      UPDATE permission SET name = 'Projects — Create' WHERE code = 'PROJECTS_CREATE';
+      UPDATE permission SET name = 'Projects — Update' WHERE code = 'PROJECTS_UPDATE';
+      UPDATE permission SET name = 'Projects — Delete' WHERE code = 'PROJECTS_DELETE';
+
+      UPDATE permission SET name = 'Main Backlog — View' WHERE code = 'ISSUES_VIEW';
+      UPDATE permission SET name = 'Main Backlog — Create' WHERE code = 'ISSUES_CREATE';
+      UPDATE permission SET name = 'Main Backlog — Update' WHERE code = 'ISSUES_UPDATE';
+      UPDATE permission SET name = 'Main Backlog — Delete' WHERE code = 'ISSUES_DELETE';
+
+      UPDATE permission SET name = 'Resource utilization — View' WHERE code = 'ALLOCATIONS_VIEW';
+      UPDATE permission SET name = 'Resource utilization — Create' WHERE code = 'ALLOCATIONS_CREATE';
+      UPDATE permission SET name = 'Resource utilization — Update' WHERE code = 'ALLOCATIONS_UPDATE';
+      UPDATE permission SET name = 'Resource utilization — Delete' WHERE code = 'ALLOCATIONS_DELETE';
+
+      UPDATE permission SET name = 'Dashboard — View' WHERE code = 'REPORTS_VIEW';
+      UPDATE permission SET name = 'Dashboard — Create' WHERE code = 'REPORTS_CREATE';
+      UPDATE permission SET name = 'Dashboard — Update' WHERE code = 'REPORTS_UPDATE';
+      UPDATE permission SET name = 'Dashboard — Delete' WHERE code = 'REPORTS_DELETE';
+
+      UPDATE permission SET name = 'Organisation — View' WHERE code = 'ORGANISATIONS_VIEW';
+      UPDATE permission SET name = 'Organisation — Create' WHERE code = 'ORGANISATIONS_CREATE';
+      UPDATE permission SET name = 'Organisation — Update' WHERE code = 'ORGANISATIONS_UPDATE';
+      UPDATE permission SET name = 'Organisation — Delete' WHERE code = 'ORGANISATIONS_DELETE';
+
+      UPDATE permission SET name = 'Management and employees — View' WHERE code = 'TEAM_VIEW';
+      UPDATE permission SET name = 'Management and employees — Create' WHERE code = 'TEAM_CREATE';
+      UPDATE permission SET name = 'Management and employees — Update' WHERE code = 'TEAM_UPDATE';
+      UPDATE permission SET name = 'Management and employees — Delete' WHERE code = 'TEAM_DELETE';
+
+      UPDATE permission SET name = 'Admin (system) — View' WHERE code = 'ADMIN_VIEW';
+      UPDATE permission SET name = 'Admin (system) — Create' WHERE code = 'ADMIN_CREATE';
+      UPDATE permission SET name = 'Admin (system) — Update' WHERE code = 'ADMIN_UPDATE';
+      UPDATE permission SET name = 'Admin (system) — Delete' WHERE code = 'ADMIN_DELETE';
+
+      UPDATE permission SET name = 'Reference data — View' WHERE code = 'REFERENCE_VIEW';
+      UPDATE permission SET name = 'Reference data — Create' WHERE code = 'REFERENCE_CREATE';
+      UPDATE permission SET name = 'Reference data — Update' WHERE code = 'REFERENCE_UPDATE';
+      UPDATE permission SET name = 'Reference data — Delete' WHERE code = 'REFERENCE_DELETE';
+
+      UPDATE permission SET name = 'Excel import — View' WHERE code = 'IMPORT_VIEW';
+      UPDATE permission SET name = 'Excel import — Run' WHERE code = 'IMPORT_CREATE';
+      UPDATE permission SET name = 'Releases — View' WHERE code = 'RELEASES_VIEW';
+      UPDATE permission SET name = 'Releases — Create' WHERE code = 'RELEASES_CREATE';
+      UPDATE permission SET name = 'Org structure — View' WHERE code = 'ORG_STRUCTURE_VIEW';
+
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT r.id, p.id FROM role r CROSS JOIN permission p
+      WHERE r.code IN ('SUPER_ADMIN', 'ADMIN', 'CXO', 'VP', 'MANAGER')
+        AND p.code = 'ORG_STRUCTURE_VIEW'
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+        );
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="rd-issue-statuses" author="dfnpm">
+    <sql>UPDATE rd_issue SET status_id = '55555555-5555-5555-5555-555555555513'
+         WHERE status_id = '55555555-5555-5555-5555-555555555502'</sql>
+    <sql>UPDATE rd_issue SET status_id = '55555555-5555-5555-5555-555555555516'
+         WHERE status_id = '55555555-5555-5555-5555-555555555503'</sql>
+    <sql>UPDATE rd_issue SET status_id = '55555555-5555-5555-5555-555555555514'
+         WHERE status_id = '55555555-5555-5555-5555-555555555504'</sql>
+    <sql>UPDATE rd_issue SET status_id = '55555555-5555-5555-5555-555555555519'
+         WHERE status_id = '55555555-5555-5555-5555-555555555505'</sql>
+    <sql>UPDATE rd_issue SET status_id = '55555555-5555-5555-5555-555555555520'
+         WHERE status_id = '55555555-5555-5555-5555-555555555506'</sql>
+    <sql>UPDATE rd_issue SET status_id = '55555555-5555-5555-5555-555555555521'
+         WHERE status_id = '55555555-5555-5555-5555-555555555507'</sql>
+    <sql>UPDATE task SET status_id = '55555555-5555-5555-5555-555555555513'
+         WHERE status_id = '55555555-5555-5555-5555-555555555502'</sql>
+    <sql>UPDATE task SET status_id = '55555555-5555-5555-5555-555555555516'
+         WHERE status_id = '55555555-5555-5555-5555-555555555503'</sql>
+    <sql>UPDATE task SET status_id = '55555555-5555-5555-5555-555555555514'
+         WHERE status_id = '55555555-5555-5555-5555-555555555504'</sql>
+    <sql>UPDATE task SET status_id = '55555555-5555-5555-5555-555555555519'
+         WHERE status_id = '55555555-5555-5555-5555-555555555505'</sql>
+    <sql>UPDATE task SET status_id = '55555555-5555-5555-5555-555555555520'
+         WHERE status_id = '55555555-5555-5555-5555-555555555506'</sql>
+    <sql>UPDATE task SET status_id = '55555555-5555-5555-5555-555555555521'
+         WHERE status_id = '55555555-5555-5555-5555-555555555507'</sql>
+    <sql>DELETE FROM workflow_rule</sql>
+    <delete tableName="issue_status"/>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555501"/><column name="name" value="Requirements Initiated"/><column name="sequence" valueNumeric="1"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#888780"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555502"/><column name="name" value="Initial Requirement Gathering"/><column name="sequence" valueNumeric="2"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#8B909A"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555503"/><column name="name" value="Pending BP Effort"/><column name="sequence" valueNumeric="3"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#9AA0AB"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555504"/><column name="name" value="Pending BP Effort Approval"/><column name="sequence" valueNumeric="4"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#A8AEB8"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555505"/><column name="name" value="Ballpark Accepted"/><column name="sequence" valueNumeric="5"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#B6BCC6"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555506"/><column name="name" value="RD Drafting"/><column name="sequence" valueNumeric="6"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#6B7C93"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555507"/><column name="name" value="Pending RD Approval"/><column name="sequence" valueNumeric="7"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#5E7190"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555508"/><column name="name" value="RD Signed Off"/><column name="sequence" valueNumeric="8"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#51668D"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555509"/><column name="name" value="Pending Final Effort"/><column name="sequence" valueNumeric="9"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#445B8A"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555510"/><column name="name" value="Pending Quotation Preparation"/><column name="sequence" valueNumeric="10"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#3D5F96"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555511"/><column name="name" value="Pending Quotation Approval"/><column name="sequence" valueNumeric="11"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#3663A2"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555512"/><column name="name" value="Quotation Approved / Dev not started"/><column name="sequence" valueNumeric="12"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#2F67AE"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555513"/><column name="name" value="Dev in progress"/><column name="sequence" valueNumeric="13"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#185FA5"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555514"/><column name="name" value="Dev Completed"/><column name="sequence" valueNumeric="14"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#2470B8"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555515"/><column name="name" value="SIT Testing"/><column name="sequence" valueNumeric="15"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#3F6FD0"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555516"/><column name="name" value="UAT Testing"/><column name="sequence" valueNumeric="16"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#534AB7"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555517"/><column name="name" value="UAT Signed Off / Pending Production"/><column name="sequence" valueNumeric="17"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#2F8F7A"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555518"/><column name="name" value="In Production"/><column name="sequence" valueNumeric="18"/><column name="terminal" valueBoolean="false"/><column name="colour" value="#1F9D6C"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555519"/><column name="name" value="Completed"/><column name="sequence" valueNumeric="19"/><column name="terminal" valueBoolean="true"/><column name="colour" value="#0F6E56"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555520"/><column name="name" value="Cancelled"/><column name="sequence" valueNumeric="20"/><column name="terminal" valueBoolean="true"/><column name="colour" value="#A32D2D"/></insert>
+    <insert tableName="issue_status"><column name="id" value="55555555-5555-5555-5555-555555555521"/><column name="name" value="On Hold"/><column name="sequence" valueNumeric="21"/><column name="terminal" valueBoolean="true"/><column name="colour" value="#854F0B"/></insert>
+  </changeSet>
+
+</databaseChangeLog>

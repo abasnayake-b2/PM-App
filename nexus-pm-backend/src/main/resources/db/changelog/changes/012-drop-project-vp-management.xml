@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+      VP is derived from project.EM → team_management.supervisor_id.
+      Drop denormalized project.vp_management_id so reparenting an EM moves projects automatically.
+    -->
+    <changeSet id="012-drop-project-vp-management" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="project" columnName="vp_management_id"/>
+        </preConditions>
+        <sql>
+            SET @fk := (
+              SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'project'
+                AND COLUMN_NAME = 'vp_management_id'
+                AND REFERENCED_TABLE_NAME IS NOT NULL
+              LIMIT 1
+            );
+            SET @sql := IF(@fk IS NULL, 'SELECT 1', CONCAT('ALTER TABLE project DROP FOREIGN KEY `', @fk, '`'));
+            PREPARE stmt FROM @sql;
+            EXECUTE stmt;
+            DEALLOCATE PREPARE stmt;
+        </sql>
+        <dropColumn tableName="project" columnName="vp_management_id"/>
+    </changeSet>
+
+</databaseChangeLog>

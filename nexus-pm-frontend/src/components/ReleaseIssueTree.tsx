@@ -1,0 +1,97 @@
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import type { Allocation, Issue } from '@/types';
+import { ResourceAvatar } from '@/components/ResourceAvatar';
+import { issueDisplayKey } from '@/utils/issueUi';
+
+interface ReleaseIssueTreeProps {
+  issues: Issue[];
+  allocations: Allocation[];
+}
+
+export function ReleaseIssueTree({ issues, allocations }: ReleaseIssueTreeProps) {
+  const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
+
+  const allocationsByIssue = useMemo(() => {
+    const map = new Map<string, Allocation[]>();
+    for (const allocation of allocations) {
+      const list = map.get(allocation.issueId) ?? [];
+      list.push(allocation);
+      map.set(allocation.issueId, list);
+    }
+    return map;
+  }, [allocations]);
+
+  const toggleIssue = (issueId: string) => {
+    setExpandedIssues((current) => {
+      const next = new Set(current);
+      if (next.has(issueId)) next.delete(issueId);
+      else next.add(issueId);
+      return next;
+    });
+  };
+
+  if (issues.length === 0) {
+    return <p className="mt-4 text-sm text-text2">No issues in this release yet.</p>;
+  }
+
+  return (
+    <ul className="mt-4 space-y-1">
+      {issues.map((issue) => {
+        const issueAllocations = allocationsByIssue.get(issue.id) ?? [];
+        const issueOpen = expandedIssues.has(issue.id);
+        return (
+          <li key={issue.id} className="rounded-lg border border-border bg-bg3">
+            <button
+              type="button"
+              onClick={() => toggleIssue(issue.id)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg2/50"
+            >
+              {issueOpen ? (
+                <ChevronDown size={14} className="shrink-0 text-text2" />
+              ) : (
+                <ChevronRight size={14} className="shrink-0 text-text2" />
+              )}
+              <span className="font-mono text-xs text-text2">{issueDisplayKey(issue)}</span>
+              <Link
+                to={`/issues/${issue.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-medium hover:text-accent"
+              >
+                {issue.title}
+              </Link>
+              <span className="ml-auto text-xs text-text2">{issue.statusName}</span>
+            </button>
+
+            {issueOpen && (
+              <ul className="border-t border-border px-3 py-2">
+                {issueAllocations.length === 0 ? (
+                  <li className="py-1 text-xs text-text2">No resources allocated</li>
+                ) : (
+                  issueAllocations.map((allocation) => (
+                    <li
+                      key={allocation.id}
+                      className="flex items-center justify-between gap-3 py-1.5 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ResourceAvatar name={allocation.employeeName} size="sm" />
+                        <span>{allocation.employeeName}</span>
+                        {allocation.roleOnProject && (
+                          <span className="text-xs text-text2">· {allocation.roleOnProject}</span>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-xs font-medium tabular-nums text-text2">
+                        {allocation.percentage}%
+                      </span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

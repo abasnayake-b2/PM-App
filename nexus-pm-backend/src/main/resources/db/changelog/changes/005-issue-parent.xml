@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="issue-parent-column" author="dfnpm">
+    <addColumn tableName="rd_issue">
+      <column name="parent_issue_id" type="CHAR(36)"/>
+    </addColumn>
+    <addForeignKeyConstraint
+            baseTableName="rd_issue"
+            baseColumnNames="parent_issue_id"
+            constraintName="fk_issue_parent"
+            referencedTableName="rd_issue"
+            referencedColumnNames="id"/>
+    <createIndex tableName="rd_issue" indexName="idx_issue_parent">
+      <column name="parent_issue_id"/>
+    </createIndex>
+  </changeSet>
+
+</databaseChangeLog>

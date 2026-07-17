@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="010-employee-experience" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="employee"/>
+                <not>
+                    <columnExists tableName="employee" columnName="total_years_of_experience"/>
+                </not>
+            </and>
+        </preConditions>
+        <addColumn tableName="employee">
+            <column name="total_years_of_experience" type="DECIMAL(5,1)"/>
+            <column name="experience_in_dfn" type="DECIMAL(5,1)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="010-employee-skill" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="employee_skill"/>
+            </not>
+        </preConditions>
+        <createTable tableName="employee_skill">
+            <column name="employee_id" type="CHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="skill_id" type="CHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="employee_skill" columnNames="employee_id, skill_id"/>
+        <addForeignKeyConstraint
+                baseTableName="employee_skill"
+                baseColumnNames="employee_id"
+                referencedTableName="employee"
+                referencedColumnNames="id"
+                constraintName="fk_es_employee"/>
+        <addForeignKeyConstraint
+                baseTableName="employee_skill"
+                baseColumnNames="skill_id"
+                referencedTableName="skill"
+                referencedColumnNames="id"
+                constraintName="fk_es_skill"/>
+    </changeSet>
+
+</databaseChangeLog>
