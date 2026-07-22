@@ -54,7 +54,7 @@ export async function downloadRosterExcel(opts: {
   columnWidths?: number[];
 }) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'DFN-PlaniX';
+  workbook.creator = 'DFN-PlanX';
   const sheet = workbook.addWorksheet(opts.sheetName.slice(0, 31), {
     views: [{ showGridLines: false }],
   });

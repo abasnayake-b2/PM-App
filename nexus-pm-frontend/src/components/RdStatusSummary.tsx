@@ -314,7 +314,7 @@ function OwnerGroupsView({
           key={group.title}
           className="overflow-hidden rounded-md border border-border bg-bg2 shadow-sm"
         >
-          <div className="border-b border-border bg-[#E9E7E1] px-3 py-2 text-center text-xs font-semibold text-text">
+          <div className="border-b border-border bg-bg3 px-3 py-2 text-center text-xs font-semibold text-text">
             {group.title}
           </div>
           <table className="w-full border-collapse text-left text-xs">
@@ -349,7 +349,7 @@ function OwnerGroupsView({
                       >
                         <span className="min-w-0 leading-snug">{row.label}</span>
                         <span
-                          className={`shrink-0 rounded border border-border bg-white px-1.5 py-0.5 text-[11px] font-semibold tabular-nums dark:bg-bg3 ${
+                          className={`shrink-0 rounded border border-border bg-bg3 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
                             count > 0 ? 'text-text' : 'text-text2'
                           }`}
                         >
@@ -438,15 +438,15 @@ function StatusCell({
         style={{ background: colour || 'var(--border-strong)' }}
         aria-hidden
       />
-      <span className="flex min-h-[2.75rem] min-w-0 flex-1 flex-col justify-center gap-0.5 bg-[#E9E7E1] px-1.5 py-1.5 dark:bg-bg3">
+      <span className="flex min-h-[2.75rem] min-w-0 flex-1 flex-col justify-center gap-0.5 bg-bg3 px-1.5 py-1.5">
         {step && (
           <span className="text-[9px] font-bold tabular-nums leading-none text-text2">{step}.</span>
         )}
-        <span className="line-clamp-2 text-[10px] font-medium leading-snug text-[#1c1c1c] dark:text-text">
+        <span className="line-clamp-2 text-[10px] font-medium leading-snug text-text">
           {label}
         </span>
       </span>
-      <span className="flex w-8 shrink-0 items-center justify-center border-l border-border bg-white dark:bg-bg2 sm:w-9">
+      <span className="flex w-8 shrink-0 items-center justify-center border-l border-border bg-bg2 sm:w-9">
         <span
           className={`text-sm font-semibold tabular-nums leading-none ${
             count > 0 ? 'text-text' : 'text-text2'

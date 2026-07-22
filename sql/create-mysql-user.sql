@@ -1,5 +1,5 @@
 -- =============================================================================
--- DFN-PlaniX — MySQL application user (matches application.yml defaults)
+-- DFN-PlanX — MySQL application user (matches application.yml defaults)
 --
 -- Usage:
 --   mysql -u root -p < create-mysql-user.sql

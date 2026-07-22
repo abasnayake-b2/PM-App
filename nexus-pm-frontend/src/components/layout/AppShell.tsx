@@ -124,7 +124,7 @@ export function AppShell() {
           <div className="flex items-center gap-3">
             <span className="brand-mark">DF</span>
             <div>
-              <h1 className="text-lg font-semibold leading-tight">DFN-PlaniX</h1>
+              <h1 className="text-lg font-semibold leading-tight">DFN-PlanX</h1>
               <p className="app-sidebar-muted text-sm">Planning</p>
             </div>
           </div>

@@ -15,6 +15,8 @@ import {
   EmUtilisationWithHeatmap,
   GroupBarsChart,
 } from '@/components/CapacityUtilisationSection';
+import { DashboardViewToggle, type DashboardViewMode } from '@/components/DashboardViewToggle';
+import { PmoDashboardSection } from '@/components/PmoDashboardSection';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { isManagerOrAboveRole, canViewOrgDashboard, isPortfolioWideRole } from '@/utils/orgRoles';
@@ -25,6 +27,17 @@ const CAPACITY_WEEK_OPTIONS = [
   { weeks: 12, label: '12 weeks' },
   { weeks: 26, label: '26 weeks' },
 ] as const;
+
+const DASHBOARD_VIEW_KEY = 'dfnpm-dashboard-view';
+
+function readDashboardView(): DashboardViewMode {
+  try {
+    const stored = sessionStorage.getItem(DASHBOARD_VIEW_KEY);
+    return stored === 'pmo' ? 'pmo' : 'resource';
+  } catch {
+    return 'resource';
+  }
+}
 
 function formatRelativeTime(iso?: string) {
   if (!iso) return '';
@@ -83,6 +96,8 @@ export function DashboardPage() {
   const { can } = usePermissions();
   const showCapacityUtilisation =
     isManagerOrAboveRole(role) && can(P.REPORTS_VIEW) && can(P.ALLOCATIONS_VIEW);
+  const showPmoDashboard = can(P.PROJECTS_VIEW) && (showOrgOverview || isManager);
+  const [dashboardView, setDashboardView] = useState<DashboardViewMode>(readDashboardView);
   const [capacityWeeks, setCapacityWeeks] = useState(12);
   const { data, isLoading, isFetching, dataUpdatedAt, refetch } = useDashboardOverview();
   const capacityQuery = useCapacityUtilisationDashboard(showCapacityUtilisation, capacityWeeks);
@@ -90,8 +105,18 @@ export function DashboardPage() {
 
   const summary = data?.summary;
   const capacityRangeLabel = `${capacityWeeks} weeks`;
+  const isPmoView = showPmoDashboard && dashboardView === 'pmo';
 
-  const capacityDurationControl = showCapacityUtilisation ? (
+  const handleDashboardViewChange = (view: DashboardViewMode) => {
+    setDashboardView(view);
+    try {
+      sessionStorage.setItem(DASHBOARD_VIEW_KEY, view);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const capacityDurationControl = showCapacityUtilisation && !isPmoView ? (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-text2">
         Capacity window · {capacityQuery.data?.heatmapFrom ?? '…'} →{' '}
@@ -149,17 +174,26 @@ export function DashboardPage() {
             </p>
           </div>
         </div>
-        {(summary?.unreadNotifications ?? 0) > 0 && (
-          <Link
-            to="/notifications"
-            className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent-muted px-4 py-2 text-sm font-medium text-accent"
-          >
-            <Bell size={16} />
-            {summary?.unreadNotifications} unread
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {(summary?.unreadNotifications ?? 0) > 0 && (
+            <Link
+              to="/notifications"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent-muted px-4 py-2 text-sm font-medium text-accent"
+            >
+              <Bell size={16} />
+              {summary?.unreadNotifications} unread
+            </Link>
+          )}
+          {showPmoDashboard && (
+            <DashboardViewToggle view={dashboardView} onChange={handleDashboardViewChange} />
+          )}
+        </div>
       </div>
 
+      {isPmoView ? (
+        <PmoDashboardSection summary={summary} summaryLoading={isLoading} />
+      ) : (
+        <>
       {showOrgOverview && (
         <>
           {capacityDurationControl}
@@ -335,6 +369,8 @@ export function DashboardPage() {
           showHeatmap={false}
           weeksLabel={capacityRangeLabel}
         />
+      )}
+        </>
       )}
 
       {breakdownPanel && (

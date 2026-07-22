@@ -31,7 +31,11 @@ export function TeamManagementPanel({ member, canEdit, onClose, onEdit }: TeamMa
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <div className="flex min-w-0 items-center gap-3">
-            <ResourceAvatar name={member.fullName} size="md" />
+            <ResourceAvatar
+              name={member.fullName}
+              size="md"
+              imageUrl={member.profilePictureUrl}
+            />
             <div className="min-w-0">
               <h2 className="truncate text-lg font-bold">{member.fullName}</h2>
               <p className="text-sm text-text2">{member.roleTitle}</p>

@@ -1,5 +1,5 @@
 -- =============================================================================
--- DFN-PlaniX — Seed data
+-- DFN-PlanX — Seed data
 -- Run AFTER build.sql (build drops/recreates empty tables; this file inserts only).
 --
 -- Usage:
@@ -234,10 +234,10 @@ INSERT INTO issue_type (id, name, workflow_code, description) VALUES
 
 INSERT INTO notification_template (id, code, subject, body_template) VALUES
 ('03000001-0000-0000-0000-000000000002', 'ALLOCATION_NEW', 'New project allocation', 'You have been allocated {{percentage}}% to {{projectName}}.'),
-('03000001-0000-0000-0000-000000000003', 'PASSWORD_RESET', 'DFN-PlaniX password reset', 'Use this link to reset your password: {{resetUrl}}');
+('03000001-0000-0000-0000-000000000003', 'PASSWORD_RESET', 'DFN-PlanX password reset', 'Use this link to reset your password: {{resetUrl}}');
 
 INSERT INTO system_settings (id, setting_key, setting_value, updated_by) VALUES
-('04000001-0000-0000-0000-000000000001', 'app.name',                       'DFN-PlaniX', '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000001', 'app.name',                       'DFN-PlanX', '77777777-7777-7777-7777-777777777701'),
 ('04000001-0000-0000-0000-000000000003', 'allocation.bench.threshold_pct', '20',     '77777777-7777-7777-7777-777777777701');
 
 -- Seeded global RD custom fields (excludes fixed columns: title, description, priority, status, capitalization).
@@ -248,6 +248,7 @@ INSERT INTO issue_field_definition
 VALUES
 ('c1000001-0000-0000-0000-000000000001', 'sow', 'SOW', 'TEXT', 255, 0, 1, 1, 'GENERAL', 10, NULL),
 ('c1000001-0000-0000-0000-000000000002', 'covered_in_existing_resources', 'Covered in Existing Resources', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 20, '["Yes","No"]'),
+('c1000001-0000-0000-0000-000000000008', 'cr_type', 'CR Type', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 25, '["CR","AMC"]'),
 ('c1000001-0000-0000-0000-000000000003', 'major_cr', 'Major CR', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 30, '["Yes","No"]'),
 ('c1000001-0000-0000-0000-000000000004', 'delivery_quarter', 'Delivery Quarter', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 40, '["Q1","Q2","Q3","Q4"]'),
 ('c1000001-0000-0000-0000-000000000005', 'delivery_year', 'Delivery Year', 'YEAR', NULL, 0, 1, 1, 'GENERAL', 50, NULL),

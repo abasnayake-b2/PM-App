@@ -115,7 +115,7 @@ function applyCell(
 
 export async function downloadEmCrMatrixExcel(matrix: CrStatusMatrix) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'DFN-PlaniX';
+  workbook.creator = 'DFN-PlanX';
   const sheet = workbook.addWorksheet('EM status matrix', {
     views: [{ state: 'frozen', ySplit: 2 }],
   });
@@ -178,7 +178,7 @@ export function downloadEmCrMatrixPdf(matrix: CrStatusMatrix) {
   doc.text('EM status matrix', 40, 36);
   doc.setFontSize(9);
   doc.setTextColor(100);
-  doc.text(`DFN-PlaniX · ${stamp()} · ${matrix.rows.length} projects`, 40, 52);
+  doc.text(`DFN-PlanX · ${stamp()} · ${matrix.rows.length} projects`, 40, 52);
   doc.setTextColor(0);
 
   const head = [buildHeaderRow(matrix)];

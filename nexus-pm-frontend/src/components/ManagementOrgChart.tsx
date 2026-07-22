@@ -4,6 +4,8 @@ import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useTeamManagement, useTeamRosterMembers } from '@/hooks/useTeamRoster';
 import type { TeamManagement, TeamRosterMember } from '@/api/teamRoster.api';
+import { TeamManagementPanel } from '@/components/TeamManagementPanel';
+import { TeamRosterMemberPanel } from '@/components/TeamRosterMemberPanel';
 import {
   isCxoRole,
   isEngineeringManagerRole,
@@ -208,9 +210,11 @@ function groupTeamByTrack(team: TeamRosterMember[]) {
 function DesignationCodeColumn({
   code,
   members,
+  onMemberClick,
 }: {
   code: string;
   members: TeamRosterMember[];
+  onMemberClick?: (member: TeamRosterMember) => void;
 }) {
   return (
     <li className="org-chart-team-leaf">
@@ -223,13 +227,15 @@ function DesignationCodeColumn({
         </div>
         <div className="flex w-full flex-col gap-1">
           {members.map((member) => (
-            <div
+            <button
               key={member.id}
-              className={`rounded-md border px-1.5 py-1 text-center text-[11px] font-semibold leading-tight text-text ${bandStyles.engineer}`}
-              title={member.fullName}
+              type="button"
+              onClick={() => onMemberClick?.(member)}
+              className={`rounded-md border px-1.5 py-1 text-center text-[11px] font-semibold leading-tight text-text transition hover:ring-2 hover:ring-accent/40 ${bandStyles.engineer}`}
+              title={`View ${member.fullName}`}
             >
               {member.fullName}
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -241,10 +247,12 @@ function EngineerTrackBranch({
   label,
   count,
   codeGroups,
+  onMemberClick,
 }: {
   label: string;
   count: number;
   codeGroups: ReturnType<typeof groupTeamByDesignation>;
+  onMemberClick?: (member: TeamRosterMember) => void;
 }) {
   return (
     <li className="org-chart-team-leaf">
@@ -254,7 +262,12 @@ function EngineerTrackBranch({
       </div>
       <ul>
         {codeGroups.map(({ code, members }) => (
-          <DesignationCodeColumn key={code} code={code} members={members} />
+          <DesignationCodeColumn
+            key={code}
+            code={code}
+            members={members}
+            onMemberClick={onMemberClick}
+          />
         ))}
       </ul>
     </li>
@@ -269,6 +282,7 @@ function PersonCard({
   expanded,
   hasChildren,
   onToggle,
+  onNameClick,
 }: {
   name: string;
   role?: string;
@@ -277,13 +291,24 @@ function PersonCard({
   expanded?: boolean;
   hasChildren?: boolean;
   onToggle?: () => void;
+  onNameClick?: () => void;
 }) {
   return (
     <div
       className={`relative mx-auto w-[112px] rounded-lg border px-1.5 py-1.5 text-center shadow-sm ${bandStyles[band]}`}
       title={[name, role].filter(Boolean).join(' · ')}
     >
-      <p className="text-[11px] font-semibold leading-tight text-text">{name}</p>
+      {onNameClick ? (
+        <button
+          type="button"
+          onClick={onNameClick}
+          className="w-full text-[11px] font-semibold leading-tight text-text hover:text-accent"
+        >
+          {name}
+        </button>
+      ) : (
+        <p className="text-[11px] font-semibold leading-tight text-text">{name}</p>
+      )}
       {role && (
         <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-text2">{role}</p>
       )}
@@ -312,6 +337,8 @@ function ChartBranch({
   showEmployees,
   expanded,
   onToggle,
+  onPersonClick,
+  onMemberClick,
 }: {
   person: TeamManagement;
   childrenBySupervisor: Map<string, TeamManagement[]>;
@@ -319,6 +346,8 @@ function ChartBranch({
   showEmployees: boolean;
   expanded: Set<string>;
   onToggle: (id: string) => void;
+  onPersonClick?: (person: TeamManagement) => void;
+  onMemberClick?: (member: TeamRosterMember) => void;
 }) {
   const reports = childrenBySupervisor.get(person.id) ?? [];
   const team =
@@ -342,6 +371,7 @@ function ChartBranch({
         expanded={isExpanded}
         hasChildren={hasChildren}
         onToggle={hasChildren ? () => onToggle(person.id) : undefined}
+        onNameClick={onPersonClick ? () => onPersonClick(person) : undefined}
       />
 
       {hasChildren && isExpanded && (
@@ -355,6 +385,8 @@ function ChartBranch({
               showEmployees={showEmployees}
               expanded={expanded}
               onToggle={onToggle}
+              onPersonClick={onPersonClick}
+              onMemberClick={onMemberClick}
             />
           ))}
           {trackGroups.map(({ track, label, members, codeGroups }) => (
@@ -363,6 +395,7 @@ function ChartBranch({
               label={label}
               count={members.length}
               codeGroups={codeGroups}
+              onMemberClick={onMemberClick}
             />
           ))}
         </ul>
@@ -378,6 +411,8 @@ export function ManagementOrgChart() {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState<'jpeg' | 'pdf' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [selectedManager, setSelectedManager] = useState<TeamManagement | null>(null);
+  const [selectedMember, setSelectedMember] = useState<TeamRosterMember | null>(null);
   const seededRef = useRef(false);
   const chartContentRef = useRef<HTMLDivElement>(null);
   const pendingExportRef = useRef<'jpeg' | 'pdf' | null>(null);
@@ -608,11 +643,32 @@ export function ManagementOrgChart() {
                 showEmployees={showEmployees}
                 expanded={expanded}
                 onToggle={toggle}
+                onPersonClick={(person) => {
+                  setSelectedMember(null);
+                  setSelectedManager(person);
+                }}
+                onMemberClick={(member) => {
+                  setSelectedManager(null);
+                  setSelectedMember(member);
+                }}
               />
             ))}
           </ul>
         </div>
       </div>
+
+      {selectedManager && (
+        <TeamManagementPanel
+          member={selectedManager}
+          onClose={() => setSelectedManager(null)}
+        />
+      )}
+      {selectedMember && (
+        <TeamRosterMemberPanel
+          member={selectedMember}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
     </div>
   );
 }

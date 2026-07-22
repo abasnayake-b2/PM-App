@@ -136,7 +136,7 @@ export async function downloadOrgStatsExcel(
 
   const codes = tables[0]?.codes ?? skillMatrix?.codes ?? [];
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'DFN-PlaniX';
+  workbook.creator = 'DFN-PlanX';
   const sheet = workbook.addWorksheet('Org structure stats', {
     views: [{ showGridLines: false }],
   });

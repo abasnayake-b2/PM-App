@@ -106,12 +106,16 @@ function TreeRow({
 }
 
 interface ManagementOrgTreeProps {
-  canEdit?: boolean;
   selectedId?: string | null;
-  onSelect?: (person: TeamManagement) => void;
+  onSelectManager?: (person: TeamManagement) => void;
+  onSelectMember?: (member: TeamRosterMember) => void;
 }
 
-export function ManagementOrgTree({ canEdit = false, selectedId, onSelect }: ManagementOrgTreeProps) {
+export function ManagementOrgTree({
+  selectedId,
+  onSelectManager,
+  onSelectMember,
+}: ManagementOrgTreeProps) {
   const { data: management = [], isLoading: managementLoading } = useTeamManagement();
   const { data: members = [], isLoading: membersLoading } = useTeamRosterMembers();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -248,6 +252,7 @@ export function ManagementOrgTree({ canEdit = false, selectedId, onSelect }: Man
       icon={<Users size={16} />}
       label={member.fullName}
       meta={member.designationCode ?? member.designation}
+      onLabelClick={onSelectMember ? () => onSelectMember(member) : undefined}
     />
   );
 
@@ -283,7 +288,7 @@ export function ManagementOrgTree({ canEdit = false, selectedId, onSelect }: Man
           subMeta={supervisor ? `Supervisor: ${supervisor}` : undefined}
           warning={hasUnresolvedSupervisor ? 'Supervisor name not linked' : undefined}
           selected={selectedId === person.id}
-          onLabelClick={canEdit ? () => onSelect?.(person) : undefined}
+          onLabelClick={onSelectManager ? () => onSelectManager(person) : undefined}
         />
         {isExpanded && (
           <>

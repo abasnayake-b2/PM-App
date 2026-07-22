@@ -9,6 +9,8 @@ export interface TeamManagement {
   supervisorName?: string;
   supervisorId?: string;
   supervisorFullName?: string;
+  /** Relative API path when set, e.g. /team-roster/management/{id}/photo */
+  profilePictureUrl?: string | null;
   status: string;
   createdAt?: string;
   updatedAt?: string;
@@ -123,6 +125,23 @@ export async function updateTeamManagement(
 
 export async function deleteTeamManagement(id: string): Promise<void> {
   await api.delete(`/team-roster/management/${id}`);
+}
+
+export async function uploadTeamManagementPhoto(
+  id: string,
+  file: File,
+): Promise<TeamManagement> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<TeamManagement>(`/team-roster/management/${id}/photo`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function deleteTeamManagementPhoto(id: string): Promise<TeamManagement> {
+  const { data } = await api.delete<TeamManagement>(`/team-roster/management/${id}/photo`);
+  return data;
 }
 
 export async function fetchTeamRosterMembers(search?: string): Promise<TeamRosterMember[]> {

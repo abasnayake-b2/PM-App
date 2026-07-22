@@ -5,6 +5,8 @@ import {
   createTeamManagement,
   updateTeamManagement,
   deleteTeamManagement,
+  uploadTeamManagementPhoto,
+  deleteTeamManagementPhoto,
   createTeamRosterMember,
   updateTeamRosterMember,
   deleteTeamRosterMember,
@@ -103,6 +105,22 @@ export function useDeleteTeamManagement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteTeamManagement,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-management'] }),
+  });
+}
+
+export function useUploadTeamManagementPhoto(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => uploadTeamManagementPhoto(id, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-management'] }),
+  });
+}
+
+export function useDeleteTeamManagementPhoto(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => deleteTeamManagementPhoto(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['team-management'] }),
   });
 }

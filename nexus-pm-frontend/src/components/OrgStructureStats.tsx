@@ -1170,7 +1170,11 @@ export function OrgStructureStats() {
                   onClick={() => setSelectedMember(member)}
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-bg3"
                 >
-                  <ResourceAvatar name={member.fullName} size="sm" />
+                  <ResourceAvatar
+                    name={member.fullName}
+                    size="sm"
+                    imageUrl={member.profilePictureUrl}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{member.fullName}</div>
                     <div className="truncate text-xs text-text2">

@@ -1,4 +1,4 @@
-# DFN-PlaniX
+# DFN-PlanX
 
 Web-based engineering project and resource planning platform — **Phase 1**.
 
@@ -20,12 +20,6 @@ docker compose up --build
 | API       | http://localhost:8080        |
 | Swagger   | http://localhost:8080/swagger-ui.html |
 | MailHog   | http://localhost:8025        |
-
-**Demo login** (after `seed.sql`):
-
-| Email | Password |
-|-------|----------|
-| admin@dfnpm.local | Admin@12345 |
 
 Additional users are created from Team → Management Excel import or Admin → Users.
 
@@ -51,7 +45,7 @@ npm run dev
 
 ## Phase 1 deliverables
 
-- [x] Spring Boot API + React app (DFN-PlaniX)
+- [x] Spring Boot API + React app (DFN-PlanX)
 - [x] MySQL schema (~38 tables) via `sql/build.sql` + seed data
 - [x] Auth: login, JWT refresh, logout, password reset / change
 - [x] Org hierarchy, team roster, org structure / chart / stats

@@ -12,8 +12,8 @@ const DIRECTFN_LOGO = '/directfn-login-bg.png';
 export function LoginPage() {
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState('admin@dfnpm.local');
-  const [password, setPassword] = useState('Admin@12345');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -77,7 +77,7 @@ export function LoginPage() {
           <div className="card p-8 shadow-theme-lg">
             <div className="mb-8 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text3">DirectFN</p>
-              <h1 className="mt-2 text-2xl font-bold tracking-tight">DFN-PlaniX</h1>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight">DFN-PlanX</h1>
               <p className="mt-2 text-text2">Sign in to your account</p>
             </div>
 
@@ -131,26 +131,6 @@ export function LoginPage() {
                 {loading ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
-
-            <div className="mt-6 rounded-lg border border-border bg-bg3/60 px-3 py-3 text-center text-sm text-text2">
-              <p className="font-medium text-text">Demo account</p>
-              <p className="mt-1 tabular-nums">
-                <span className="text-text">admin@dfnpm.local</span>
-                <span className="mx-1.5 text-text3">·</span>
-                <span className="text-text">Admin@12345</span>
-              </p>
-              <button
-                type="button"
-                className="mt-2 text-xs font-medium text-accent hover:underline"
-                onClick={() => {
-                  setEmail('admin@dfnpm.local');
-                  setPassword('Admin@12345');
-                  setError('');
-                }}
-              >
-                Fill demo credentials
-              </button>
-            </div>
           </div>
         </div>
       </div>

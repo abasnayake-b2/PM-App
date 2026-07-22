@@ -9,4 +9,4 @@ Apply in order on a clean MySQL:
 Do **not** run Liquibase for Phase 1 installs (`liquibase.enabled: false`).  
 Liquibase changelogs under the backend are legacy / not aligned with this schema.
 
-Bootstrap login after seed: `admin@dfnpm.local` / `Admin@12345`
+Bootstrap admin credentials are documented in the `seed.sql` header.

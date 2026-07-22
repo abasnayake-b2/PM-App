@@ -1,5 +1,5 @@
 -- =============================================================================
--- DFN-PlaniX — Schema rebuild (empty tables only; no seed data)
+-- DFN-PlanX — Schema rebuild (empty tables only; no seed data)
 --
 -- Usage:
 --   mysql -u root -p < build.sql
@@ -16,6 +16,7 @@ USE dfn_pm;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS em_capacity_plan;
 DROP TABLE IF EXISTS password_reset_token;
 DROP TABLE IF EXISTS refresh_token;
 DROP TABLE IF EXISTS audit_log;
@@ -228,6 +229,7 @@ CREATE TABLE team_management (
     last_name       VARCHAR(100) NOT NULL,
     supervisor_id   CHAR(36)     NULL,
     status          VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+    profile_picture VARCHAR(255) NULL,
     import_batch_id CHAR(36)     NULL,
     created_by      CHAR(36)     NULL,
     updated_by      CHAR(36)     NULL,
@@ -614,6 +616,19 @@ CREATE TABLE audit_log (
     ip_address  VARCHAR(45) NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_audit_employee FOREIGN KEY (employee_id) REFERENCES employee(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE em_capacity_plan (
+    id                    CHAR(36)  NOT NULL PRIMARY KEY,
+    em_management_id      CHAR(36)  NOT NULL,
+    additional_resources  INT       NOT NULL DEFAULT 0,
+    created_by            CHAR(36)  NULL,
+    updated_by            CHAR(36)  NULL,
+    created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_em_capacity_plan_em (em_management_id),
+    CONSTRAINT fk_em_capacity_plan_em
+        FOREIGN KEY (em_management_id) REFERENCES team_management(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE refresh_token (

@@ -1,14 +1,17 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { TeamExcelUpload } from '@/components/TeamExcelUpload';
 import { TeamManagementPanel } from '@/components/TeamManagementPanel';
 import { SlideOverPanel } from '@/components/SlideOverPanel';
+import { ResourceAvatar } from '@/components/ResourceAvatar';
 import {
   useTeamManagement,
   useCreateTeamManagement,
   useUpdateTeamManagement,
   useDeleteTeamManagement,
+  useUploadTeamManagementPhoto,
+  useDeleteTeamManagementPhoto,
   type TeamManagementPayload,
 } from '@/hooks/useTeamRoster';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -31,6 +34,18 @@ function ManagementForm({
   onCancel: () => void;
   onSubmit: (payload: TeamManagementPayload) => void;
 }) {
+  const memberId = initial?.id ?? '';
+  const [pictureUrl, setPictureUrl] = useState<string | null | undefined>(initial?.profilePictureUrl);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadPhoto = useUploadTeamManagementPhoto(memberId);
+  const deletePhoto = useDeleteTeamManagementPhoto(memberId);
+
+  useEffect(() => {
+    setPictureUrl(initial?.profilePictureUrl);
+    setPhotoError(null);
+  }, [initial?.id, initial?.profilePictureUrl]);
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -46,6 +61,86 @@ function ManagementForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {memberId ? (
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-bg3 p-3">
+          <ResourceAvatar
+            name={initial?.fullName ?? 'Management'}
+            size="lg"
+            imageUrl={pictureUrl}
+          />
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-sm font-medium">Profile picture</p>
+            <p className="text-xs text-text2">JPG, PNG, WEBP or GIF · max 2 MB</p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  setPhotoError(null);
+                  uploadPhoto.mutate(file, {
+                    onSuccess: (row) => setPictureUrl(row.profilePictureUrl),
+                    onError: (err) => {
+                      setPhotoError(
+                        isAxiosError(err)
+                          ? ((err.response?.data as { detail?: string })?.detail ??
+                            'Failed to upload picture.')
+                          : 'Failed to upload picture.',
+                      );
+                    },
+                  });
+                }}
+              />
+              <button
+                type="button"
+                disabled={uploadPhoto.isPending || deletePhoto.isPending}
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                style={{ color: 'var(--accent-fg)' }}
+              >
+                {uploadPhoto.isPending
+                  ? 'Uploading…'
+                  : pictureUrl
+                    ? 'Update picture'
+                    : 'Add picture'}
+              </button>
+              {pictureUrl && (
+                <button
+                  type="button"
+                  disabled={uploadPhoto.isPending || deletePhoto.isPending}
+                  onClick={() => {
+                    setPhotoError(null);
+                    deletePhoto.mutate(undefined, {
+                      onSuccess: () => setPictureUrl(null),
+                      onError: (err) => {
+                        setPhotoError(
+                          isAxiosError(err)
+                            ? ((err.response?.data as { detail?: string })?.detail ??
+                              'Failed to delete picture.')
+                            : 'Failed to delete picture.',
+                        );
+                      },
+                    });
+                  }}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-bg2 disabled:opacity-50"
+                >
+                  {deletePhoto.isPending ? 'Removing…' : 'Delete picture'}
+                </button>
+              )}
+            </div>
+            {photoError && <p className="text-xs text-danger">{photoError}</p>}
+          </div>
+        </div>
+      ) : (
+        <p className="rounded-lg border border-border bg-bg3 px-3 py-2 text-xs text-text2">
+          Save the management record first, then you can add a profile picture.
+        </p>
+      )}
+
       <label className="block text-sm">
         <span className="text-text2">Role</span>
         <input name="roleTitle" required defaultValue={initial?.roleTitle} className={inputClass} />

@@ -29,7 +29,7 @@ const COPY: Record<
   management: {
     title: 'Import management from Excel',
     description:
-      'Upload an Excel file with a Management sheet: Role (title), First Name, Last Name, Supervisor, Role (CXO / VP / CPO / Manager). Replaces the current management roster and auto-creates login accounts with initial password FirstInitialLastName@12345 (e.g. LSurasinghe@12345).',
+      'Upload an Excel file with a Management sheet: Role (title), First Name, Last Name, Supervisor, Role (CXO / CEO / COO / CTO / CPO / VP / Manager), Email. Replaces the current management roster and auto-creates login accounts using the Email column when provided (otherwise firstname.lastname@dfnpm.local). Initial password is FirstInitialLastName@12345 (e.g. ECulum@12345).',
     sheetName: 'Management',
     success: (count, fileName, usersCreated) =>
       `Imported ${count} management record${count !== 1 ? 's' : ''} from ${fileName}${

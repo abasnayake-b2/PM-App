@@ -1,4 +1,4 @@
-# DFN-PlaniX — Run locally on Windows
+# DFN-PlanX — Run locally on Windows
 
 You already have: **Java 26**, **MySQL 80** (running), **database seeded** via Workbench.
 
@@ -96,11 +96,7 @@ Open: **http://localhost:5173**
 
 ## Step 5 — Log in
 
-| Email | Password |
-|-------|----------|
-| admin@dfnpm.local | Admin@12345 |
-
-Other accounts are created via Admin → Users or Management Excel import (not in `seed.sql`).
+Use the bootstrap admin created by `seed.sql` (see the seed file header for credentials). Other accounts are created via Admin → Users or Management Excel import.
 
 ---
 
