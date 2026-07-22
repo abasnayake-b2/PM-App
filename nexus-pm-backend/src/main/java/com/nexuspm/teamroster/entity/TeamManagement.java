@@ -33,6 +33,10 @@ public class TeamManagement extends AuditableEntity {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    /** Filename under the configured Pic/ directory (e.g. mgmt-{uuid}.jpg). */
+    @Column(name = "profile_picture", length = 255)
+    private String profilePicture;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "import_batch_id")
     private TeamImportBatch importBatch;

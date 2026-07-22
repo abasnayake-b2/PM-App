@@ -354,6 +354,26 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             """)
     java.util.List<RdIssue> findChildrenByParentId(@Param("parentId") UUID parentId);
 
+    @Query("""
+            SELECT DISTINCT i FROM RdIssue i
+            JOIN FETCH i.project p
+            LEFT JOIN FETCH p.engineeringManagerManagement
+            JOIN FETCH i.issueType t
+            LEFT JOIN FETCH i.status
+            WHERE i.deleted = false
+              AND p.deleted = false
+              AND p.archived = false
+              AND (:scopedProjectIds IS NULL OR p.id IN :scopedProjectIds)
+              AND (
+                    UPPER(t.workflowCode) = 'CHANGE'
+                 OR LOWER(t.name) LIKE '%change request%'
+                 OR LOWER(t.name) = 'cr'
+                 OR LOWER(t.name) LIKE '%amc%'
+              )
+            """)
+    List<RdIssue> findCapacityPlanCandidates(
+            @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds);
+
     @Modifying
     @Query("UPDATE RdIssue i SET i.assignedTo = NULL WHERE i.assignedTo.id IN :employeeIds")
     void clearAssigneeByEmployeeIds(@Param("employeeIds") List<UUID> employeeIds);

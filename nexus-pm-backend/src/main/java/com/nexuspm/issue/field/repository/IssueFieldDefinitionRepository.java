@@ -16,4 +16,6 @@ public interface IssueFieldDefinitionRepository extends JpaRepository<IssueField
     boolean existsByFieldKeyIgnoreCase(String fieldKey);
 
     Optional<IssueFieldDefinition> findByFieldKey(String fieldKey);
+
+    List<IssueFieldDefinition> findByFieldKeyIn(List<String> fieldKeys);
 }

@@ -15,7 +15,7 @@ public class OpenApiConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("DFN-PlaniX API")
+                        .title("DFN-PlanX API")
                         .description("Project and Resource Management API")
                         .version("0.1.0"))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))

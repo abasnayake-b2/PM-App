@@ -1,6 +1,6 @@
 spring:
   application:
-    name: dfn-planix
+    name: dfn-planx
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:dfn_pm}?useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY:true}&serverTimezone=UTC
     username: ${DB_USERNAME:root}
@@ -98,9 +98,14 @@ logging:
       max-file-size: ${LOG_MAX_FILE_SIZE:10MB}
       max-history: ${LOG_MAX_HISTORY:30}
       total-size-cap: ${LOG_TOTAL_SIZE_CAP:1GB}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   level:
-    com.nexuspm: INFO
-    org.springframework.security: WARN
-    org.hibernate.SQL: WARN
-    org.hibernate.orm.jdbc.bind: WARN
-    org.hibernate.type.descriptor.sql: WARN
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.nexuspm: ${LOG_LEVEL_APP:INFO}
+    org.springframework.web: ${LOG_LEVEL_WEB:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL:DEBUG}
+    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_HIBERNATE_BIND:TRACE}
+    org.hibernate.type.descriptor.sql: ${LOG_LEVEL_HIBERNATE_TYPE:TRACE}

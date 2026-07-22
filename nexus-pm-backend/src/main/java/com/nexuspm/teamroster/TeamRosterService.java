@@ -107,9 +107,10 @@ public class TeamRosterService {
         List<TeamManagement> managementRows = new ArrayList<>();
         Map<UUID, String> supervisorNames = new HashMap<>();
         Map<UUID, String> systemRoleCodes = new HashMap<>();
+        Map<UUID, String> importEmails = new HashMap<>();
         Map<UUID, String> relinkKeys = captureManagementRelinkKeys();
         try (InputStream in = file.getInputStream(); Workbook workbook = WorkbookFactory.create(in)) {
-            parseManagementSheet(workbook, batch, managementRows, supervisorNames, systemRoleCodes);
+            parseManagementSheet(workbook, batch, managementRows, supervisorNames, systemRoleCodes, importEmails);
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -122,7 +123,8 @@ public class TeamRosterService {
         managementRepository.saveAll(managementRows);
         relinkLoginUsersToManagement(managementRows, relinkKeys);
         List<ManagementUserProvisioned> provisionedUsers =
-                managementUserProvisioningService.provisionFromManagementImport(managementRows, systemRoleCodes);
+                managementUserProvisioningService.provisionFromManagementImport(
+                        managementRows, systemRoleCodes, importEmails);
 
         batch.setManagementCount(managementRows.size());
         batch.setMemberCount(0);
@@ -262,9 +264,9 @@ public class TeamRosterService {
 
     @Transactional
     public void deleteManagement(UUID id) {
-        if (!managementRepository.existsById(id)) {
-            throw new BusinessException("NOT_FOUND", "Management record not found", 404);
-        }
+        TeamManagement entity = managementRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
+        String picture = entity.getProfilePicture();
 
         // Login users are linked via employee.team_management_id — unlink + deactivate so delete can proceed.
         employeeRepository.findByTeamManagementId(id).ifPresent(employee -> {
@@ -282,6 +284,44 @@ public class TeamRosterService {
         detachManagementReferences(id);
         entityManager.flush();
         managementRepository.deleteById(id);
+        profilePictureStorageService.deleteIfPresent(picture);
+    }
+
+    @Transactional
+    public TeamManagementResponse uploadManagementPhoto(UUID id, MultipartFile file) {
+        TeamManagement entity = managementRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
+
+        String previous = entity.getProfilePicture();
+        String filename = profilePictureStorageService.storeManagement(id, file);
+        if (previous != null && !previous.equals(filename)) {
+            profilePictureStorageService.deleteIfPresent(previous);
+        }
+        entity.setProfilePicture(filename);
+        return toManagementResponse(auditNameEnricher.enrich(managementRepository.save(entity)));
+    }
+
+    @Transactional
+    public TeamManagementResponse deleteManagementPhoto(UUID id) {
+        TeamManagement entity = managementRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
+
+        String previous = entity.getProfilePicture();
+        entity.setProfilePicture(null);
+        TeamManagementResponse response = toManagementResponse(
+                auditNameEnricher.enrich(managementRepository.save(entity)));
+        profilePictureStorageService.deleteIfPresent(previous);
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public ProfilePictureFile loadManagementPhoto(UUID id) {
+        TeamManagement entity = managementRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
+        Path path = profilePictureStorageService.resolveExisting(entity.getProfilePicture());
+        String ext = ImageUploadValidator.extensionOf(entity.getProfilePicture());
+        MediaType mediaType = MediaType.parseMediaType(ImageUploadValidator.contentTypeForExtension(ext));
+        return new ProfilePictureFile(new FileSystemResource(path), mediaType);
     }
 
     @Transactional
@@ -388,29 +428,123 @@ public class TeamRosterService {
         return sheet;
     }
 
+    private record ManagementSheetColumns(
+            int roleTitle,
+            int firstName,
+            int lastName,
+            int supervisor,
+            int systemRole,
+            int email,
+            int firstDataRow) {
+
+        static final ManagementSheetColumns DEFAULT = new ManagementSheetColumns(0, 1, 2, 3, 4, 5, 1);
+    }
+
+    private ManagementSheetColumns resolveManagementColumns(Sheet sheet) {
+        Row header = sheet.getRow(0);
+        if (header == null) {
+            return ManagementSheetColumns.DEFAULT;
+        }
+
+        List<Integer> roleColumns = new ArrayList<>();
+        Integer firstName = null;
+        Integer lastName = null;
+        Integer supervisor = null;
+        Integer email = null;
+
+        for (int col = 0; col <= header.getLastCellNum(); col++) {
+            String label = normalizeHeaderLabel(cellString(header.getCell(col)));
+            if (label.isEmpty()) {
+                continue;
+            }
+            if (label.equals("role")) {
+                roleColumns.add(col);
+            } else if (label.equals("firstname") || label.equals("first")) {
+                firstName = col;
+            } else if (label.equals("lastname") || label.equals("last")) {
+                lastName = col;
+            } else if (label.startsWith("supervis")) {
+                supervisor = col;
+            } else if (label.equals("email") || label.equals("emailaddress")) {
+                email = col;
+            }
+        }
+
+        if (firstName == null && lastName == null && roleColumns.isEmpty()) {
+            return ManagementSheetColumns.DEFAULT;
+        }
+
+        int roleTitleCol = roleColumns.isEmpty() ? 0 : roleColumns.get(0);
+        int systemRoleCol = roleColumns.size() >= 2 ? roleColumns.get(1) : 4;
+        return new ManagementSheetColumns(
+                roleTitleCol,
+                firstName != null ? firstName : 1,
+                lastName != null ? lastName : 2,
+                supervisor != null ? supervisor : 3,
+                systemRoleCol,
+                email != null ? email : 5,
+                1);
+    }
+
+    private static String normalizeHeaderLabel(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
     private void parseManagementSheet(
             Workbook workbook,
             TeamImportBatch batch,
             List<TeamManagement> out,
             Map<UUID, String> supervisorNames,
-            Map<UUID, String> systemRoleCodes) {
+            Map<UUID, String> systemRoleCodes,
+            Map<UUID, String> importEmails) {
         Sheet sheet = resolveSheet(workbook, "Management");
-        for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
+        ManagementSheetColumns columns = resolveManagementColumns(sheet);
+        Set<String> emailsInSheet = new HashSet<>();
+
+        for (int rowIdx = columns.firstDataRow(); rowIdx <= sheet.getLastRowNum(); rowIdx++) {
             Row row = sheet.getRow(rowIdx);
-            if (row == null) continue;
-            String role = cellString(row.getCell(0));
-            String firstName = cellString(row.getCell(1));
-            String lastName = cellString(row.getCell(2));
-            if (isBlank(role) && isBlank(firstName) && isBlank(lastName)) continue;
-            if (isBlank(role) || isBlank(firstName)) continue;
+            if (row == null) {
+                continue;
+            }
+            String role = cellString(row.getCell(columns.roleTitle()));
+            String firstName = cellString(row.getCell(columns.firstName()));
+            String lastName = cellString(row.getCell(columns.lastName()));
+            if (isBlank(role) && isBlank(firstName) && isBlank(lastName)) {
+                continue;
+            }
+            if (isBlank(role) || isBlank(firstName)) {
+                continue;
+            }
 
             TeamManagement m = new TeamManagement();
             m.setId(UUID.randomUUID());
             m.setRoleTitle(role.trim());
             m.setFirstName(firstName.trim());
             m.setLastName(lastName != null ? lastName.trim() : "");
-            supervisorNames.put(m.getId(), trimOrNull(cellString(row.getCell(3))));
-            systemRoleCodes.put(m.getId(), trimOrNull(cellString(row.getCell(4))));
+            supervisorNames.put(m.getId(), trimOrNull(cellString(row.getCell(columns.supervisor()))));
+            systemRoleCodes.put(m.getId(), trimOrNull(cellString(row.getCell(columns.systemRole()))));
+
+            String email = trimOrNull(cellString(row.getCell(columns.email())));
+            if (email != null) {
+                String normalizedEmail = email.toLowerCase(Locale.ROOT);
+                if (!normalizedEmail.contains("@") || normalizedEmail.startsWith("@") || normalizedEmail.endsWith("@")) {
+                    throw new BusinessException(
+                            "IMPORT_VALIDATION",
+                            "Row " + (rowIdx + 1) + ": Invalid email \"" + email + "\"",
+                            400);
+                }
+                if (!emailsInSheet.add(normalizedEmail)) {
+                    throw new BusinessException(
+                            "IMPORT_VALIDATION",
+                            "Row " + (rowIdx + 1) + ": Duplicate email \"" + email + "\" in the Excel file",
+                            400);
+                }
+                importEmails.put(m.getId(), normalizedEmail);
+            }
+
             m.setImportBatch(batch);
             m.setStatus("ACTIVE");
             out.add(m);
@@ -800,6 +934,8 @@ public class TeamRosterService {
                 .supervisorName(m.getSupervisor() != null ? m.getSupervisor().getFullName() : null)
                 .supervisorId(m.getSupervisor() != null ? m.getSupervisor().getId() : null)
                 .supervisorFullName(m.getSupervisor() != null ? m.getSupervisor().getFullName() : null)
+                .profilePictureUrl(ProfilePictureStorageService.managementPhotoUrl(
+                        m.getId(), m.getProfilePicture(), m.getUpdatedAt()))
                 .status(m.getStatus())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())

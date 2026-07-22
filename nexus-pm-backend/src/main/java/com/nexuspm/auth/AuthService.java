@@ -176,9 +176,9 @@ public class AuthService {
             String resetUrl = properties.getApp().getBaseUrl() + "/reset-password?token=" + rawToken;
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(auth.getEmployee().getEmail());
-            message.setSubject("DFN-PlaniX — Password Reset");
+            message.setSubject("DFN-PlanX — Password Reset");
             message.setText(
-                    "You requested a password reset for DFN-PlaniX.\n\n"
+                    "You requested a password reset for DFN-PlanX.\n\n"
                             + "Use this link to set a new password (valid for "
                             + properties.getApp().getPasswordResetTtlHours()
                             + " hour(s)):\n"

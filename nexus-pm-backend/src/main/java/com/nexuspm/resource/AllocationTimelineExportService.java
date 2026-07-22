@@ -405,7 +405,7 @@ public class AllocationTimelineExportService {
 
         Comment comment = drawing.createCellComment(anchor);
         comment.setString(creationHelper.createRichTextString(tooltip));
-        comment.setAuthor("DFN-PlaniX");
+        comment.setAuthor("DFN-PlanX");
         comment.setVisible(false);
         cell.setCellComment(comment);
     }

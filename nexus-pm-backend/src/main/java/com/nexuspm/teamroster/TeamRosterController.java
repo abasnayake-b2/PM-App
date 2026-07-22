@@ -50,6 +50,30 @@ public class TeamRosterController {
         teamRosterService.deleteManagement(id);
     }
 
+    @GetMapping("/management/{id}/photo")
+    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    public ResponseEntity<Resource> getManagementPhoto(@PathVariable UUID id) {
+        TeamRosterService.ProfilePictureFile photo = teamRosterService.loadManagementPhoto(id);
+        return ResponseEntity.ok()
+                .contentType(photo.mediaType())
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                .body(photo.resource());
+    }
+
+    @PostMapping(value = "/management/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@perm.can('TEAM_UPDATE')")
+    public TeamManagementResponse uploadManagementPhoto(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file) {
+        return teamRosterService.uploadManagementPhoto(id, file);
+    }
+
+    @DeleteMapping("/management/{id}/photo")
+    @PreAuthorize("@perm.can('TEAM_UPDATE')")
+    public TeamManagementResponse deleteManagementPhoto(@PathVariable UUID id) {
+        return teamRosterService.deleteManagementPhoto(id);
+    }
+
     @PostMapping("/management/relink-supervisors")
     @PreAuthorize("@perm.can('TEAM_UPDATE')")
     public RelinkSupervisorsResult relinkManagementSupervisors() {

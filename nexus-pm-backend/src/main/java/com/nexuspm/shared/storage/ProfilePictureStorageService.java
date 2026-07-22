@@ -31,14 +31,25 @@ public class ProfilePictureStorageService {
      * Relative authenticated API path for an employee's roster photo, or null if none.
      */
     public static String memberPhotoUrl(UUID employeeId, String filename, Instant updatedAt) {
-        if (employeeId == null || filename == null || filename.isBlank()) {
+        return photoUrl("/team-roster/members/", employeeId, filename, updatedAt);
+    }
+
+    /**
+     * Relative authenticated API path for a management roster photo, or null if none.
+     */
+    public static String managementPhotoUrl(UUID managementId, String filename, Instant updatedAt) {
+        return photoUrl("/team-roster/management/", managementId, filename, updatedAt);
+    }
+
+    private static String photoUrl(String pathPrefix, UUID id, String filename, Instant updatedAt) {
+        if (id == null || filename == null || filename.isBlank()) {
             return null;
         }
         String version = filename;
         if (updatedAt != null) {
             version = filename + "-" + updatedAt.toEpochMilli();
         }
-        return "/team-roster/members/" + employeeId + "/photo?v=" + version;
+        return pathPrefix + id + "/photo?v=" + version;
     }
 
     public Path picDirectory() {
@@ -46,6 +57,15 @@ public class ProfilePictureStorageService {
     }
 
     public String store(UUID employeeId, MultipartFile file) {
+        return storeWithPrefix("", employeeId, file);
+    }
+
+    /** Stores as {@code mgmt-{id}.ext} so management files do not collide with employee photos. */
+    public String storeManagement(UUID managementId, MultipartFile file) {
+        return storeWithPrefix("mgmt-", managementId, file);
+    }
+
+    private String storeWithPrefix(String filenamePrefix, UUID id, MultipartFile file) {
         ImageUploadValidator.validate(file, properties);
         String ext = ImageUploadValidator.extensionOf(file.getOriginalFilename());
         if (ext == null) {
@@ -63,7 +83,7 @@ public class ProfilePictureStorageService {
             throw new BusinessException("STORAGE", "Could not create Pic directory", 500);
         }
 
-        String filename = employeeId + "." + ext;
+        String filename = filenamePrefix + id + "." + ext;
         Path target = dir.resolve(filename).normalize();
         if (!target.startsWith(dir)) {
             throw new BusinessException("VALIDATION", "Invalid profile picture path", 400);

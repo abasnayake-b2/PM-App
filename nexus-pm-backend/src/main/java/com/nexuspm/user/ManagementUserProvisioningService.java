@@ -40,7 +40,8 @@ public class ManagementUserProvisioningService {
     @Transactional
     public List<ManagementUserProvisioned> provisionFromManagementImport(
             List<TeamManagement> management,
-            Map<UUID, String> roleCodesByManagementId) {
+            Map<UUID, String> roleCodesByManagementId,
+            Map<UUID, String> emailsByManagementId) {
         if (management.isEmpty()) {
             return List.of();
         }
@@ -65,7 +66,10 @@ public class ManagementUserProvisioningService {
                             "System role not found: " + roleCode,
                             400));
 
-            String email = allocateEmail(person.getFirstName(), person.getLastName(), reservedEmails);
+            String sheetEmail = emailsByManagementId != null ? emailsByManagementId.get(person.getId()) : null;
+            String email = !isBlank(sheetEmail)
+                    ? allocateProvidedEmail(sheetEmail, reservedEmails)
+                    : allocateEmail(person.getFirstName(), person.getLastName(), reservedEmails);
             String password = generateInitialPassword(person.getFirstName(), person.getLastName());
 
             Employee employee = new Employee();
@@ -119,15 +123,31 @@ public class ManagementUserProvisioningService {
     static String mapSheetRole(String sheetRole) {
         String normalized = sheetRole.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
         return switch (normalized) {
-            case "CXO", "CPO" -> "CXO";
+            case "CXO", "CPO", "CEO", "COO", "CTO" -> "CXO";
             case "VP" -> "VP";
             case "MANAGER", "SENIOR_MANAGER", "SR_MANAGER", "SEM", "SR_SEM" -> "MANAGER";
             default -> throw new BusinessException(
                     "IMPORT_VALIDATION",
                     "Unsupported management role \"" + sheetRole
-                            + "\". Use CXO, VP, CPO, Manager, or Senior Manager.",
+                            + "\". Use CXO, CEO, COO, CTO, CPO, VP, Manager, or Senior Manager.",
                     400);
         };
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String allocateProvidedEmail(String rawEmail, Set<String> reservedEmails) {
+        String email = rawEmail.trim().toLowerCase(Locale.ROOT);
+        if (!email.contains("@") || email.startsWith("@") || email.endsWith("@")) {
+            throw new BusinessException("IMPORT_VALIDATION", "Invalid email: " + rawEmail, 400);
+        }
+        if (reservedEmails.contains(email)) {
+            throw new BusinessException("EMAIL_EXISTS", "Email already in use: " + email, 400);
+        }
+        reservedEmails.add(email);
+        return email;
     }
 
     static String inferRoleFromTitle(String roleTitle) {
@@ -135,7 +155,7 @@ public class ManagementUserProvisioningService {
             return "MANAGER";
         }
         String title = roleTitle.toLowerCase(Locale.ROOT);
-        if (title.contains("ceo") || title.contains("cto") || title.contains("cpo") || title.contains("cxo")) {
+        if (title.contains("ceo") || title.contains("coo") || title.contains("cto") || title.contains("cpo") || title.contains("cxo")) {
             return "CXO";
         }
         if (title.matches(".*\\bvp\\b.*")) {

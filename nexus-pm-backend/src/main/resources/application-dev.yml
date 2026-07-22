@@ -1,9 +1,15 @@
 spring:
   jpa:
-    show-sql: false
+    show-sql: true
 
 logging:
   level:
+    root: DEBUG
     com.nexuspm: DEBUG
-    org.hibernate.SQL: WARN
-    org.hibernate.orm.jdbc.bind: WARN
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.hibernate.type.descriptor.sql: TRACE

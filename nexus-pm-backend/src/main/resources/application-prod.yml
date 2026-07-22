@@ -1,18 +1,51 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  liquibase:
+    # Schema is applied via sql/build.sql + sql/seed.sql
+    enabled: false
   datasource:
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=UTC
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:mysql://localhost:3306/dfn_pm?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: Anu@1312anu
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
 
 dfnpm:
-  jwt:
-    require-persistent-keys: true
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://192.168.14.91
+      - https://dfnplanx.directfn.net
   security:
-    swagger-enabled: false
-    cookie-secure: true
-    cookie-same-site: Strict
+    swagger-enabled: true
+    cookie-secure: false
+    redis-enabled: false
+    rate-limit-enabled: false
 
 management:
-  endpoint:
-    health:
-      show-details: never
+  health:
+    mail:
+      enabled: false
+    redis:
+      enabled: false
+
+logging:
+  level:
+    root: DEBUG
+    com.nexuspm: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.hibernate.type.descriptor.sql: TRACE

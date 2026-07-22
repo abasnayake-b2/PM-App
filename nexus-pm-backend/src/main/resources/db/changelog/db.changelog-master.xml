@@ -20,5 +20,7 @@
     <include file="db/changelog/changes/013-permission-menu-labels.xml"/>
     <include file="db/changelog/changes/014-issue-custom-fields.xml"/>
     <include file="db/changelog/changes/015-employee-profile-picture.xml"/>
+    <include file="db/changelog/changes/016-team-management-profile-picture.xml"/>
+    <include file="db/changelog/changes/017-em-capacity-plan.xml"/>
 
 </databaseChangeLog>

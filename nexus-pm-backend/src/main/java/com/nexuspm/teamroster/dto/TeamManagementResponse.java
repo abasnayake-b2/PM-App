@@ -17,6 +17,8 @@ public class TeamManagementResponse {
     private String supervisorName;
     private UUID supervisorId;
     private String supervisorFullName;
+    /** Relative API path when a picture is stored, e.g. /team-roster/management/{id}/photo */
+    private String profilePictureUrl;
     private String status;
     private Instant createdAt;
     private Instant updatedAt;

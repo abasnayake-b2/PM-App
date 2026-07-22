@@ -31,3 +31,11 @@ management:
       enabled: false
     redis:
       enabled: false
+
+# Optional: verbose logging for local troubleshooting (dev profile also enables full logs)
+logging:
+  level:
+    com.nexuspm: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
