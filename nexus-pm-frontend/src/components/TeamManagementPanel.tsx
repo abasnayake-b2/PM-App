@@ -28,7 +28,7 @@ export function TeamManagementPanel({ member, canEdit, onClose, onEdit }: TeamMa
         className="fixed inset-0 z-40 bg-black/50"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 shadow-2xl">
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l glass-panel">
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <div className="flex min-w-0 items-center gap-3">
             <ResourceAvatar

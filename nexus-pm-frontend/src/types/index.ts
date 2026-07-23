@@ -279,6 +279,11 @@ export interface OrgWorkforceSummary {
   vpCount: number;
   engineeringManagerCount: number;
   projectCount: number;
+  employees?: EmOrgEngineerItem[];
+  cxos?: EmOrgEngineerItem[];
+  vps?: EmOrgEngineerItem[];
+  engineeringManagers?: EmOrgEngineerItem[];
+  projects?: OrgBreakdownProject[];
 }
 
 export interface OrgBreakdownProject {
@@ -294,6 +299,7 @@ export interface VpOrgBreakdownRow {
   engineerCount: number;
   projectCount: number;
   engineeringManagers?: EmOrgEngineerItem[];
+  engineers?: EmOrgEngineerItem[];
   projects?: OrgBreakdownProject[];
 }
 

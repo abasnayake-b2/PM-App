@@ -1161,6 +1161,7 @@ export function OrgStructureStats() {
           subtitle={peopleDrill.subtitle}
           onClose={() => setPeopleDrill(null)}
           wide
+          protectUnsaved={false}
         >
           <ul className="divide-y divide-border rounded-xl border border-border">
             {peopleDrill.members.map((member) => (

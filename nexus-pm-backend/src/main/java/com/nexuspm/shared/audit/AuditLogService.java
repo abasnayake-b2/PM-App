@@ -3,11 +3,13 @@ package com.nexuspm.shared.audit;
 import com.nexuspm.shared.audit.entity.AuditLog;
 import com.nexuspm.shared.audit.repository.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuditLogService {
@@ -25,6 +27,14 @@ public class AuditLogService {
         entry.setDetails(details);
         entry.setIpAddress(ipAddress);
         auditLogRepository.save(entry);
+        log.info(
+                "AUDIT action={} entityType={} entityId={} userId={} ip={} details={}",
+                action,
+                entityType,
+                entityId,
+                employeeId,
+                ipAddress != null ? ipAddress : "-",
+                details != null ? details : "-");
     }
 
     public void logLogin(UUID employeeId, String ipAddress) {

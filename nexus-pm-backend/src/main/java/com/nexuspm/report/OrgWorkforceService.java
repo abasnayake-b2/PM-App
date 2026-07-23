@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,23 +35,40 @@ public class OrgWorkforceService {
     @Transactional(readOnly = true)
     public OrgWorkforceSummary buildSummary() {
         List<TeamManagement> management = activeManagement();
-        long cxoCount = management.stream()
+        List<EmOrgEngineerItem> cxos = management.stream()
                 .filter(person -> isCxoRole(person.getRoleTitle()))
-                .count();
-        long vpCount = management.stream()
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toManagementItem)
+                .toList();
+        List<EmOrgEngineerItem> vps = management.stream()
                 .filter(person -> isVpRole(person.getRoleTitle()))
-                .count();
-        long engineeringManagers = management.stream()
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toManagementItem)
+                .toList();
+        List<EmOrgEngineerItem> engineeringManagers = management.stream()
                 .filter(person -> isEngineeringManagerRole(person.getRoleTitle()))
-                .count();
-        long employeeCount = employeeRepository.countActiveRosterEmployees();
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toManagementItem)
+                .toList();
+        List<EmOrgEngineerItem> employees = employeeRepository.findActiveRosterEmployees().stream()
+                .map(employee -> EmOrgEngineerItem.builder()
+                        .name(employee.getFullName())
+                        .designation(designationLabel(employee))
+                        .build())
+                .toList();
+        List<OrgBreakdownProjectItem> projects = projectRepository.findAllBreakdownProjectsNonArchived();
 
         return OrgWorkforceSummary.builder()
-                .employeeCount(employeeCount)
-                .cxoCount(cxoCount)
-                .vpCount(vpCount)
-                .engineeringManagerCount(engineeringManagers)
-                .projectCount(projectRepository.countNonArchived())
+                .employeeCount(employees.size())
+                .cxoCount(cxos.size())
+                .vpCount(vps.size())
+                .engineeringManagerCount(engineeringManagers.size())
+                .projectCount(projects.size())
+                .employees(employees)
+                .cxos(cxos)
+                .vps(vps)
+                .engineeringManagers(engineeringManagers)
+                .projects(projects)
                 .build();
     }
 
@@ -67,7 +83,7 @@ public class OrgWorkforceService {
         Map<String, TeamManagement> byName = indexByName(management);
         Map<UUID, List<TeamManagement>> childrenBySupervisor =
                 childrenBySupervisor(management, byId, byName);
-        Map<UUID, Long> engineersByManagerId = rosterCountByEngineeringManagerId();
+        List<Employee> engineers = employeeRepository.findActiveEngineersWithManager();
 
         List<TeamManagement> vps = management.stream()
                 .filter(person -> isVpRole(person.getRoleTitle()))
@@ -75,7 +91,7 @@ public class OrgWorkforceService {
                 .toList();
 
         return vps.stream()
-                .map(vp -> toVpRow(vp, management, childrenBySupervisor, engineersByManagerId))
+                .map(vp -> toVpRow(vp, management, childrenBySupervisor, engineers))
                 .toList();
     }
 
@@ -100,25 +116,11 @@ public class OrgWorkforceService {
                 .toList();
     }
 
-    private Map<UUID, Long> rosterCountByEngineeringManagerId() {
-        Map<UUID, Long> counts = new HashMap<>();
-        for (Employee employee : employeeRepository.findActiveEngineersWithManager()) {
-            UUID managerId = employee.getEngineeringManagerManagement() != null
-                    ? employee.getEngineeringManagerManagement().getId()
-                    : null;
-            if (managerId == null) {
-                continue;
-            }
-            counts.merge(managerId, 1L, Long::sum);
-        }
-        return counts;
-    }
-
     private VpOrgBreakdownRow toVpRow(
             TeamManagement vp,
             List<TeamManagement> management,
             Map<UUID, List<TeamManagement>> childrenBySupervisor,
-            Map<UUID, Long> engineersByManagerName) {
+            List<Employee> engineers) {
         Set<UUID> descendantIds = collectDescendantIds(vp.getId(), childrenBySupervisor);
 
         List<TeamManagement> emsUnderVp = management.stream()
@@ -127,16 +129,21 @@ public class OrgWorkforceService {
                 .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
 
-        long engineerCount = emsUnderVp.stream()
-                .mapToLong(em -> engineersByManagerName.getOrDefault(em.getId(), 0L))
-                .sum();
-
         List<EmOrgEngineerItem> engineeringManagers = emsUnderVp.stream()
-                .map(em -> EmOrgEngineerItem.builder()
-                        .name(em.getFullName())
-                        .designation(em.getRoleTitle())
-                        .build())
+                .map(this::toManagementItem)
                 .toList();
+
+        List<EmOrgEngineerItem> engineerItems = new ArrayList<>();
+        for (TeamManagement em : emsUnderVp) {
+            for (Employee employee : engineersForManager(em, engineers)) {
+                engineerItems.add(EmOrgEngineerItem.builder()
+                        .name(employee.getFullName())
+                        .designation(designationLabel(employee))
+                        .build());
+            }
+        }
+        engineerItems.sort(Comparator.comparing(EmOrgEngineerItem::getName, String.CASE_INSENSITIVE_ORDER));
+
         List<UUID> emIds = emsUnderVp.stream().map(TeamManagement::getId).toList();
         List<OrgBreakdownProjectItem> projects = emIds.isEmpty()
                 ? List.of()
@@ -146,9 +153,10 @@ public class OrgWorkforceService {
                 .vpId(vp.getId())
                 .vpName(vp.getFullName())
                 .engineeringManagerCount(emsUnderVp.size())
-                .engineerCount(engineerCount)
+                .engineerCount(engineerItems.size())
                 .projectCount(projects.size())
                 .engineeringManagers(engineeringManagers)
+                .engineers(engineerItems)
                 .projects(projects)
                 .build();
     }
@@ -171,6 +179,13 @@ public class OrgWorkforceService {
                 .projectCount(projects.size())
                 .engineers(engineerItems)
                 .projects(projects)
+                .build();
+    }
+
+    private EmOrgEngineerItem toManagementItem(TeamManagement person) {
+        return EmOrgEngineerItem.builder()
+                .name(person.getFullName())
+                .designation(person.getRoleTitle() != null ? person.getRoleTitle() : "—")
                 .build();
     }
 

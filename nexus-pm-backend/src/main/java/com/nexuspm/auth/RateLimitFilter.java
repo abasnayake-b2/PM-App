@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "dfnpm.security.rate-limit-enabled", havingValue = "true", matchIfMissing = true)
@@ -69,6 +71,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         if (count != null && count > rule.getMaxRequests()) {
+            log.warn(
+                    "Rate limit exceeded path={} ip={} count={} max={} windowSeconds={}",
+                    path,
+                    clientKey,
+                    count,
+                    rule.getMaxRequests(),
+                    rule.getWindowSeconds());
             writeTooManyRequests(response, rule.getWindowSeconds());
             return;
         }

@@ -15,6 +15,7 @@ import com.nexuspm.user.entity.Employee;
 import com.nexuspm.user.repository.PermissionRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -33,6 +34,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -53,14 +55,21 @@ public class AuthService {
 
     @Transactional
     public LoginResult login(LoginRequest request, HttpServletRequest httpRequest) {
-        UserAuth auth = userAuthRepository.findByEmployeeEmail(request.getEmail().toLowerCase())
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+        String email = request.getEmail() != null ? request.getEmail().toLowerCase() : "";
+        String ip = resolveClientIp(httpRequest);
+        UserAuth auth = userAuthRepository.findByEmployeeEmail(email)
+                .orElseThrow(() -> {
+                    log.warn("Login failed: unknown email={} ip={}", email, ip);
+                    return new BadCredentialsException("Invalid email or password");
+                });
 
         if (!auth.isActive()) {
+            log.warn("Login failed: inactive account email={} ip={}", email, ip);
             throw new BusinessException("ACCOUNT_INACTIVE", "Account inactive. Contact administrator.", 403);
         }
 
         if (auth.getLockedUntil() != null && auth.getLockedUntil().isAfter(Instant.now())) {
+            log.warn("Login failed: locked account email={} ip={} until={}", email, ip, auth.getLockedUntil());
             throw new LockedException(
                     "Account locked after too many failed login attempts. Contact your administrator.");
         }
@@ -72,6 +81,17 @@ public class AuthService {
             auth.setFailedAttempts(auth.getFailedAttempts() + 1);
             if (auth.getFailedAttempts() >= properties.getApp().getMaxFailedLoginAttempts()) {
                 auth.setLockedUntil(Instant.now().plus(1, ChronoUnit.HOURS));
+                log.warn(
+                        "Account locked after failed attempts email={} attempts={} ip={}",
+                        email,
+                        auth.getFailedAttempts(),
+                        ip);
+            } else {
+                log.warn(
+                        "Login failed: bad password email={} attempts={} ip={}",
+                        email,
+                        auth.getFailedAttempts(),
+                        ip);
             }
             userAuthRepository.save(auth);
             throw new BadCredentialsException("Invalid email or password");
@@ -96,7 +116,13 @@ public class AuthService {
         String rawRefresh = generateSecureToken();
         saveRefreshToken(employee, rawRefresh);
 
-        auditLogService.logLogin(employee.getId(), resolveClientIp(httpRequest));
+        auditLogService.logLogin(employee.getId(), ip);
+        log.info(
+                "Login success email={} userId={} role={} ip={}",
+                email,
+                employee.getId(),
+                employee.getPrimaryRoleCode(),
+                ip);
 
         return LoginResult.builder()
                 .refreshToken(rawRefresh)
@@ -160,11 +186,13 @@ public class AuthService {
         }
         refreshTokenRepository.revokeAllForEmployee(principal.getId());
         auditLogService.logLogout(principal.getId(), resolveClientIp(request));
+        log.info("Logout userId={} email={} ip={}", principal.getId(), principal.getEmail(), resolveClientIp(request));
     }
 
     @Transactional
     public void requestPasswordReset(PasswordResetRequestDto request) {
-        userAuthRepository.findByEmployeeEmail(request.getEmail().toLowerCase()).ifPresent(auth -> {
+        String email = request.getEmail() != null ? request.getEmail().toLowerCase() : "";
+        userAuthRepository.findByEmployeeEmail(email).ifPresentOrElse(auth -> {
             String rawToken = generateSecureToken();
             PasswordResetToken resetToken = new PasswordResetToken();
             resetToken.setId(UUID.randomUUID());
@@ -185,15 +213,20 @@ public class AuthService {
                             + resetUrl
                             + "\n\nIf you did not request this, you can ignore this email.");
             mailSender.send(message);
-        });
+            log.info("Password reset email sent email={} userId={}", email, auth.getEmployee().getId());
+        }, () -> log.info("Password reset requested for unknown email={}", email));
     }
 
     @Transactional
     public void confirmPasswordReset(PasswordResetConfirmDto request) {
         PasswordResetToken token = passwordResetTokenRepository.findByTokenHash(hashToken(request.getToken()))
-                .orElseThrow(() -> new BusinessException("INVALID_TOKEN", "Invalid or expired reset token", 400));
+                .orElseThrow(() -> {
+                    log.warn("Password reset confirm failed: invalid token");
+                    return new BusinessException("INVALID_TOKEN", "Invalid or expired reset token", 400);
+                });
 
         if (token.isUsed() || token.getExpiresAt().isBefore(Instant.now())) {
+            log.warn("Password reset confirm failed: expired/used token userId={}", token.getEmployee().getId());
             throw new BusinessException("INVALID_TOKEN", "Invalid or expired reset token", 400);
         }
 
@@ -210,6 +243,7 @@ public class AuthService {
         token.setUsed(true);
         passwordResetTokenRepository.save(token);
         refreshTokenRepository.revokeAllForEmployee(auth.getEmployee().getId());
+        log.info("Password reset completed userId={}", auth.getEmployee().getId());
     }
 
     @Transactional
@@ -229,6 +263,7 @@ public class AuthService {
         applyNewPassword(auth, request.getNewPassword());
         userAuthRepository.save(auth);
         refreshTokenRepository.revokeAllForEmployee(auth.getEmployee().getId());
+        log.info("Password changed userId={} email={}", principal.getId(), principal.getEmail());
 
         Employee employee = auth.getEmployee();
         String accessToken = jwtService.generateAccessToken(

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Trash2, X } from 'lucide-react';
 import type { Allocation, Capacity, Issue } from '@/types';
 import { AllocationForm } from '@/components/AllocationForm';
 import { ResourceIssueAllocateForm } from '@/components/ResourceIssueAllocateForm';
 import { ResourceAvatar } from '@/components/ResourceAvatar';
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { useCreateAllocation, useDeleteAllocation, useUpdateAllocation } from '@/hooks/useResources';
+import { useUnsavedCloseGuard } from '@/hooks/useUnsavedCloseGuard';
 import {
   capacityPeriodView,
   formatAllocationDateRange,
@@ -42,6 +44,13 @@ export function TeamMemberPanel({
   const createAllocation = useCreateAllocation();
   const updateAllocation = useUpdateAllocation();
   const deleteAllocation = useDeleteAllocation();
+  const formOpen = allocating || editingAllocation != null;
+  const unsaved = useUnsavedCloseGuard(formOpen);
+  const { setDirty, confirmOpen, keepEditing, requestClose: guardClose } = unsaved;
+
+  useEffect(() => {
+    if (!formOpen) setDirty(false);
+  }, [formOpen, setDirty]);
 
   const { allocations, totalPercentage, availablePercentage } = capacityPeriodView(
     row,
@@ -87,15 +96,33 @@ export function TeamMemberPanel({
     });
   };
 
+  const requestClose = useCallback(() => {
+    guardClose(onClose);
+  }, [guardClose, onClose]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      if (confirmOpen) {
+        keepEditing();
+        return;
+      }
+      requestClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [confirmOpen, keepEditing, requestClose]);
+
   return (
     <>
       <button
         type="button"
         aria-label="Close panel"
         className="fixed inset-0 z-40 bg-black/50"
-        onClick={onClose}
+        onClick={requestClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 shadow-2xl">
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l glass-panel">
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <div className="flex items-center gap-3">
             <ResourceAvatar name={row.employeeName} size="md" imageUrl={row.profilePictureUrl} />
@@ -106,14 +133,19 @@ export function TeamMemberPanel({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded-lg p-1.5 text-text2 hover:bg-bg3 hover:text-text"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div
+          ref={unsaved.contentRef}
+          className="flex-1 overflow-y-auto p-5"
+          onInputCapture={unsaved.markDirtyFromEvent}
+          onChangeCapture={unsaved.markDirtyFromEvent}
+        >
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-border bg-bg3 p-4 text-center">
               <p className="text-xs font-medium uppercase tracking-wide text-text2">Allocated</p>
@@ -308,6 +340,14 @@ export function TeamMemberPanel({
           )}
         </div>
       </aside>
+
+      <UnsavedChangesDialog
+        open={unsaved.confirmOpen}
+        saving={unsaved.saving}
+        onSave={() => void unsaved.save()}
+        onKeepChanging={unsaved.keepEditing}
+        onCancel={unsaved.discard}
+      />
     </>
   );
 }

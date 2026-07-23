@@ -13,7 +13,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         type:
@@ -40,12 +40,12 @@ management:
 
 logging:
   level:
-    root: DEBUG
-    com.nexuspm: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.transaction: DEBUG
-    org.springframework.orm.jpa: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    org.hibernate.type.descriptor.sql: TRACE
+    root: INFO
+    com.nexuspm: INFO
+    org.springframework.web: INFO
+    org.springframework.security: WARN
+    org.springframework.transaction: WARN
+    org.springframework.orm.jpa: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.hibernate.type.descriptor.sql: WARN

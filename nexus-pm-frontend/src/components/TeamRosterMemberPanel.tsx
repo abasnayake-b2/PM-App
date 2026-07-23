@@ -88,7 +88,7 @@ export function TeamRosterMemberPanel({ member, canEdit, onClose, onEdit }: Team
         className="fixed inset-0 z-40 bg-black/50"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 shadow-2xl">
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l glass-panel">
         <div className="border-b border-border bg-gradient-to-br from-accent/10 via-bg2 to-bg2 p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">

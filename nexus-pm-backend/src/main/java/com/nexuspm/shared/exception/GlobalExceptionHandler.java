@@ -26,6 +26,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(OverAllocationException.class)
     public ProblemDetail handleOverAllocation(OverAllocationException ex) {
+        log.warn("Over-allocation rejected: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("OVER_ALLOCATION");
         problem.setType(URI.create("about:blank"));
@@ -38,6 +39,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ProblemDetail handleBusiness(BusinessException ex) {
+        log.warn("Business exception code={} status={} message={}", ex.getErrorCode(), ex.getStatus(), ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.valueOf(ex.getStatus()), ex.getMessage());
         problem.setTitle(ex.getErrorCode());
         problem.setType(URI.create("about:blank"));
@@ -47,11 +49,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
+        log.warn("Authentication failed: {}", ex.getMessage());
         return problem(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", ex.getMessage());
     }
 
     @ExceptionHandler(LockedException.class)
     public ProblemDetail handleLocked(LockedException ex) {
+        log.warn("Account locked: {}", ex.getMessage());
         ProblemDetail problem = problem(HttpStatus.LOCKED, "ACCOUNT_LOCKED", ex.getMessage());
         problem.setStatus(HttpStatus.LOCKED);
         return problem;
@@ -59,6 +63,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        log.warn("Access denied: {}", ex.getMessage());
         return problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You do not have permission to perform this action");
     }
 
@@ -68,6 +73,7 @@ public class GlobalExceptionHandler {
         for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
+        log.warn("Validation failed fields={}", errors.keySet());
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed");
         problem.setProperty("errors", errors);
         return problem;
@@ -102,6 +108,7 @@ public class GlobalExceptionHandler {
                 }
             }
         }
+        log.warn("Data integrity violation: {}", detail);
         return problem(HttpStatus.BAD_REQUEST, "DUPLICATE", detail);
     }
 

@@ -14,10 +14,11 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
+        format_sql: false
         type:
           preferred_uuid_jdbc_type: CHAR
   liquibase:
@@ -99,13 +100,15 @@ logging:
       max-history: ${LOG_MAX_HISTORY:30}
       total-size-cap: ${LOG_TOTAL_SIZE_CAP:1GB}
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId:-}] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId:-}] %-5level %logger{36} - %msg%n"
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
     com.nexuspm: ${LOG_LEVEL_APP:INFO}
+    com.nexuspm.shared.logging.RequestLoggingFilter: ${LOG_LEVEL_HTTP:INFO}
+    com.nexuspm.shared.audit.AuditLogService: ${LOG_LEVEL_AUDIT:INFO}
     org.springframework.web: ${LOG_LEVEL_WEB:INFO}
     org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}
-    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL:DEBUG}
-    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_HIBERNATE_BIND:TRACE}
-    org.hibernate.type.descriptor.sql: ${LOG_LEVEL_HIBERNATE_TYPE:TRACE}
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL:WARN}
+    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_HIBERNATE_BIND:WARN}
+    org.hibernate.type.descriptor.sql: ${LOG_LEVEL_HIBERNATE_TYPE:WARN}

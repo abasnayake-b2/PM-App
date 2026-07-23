@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-glass="off">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,10 +15,21 @@
       try {
         var raw = localStorage.getItem('dfnpm-ui');
         if (raw) {
-          var theme = JSON.parse(raw).state && JSON.parse(raw).state.theme;
-          if (theme === 'light' || theme === 'dark' || theme === 'blue') {
+          var state = JSON.parse(raw).state || {};
+          var theme = state.theme;
+          if (
+            theme === 'light' ||
+            theme === 'dark' ||
+            theme === 'blue' ||
+            theme === 'coffee' ||
+            theme === 'espresso'
+          ) {
             document.documentElement.setAttribute('data-theme', theme);
           }
+          document.documentElement.setAttribute(
+            'data-glass',
+            state.glassEnabled === true ? 'on' : 'off',
+          );
         }
       } catch (e) {}
     </script>

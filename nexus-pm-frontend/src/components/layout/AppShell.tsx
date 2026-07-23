@@ -19,8 +19,10 @@ import {
   X,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { GlassToggle } from '@/components/GlassToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useUIStore } from '@/store/useUIStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { logout } from '@/api/auth.api';
@@ -64,6 +66,7 @@ function NavCollapsibleGroup({
 export function AppShell() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const glassEnabled = useUIStore((s) => s.glassEnabled);
   const { can, showAdminNav } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,7 +121,14 @@ export function AppShell() {
     clsx('nav-link', isActive && 'nav-link-active');
 
   return (
-    <div className="flex min-h-screen">
+    <div className="app-shell relative flex min-h-screen">
+      {glassEnabled && (
+        <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
+          <div className="absolute -left-24 -top-28 h-[28rem] w-[28rem] rounded-full bg-[color:var(--glass-glow-1)] blur-3xl" />
+          <div className="absolute -right-16 top-10 h-[24rem] w-[24rem] rounded-full bg-[color:var(--glass-glow-2)] blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-[22rem] w-[22rem] rounded-full bg-[color:var(--glass-glow-3)] blur-3xl" />
+        </div>
+      )}
       <aside className="app-sidebar flex w-64 flex-col border-r">
         <div className="border-b px-6 py-5" style={{ borderColor: 'var(--sidebar-border)' }}>
           <div className="flex items-center gap-3">
@@ -225,11 +235,12 @@ export function AppShell() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header
-          className="app-header flex items-center justify-end gap-3 border-b px-6 py-2.5 sm:px-8"
+          className="app-header sticky top-0 z-20 flex items-center justify-end gap-3 border-b px-6 py-2.5 sm:px-8"
           style={{ boxShadow: 'var(--shadow-sm)' }}
         >
           <NotificationBell />
           <div className="hidden h-8 w-px bg-border sm:block" aria-hidden />
+          <GlassToggle compact />
           <ThemeToggle compact />
           <div className="hidden h-8 w-px bg-border md:block" aria-hidden />
           <div className="hidden text-right md:block">
@@ -254,7 +265,7 @@ export function AppShell() {
             <span className="hidden sm:inline">Sign out</span>
           </button>
         </header>
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-bg p-8">
+        <main className="app-main min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-8">
           {showPasswordBanner && (
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
               <div>

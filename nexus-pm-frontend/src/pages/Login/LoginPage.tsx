@@ -1,10 +1,10 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { Eye, EyeOff, Globe2, ShieldCheck, Sparkles } from 'lucide-react';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { login } from '@/api/auth.api';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useUIStore } from '@/store/useUIStore';
 import { authUserFromToken } from '@/utils/permissions';
 import {
   clearRememberedLogin,
@@ -33,6 +33,18 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Login is always dark (no theme / glass picker). Restore app preference on leave.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', 'dark');
+    root.setAttribute('data-glass', 'off');
+    return () => {
+      const { theme, glassEnabled } = useUIStore.getState();
+      root.setAttribute('data-theme', theme);
+      root.setAttribute('data-glass', glassEnabled ? 'on' : 'off');
+    };
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -69,10 +81,6 @@ export function LoginPage() {
 
   return (
     <div className="login-shell relative flex min-h-screen">
-      <div className="absolute right-4 top-4 z-30">
-        <ThemeToggle className="bg-bg2/80 backdrop-blur-md" />
-      </div>
-
       <aside className="login-brand-panel relative hidden w-[78%] bg-[#07122f] lg:block">
         <video
           className="login-brand-media absolute inset-0 h-full w-full object-contain object-center"

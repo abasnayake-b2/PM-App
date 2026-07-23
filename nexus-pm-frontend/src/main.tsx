@@ -9,9 +9,13 @@ const queryClient = new QueryClient();
 
 function ThemeInitializer() {
   const theme = useUIStore((s) => s.theme);
+  const glassEnabled = useUIStore((s) => s.glassEnabled);
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-glass', glassEnabled ? 'on' : 'off');
+  }, [glassEnabled]);
   return null;
 }
 

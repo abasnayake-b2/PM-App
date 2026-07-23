@@ -73,7 +73,7 @@ function CountPanelTrigger({
   onOpen: (panel: BreakdownPanel) => void;
 }) {
   if (count === 0) {
-    return <span>{count}</span>;
+    return <span className="font-semibold">{count}</span>;
   }
 
   return (
@@ -207,32 +207,84 @@ export function DashboardPage() {
               <dl className="flex min-h-0 flex-1 flex-col justify-center gap-3 px-5 py-5">
                 <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
                   <dt className="text-sm text-text2"># Engineers</dt>
-                  <dd className="text-xl font-semibold tabular-nums">
-                    {isLoading ? '…' : (data?.orgWorkforce?.employeeCount ?? 0)}
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.employeeCount ?? 0}
+                        groups={groupEngineersByDesignation(data?.orgWorkforce?.employees ?? [])}
+                        label="Engineers"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
                   <dt className="text-sm text-text2"># CXO</dt>
-                  <dd className="text-xl font-semibold tabular-nums">
-                    {isLoading ? '…' : (data?.orgWorkforce?.cxoCount ?? 0)}
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.cxoCount ?? 0}
+                        groups={groupEngineersByDesignation(data?.orgWorkforce?.cxos ?? [])}
+                        label="CXO"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
                   <dt className="text-sm text-text2"># VP</dt>
-                  <dd className="text-xl font-semibold tabular-nums">
-                    {isLoading ? '…' : (data?.orgWorkforce?.vpCount ?? 0)}
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.vpCount ?? 0}
+                        groups={groupEngineersByDesignation(data?.orgWorkforce?.vps ?? [])}
+                        label="VP"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
                   <dt className="text-sm text-text2"># of Engineering Manager</dt>
-                  <dd className="text-xl font-semibold tabular-nums">
-                    {isLoading ? '…' : (data?.orgWorkforce?.engineeringManagerCount ?? 0)}
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.engineeringManagerCount ?? 0}
+                        groups={groupEngineersByDesignation(
+                          data?.orgWorkforce?.engineeringManagers ?? [],
+                        )}
+                        label="Engineering managers"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt className="text-sm text-text2"># Projects</dt>
-                  <dd className="text-xl font-semibold tabular-nums">
-                    {isLoading ? '…' : (data?.orgWorkforce?.projectCount ?? 0)}
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.projectCount ?? 0}
+                        groups={groupBreakdownProjects(data?.orgWorkforce?.projects ?? [])}
+                        label="Projects"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -292,7 +344,15 @@ export function DashboardPage() {
                             onOpen={setBreakdownPanel}
                           />
                         </td>
-                        <td className="px-2 py-2.5 text-right tabular-nums">{row.engineerCount}</td>
+                        <td className="px-2 py-2.5 text-right tabular-nums">
+                          <CountPanelTrigger
+                            count={row.engineerCount}
+                            groups={groupEngineersByDesignation(row.engineers ?? [])}
+                            label="Engineers"
+                            subtitle={row.vpName}
+                            onOpen={setBreakdownPanel}
+                          />
+                        </td>
                         <td className="px-2 py-2.5 text-right tabular-nums">
                           <CountPanelTrigger
                             count={row.projectCount}

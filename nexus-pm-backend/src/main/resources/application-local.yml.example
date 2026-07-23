@@ -32,10 +32,11 @@ management:
     redis:
       enabled: false
 
-# Optional: verbose logging for local troubleshooting (dev profile also enables full logs)
+# Optional: verbose app logging for local troubleshooting
+# Uncomment Hibernate lines only when debugging SQL:
 logging:
   level:
     com.nexuspm: DEBUG
     org.springframework.web: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
+    # org.hibernate.SQL: DEBUG
+    # org.hibernate.orm.jdbc.bind: TRACE

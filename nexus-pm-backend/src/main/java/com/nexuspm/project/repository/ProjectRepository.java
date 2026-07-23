@@ -217,6 +217,17 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     long countNonArchived();
 
     @Query("""
+            SELECT new com.nexuspm.report.dto.OrgBreakdownProjectItem(
+                p.name, co.region.name, co.name)
+            FROM Project p
+            JOIN p.client c
+            JOIN c.country co
+            WHERE p.deleted = false AND p.archived = false
+            ORDER BY co.region.name, co.name, p.name
+            """)
+    List<OrgBreakdownProjectItem> findAllBreakdownProjectsNonArchived();
+
+    @Query("""
             SELECT COUNT(p) FROM Project p
             WHERE p.deleted = false AND p.archived = false
               AND p.engineeringManagerManagement.id IN :emIds

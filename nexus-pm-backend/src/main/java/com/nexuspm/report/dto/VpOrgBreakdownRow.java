@@ -15,5 +15,6 @@ public class VpOrgBreakdownRow {
     private long engineerCount;
     private long projectCount;
     private List<EmOrgEngineerItem> engineeringManagers;
+    private List<EmOrgEngineerItem> engineers;
     private List<OrgBreakdownProjectItem> projects;
 }

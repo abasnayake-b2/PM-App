@@ -274,6 +274,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     long countActiveRosterEmployees();
 
     @Query("""
+            SELECT e FROM Employee e
+            LEFT JOIN FETCH e.designation
+            WHERE e.status = 'ACTIVE'
+              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+            ORDER BY e.firstName, e.lastName
+            """)
+    List<Employee> findActiveRosterEmployees();
+
+    @Query("""
             SELECT COUNT(e) FROM Employee e
             WHERE e.status = 'ACTIVE'
             """)
