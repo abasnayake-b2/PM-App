@@ -6,7 +6,9 @@ import com.nexuspm.user.entity.Employee;
 import com.nexuspm.user.entity.OrgLevel;
 import com.nexuspm.user.entity.Role;
 import com.nexuspm.user.repository.OrgLevelRepository;
+import com.nexuspm.shared.cache.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ public class OrgHierarchyService {
 
     private final OrgLevelRepository orgLevelRepository;
 
+    @Cacheable(cacheNames = CacheNames.ORG_LEVELS, key = "'all'")
     @Transactional(readOnly = true)
     public List<OrgLevelResponse> listOrgLevels() {
         return orgLevelRepository.findAllOrdered().stream()

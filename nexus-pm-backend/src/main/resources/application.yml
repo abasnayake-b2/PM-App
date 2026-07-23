@@ -73,6 +73,12 @@ dfnpm:
   storage:
     pic-dir: ${PIC_DIR:Pic}
     max-pic-bytes: ${MAX_PIC_BYTES:2097152}
+  cache:
+    enabled: ${CACHE_ENABLED:true}
+    ttl-minutes: ${CACHE_TTL_MINUTES:360}
+    max-size: ${CACHE_MAX_SIZE:500}
+    warmup-on-startup: ${CACHE_WARMUP_ON_STARTUP:true}
+    daily-refresh-cron: ${CACHE_DAILY_REFRESH_CRON:0 0 2 * * *}
 
 management:
   endpoints:

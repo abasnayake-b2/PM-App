@@ -3,6 +3,7 @@ package com.nexuspm.user;
 import com.nexuspm.auth.AuthService;
 import com.nexuspm.auth.entity.UserAuth;
 import com.nexuspm.auth.repository.UserAuthRepository;
+import com.nexuspm.shared.cache.CacheNames;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.user.dto.*;
 import com.nexuspm.user.entity.Department;
@@ -16,6 +17,7 @@ import com.nexuspm.user.repository.EmployeeRepository;
 import com.nexuspm.user.repository.RoleRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -175,6 +177,7 @@ public class EmployeeService {
         return employeeMapper.toResponse(employee);
     }
 
+    @Cacheable(cacheNames = CacheNames.DEPARTMENTS, key = "'employee-dto'")
     @Transactional(readOnly = true)
     public List<DepartmentResponse> listDepartments() {
         return departmentRepository.findAll().stream()
@@ -182,6 +185,7 @@ public class EmployeeService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = CacheNames.DESIGNATIONS, key = "'employee-dto'")
     @Transactional(readOnly = true)
     public List<DesignationResponse> listDesignations() {
         return designationRepository.findAllWithDepartment().stream()
@@ -197,6 +201,7 @@ public class EmployeeService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = CacheNames.ROLES, key = "'employee-options'")
     @Transactional(readOnly = true)
     public List<RoleOptionResponse> listRoles() {
         return roleRepository.findAll().stream()

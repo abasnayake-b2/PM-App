@@ -9,7 +9,10 @@ import com.nexuspm.user.entity.Role;
 import com.nexuspm.user.repository.EmployeeRepository;
 import com.nexuspm.user.repository.PermissionRepository;
 import com.nexuspm.user.repository.RoleRepository;
+import com.nexuspm.shared.cache.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,7 @@ public class RoleAccessService {
     private final PermissionRepository permissionRepository;
     private final EmployeeRepository employeeRepository;
 
+    @Cacheable(cacheNames = CacheNames.PERMISSIONS, key = "'all'")
     @Transactional(readOnly = true)
     public List<PermissionResponse> listPermissions() {
         return permissionRepository.findAllByOrderByModuleAscActionAsc().stream()
@@ -35,6 +39,7 @@ public class RoleAccessService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = CacheNames.ACCESS_ROLES, key = "'all'")
     @Transactional(readOnly = true)
     public List<RoleAccessResponse> listRoles() {
         return roleRepository.findAll().stream()
@@ -53,6 +58,7 @@ public class RoleAccessService {
         return toRoleAccessResponse(role);
     }
 
+    @CacheEvict(cacheNames = {CacheNames.ACCESS_ROLES, CacheNames.ROLES}, allEntries = true)
     @Transactional
     public RoleAccessResponse createRole(CreateAccessRoleRequest request) {
         String name = request.getName().trim();
@@ -74,6 +80,7 @@ public class RoleAccessService {
         return toRoleAccessResponse(role);
     }
 
+    @CacheEvict(cacheNames = {CacheNames.ACCESS_ROLES, CacheNames.ROLES}, allEntries = true)
     @Transactional
     public RoleAccessResponse updateRolePermissions(UUID roleId, List<String> permissionCodes) {
         Role role = roleRepository.findById(roleId)
@@ -86,6 +93,7 @@ public class RoleAccessService {
         return toRoleAccessResponse(role);
     }
 
+    @CacheEvict(cacheNames = {CacheNames.ACCESS_ROLES, CacheNames.ROLES}, allEntries = true)
     @Transactional
     public void deleteRole(UUID roleId) {
         Role role = roleRepository.findById(roleId)

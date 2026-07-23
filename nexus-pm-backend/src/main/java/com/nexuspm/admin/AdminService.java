@@ -12,10 +12,13 @@ import com.nexuspm.organisation.repository.CountryRepository;
 import com.nexuspm.shared.audit.AuditLogService;
 import com.nexuspm.shared.audit.entity.AuditLog;
 import com.nexuspm.shared.audit.repository.AuditLogRepository;
+import com.nexuspm.shared.cache.CacheNames;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.shared.security.SecurityUtils;
 import com.nexuspm.user.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -53,6 +56,7 @@ public class AdminService {
         return page.map(log -> toAuditResponse(log, names.get(log.getEmployeeId())));
     }
 
+    @Cacheable(cacheNames = CacheNames.HOLIDAYS, key = "'all'")
     @Transactional(readOnly = true)
     public List<HolidayResponse> listHolidays() {
         return holidayCalendarRepository.findAllWithCountry().stream()
@@ -60,6 +64,7 @@ public class AdminService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = CacheNames.HOLIDAYS, allEntries = true)
     @Transactional
     public HolidayResponse createHoliday(CreateHolidayRequest request) {
         HolidayCalendar holiday = new HolidayCalendar();
@@ -76,6 +81,7 @@ public class AdminService {
         return toHolidayResponse(holiday);
     }
 
+    @CacheEvict(cacheNames = CacheNames.HOLIDAYS, allEntries = true)
     @Transactional
     public void deleteHoliday(UUID id) {
         HolidayCalendar holiday = holidayCalendarRepository.findById(id)
@@ -122,6 +128,7 @@ public class AdminService {
         auditLogService.log(SecurityUtils.currentUserId(), "DELETE", "WORKFLOW_RULE", id, null, null);
     }
 
+    @Cacheable(cacheNames = CacheNames.SETTINGS, key = "'all'")
     @Transactional(readOnly = true)
     public List<SystemSettingResponse> listSettings() {
         return systemSettingRepository.findAllByOrderBySettingKeyAsc().stream()
@@ -129,6 +136,7 @@ public class AdminService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = CacheNames.SETTINGS, allEntries = true)
     @Transactional
     public SystemSettingResponse updateSetting(UUID id, UpdateSettingRequest request) {
         SystemSetting setting = systemSettingRepository.findById(id)

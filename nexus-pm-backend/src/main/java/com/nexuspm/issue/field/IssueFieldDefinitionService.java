@@ -9,8 +9,11 @@ import com.nexuspm.issue.field.dto.UpdateIssueFieldDefinitionRequest;
 import com.nexuspm.issue.field.entity.IssueFieldDefinition;
 import com.nexuspm.issue.field.repository.IssueFieldDefinitionRepository;
 import com.nexuspm.issue.field.repository.IssueFieldValueRepository;
+import com.nexuspm.shared.cache.CacheNames;
 import com.nexuspm.shared.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ public class IssueFieldDefinitionService {
     private final IssueFieldValueRepository valueRepository;
     private final ObjectMapper objectMapper;
 
+    @Cacheable(cacheNames = CacheNames.FIELD_DEFS_ALL, key = "'all'")
     @Transactional(readOnly = true)
     public List<IssueFieldDefinitionResponse> listAll() {
         return definitionRepository.findAllByOrderByDisplayOrderAsc().stream()
@@ -37,6 +41,7 @@ public class IssueFieldDefinitionService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = CacheNames.FIELD_DEFS_ACTIVE, key = "'all'")
     @Transactional(readOnly = true)
     public List<IssueFieldDefinitionResponse> listActive() {
         return definitionRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
@@ -44,6 +49,7 @@ public class IssueFieldDefinitionService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DEFS_ALL, CacheNames.FIELD_DEFS_ACTIVE}, allEntries = true)
     @Transactional
     public IssueFieldDefinitionResponse create(CreateIssueFieldDefinitionRequest request) {
         String label = request.getLabel().trim();
@@ -77,6 +83,7 @@ public class IssueFieldDefinitionService {
         return toResponse(definitionRepository.save(definition));
     }
 
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DEFS_ALL, CacheNames.FIELD_DEFS_ACTIVE}, allEntries = true)
     @Transactional
     public IssueFieldDefinitionResponse update(UUID id, UpdateIssueFieldDefinitionRequest request) {
         IssueFieldDefinition definition = definitionRepository.findById(id)
@@ -114,6 +121,7 @@ public class IssueFieldDefinitionService {
         return toResponse(definitionRepository.save(definition));
     }
 
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DEFS_ALL, CacheNames.FIELD_DEFS_ACTIVE}, allEntries = true)
     @Transactional
     public void delete(UUID id) {
         IssueFieldDefinition definition = definitionRepository.findById(id)

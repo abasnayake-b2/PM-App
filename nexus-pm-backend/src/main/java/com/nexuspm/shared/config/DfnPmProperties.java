@@ -18,6 +18,7 @@ public class DfnPmProperties {
     private App app = new App();
     private Security security = new Security();
     private Storage storage = new Storage();
+    private Cache cache = new Cache();
 
     @Getter
     @Setter
@@ -80,5 +81,20 @@ public class DfnPmProperties {
         private String picDir = "Pic";
         /** Max profile picture size in bytes (default 2 MB). */
         private long maxPicBytes = 2L * 1024 * 1024;
+    }
+
+    @Getter
+    @Setter
+    public static class Cache {
+        /** Master switch for Spring Cache / Caffeine. */
+        private boolean enabled = true;
+        /** Default TTL for all named caches (safety net even with write eviction). */
+        private long ttlMinutes = 360;
+        /** Max entries per cache. */
+        private long maxSize = 500;
+        /** Warm caches after application start. */
+        private boolean warmupOnStartup = true;
+        /** Cron for daily full refresh (default 02:00 server time). */
+        private String dailyRefreshCron = "0 0 2 * * *";
     }
 }

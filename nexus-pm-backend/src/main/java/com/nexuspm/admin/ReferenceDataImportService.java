@@ -1,6 +1,8 @@
 package com.nexuspm.admin;
 
 import com.nexuspm.admin.dto.ReferenceDataImportResult;
+import com.nexuspm.shared.cache.CacheEvictionService;
+import com.nexuspm.shared.cache.CacheNames;
 import com.nexuspm.shared.config.DfnPmProperties;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.shared.security.SecurityUtils;
@@ -35,6 +37,7 @@ public class ReferenceDataImportService {
     private final SkillRepository skillRepository;
     private final EmployeeRepository employeeRepository;
     private final DfnPmProperties properties;
+    private final CacheEvictionService cacheEvictionService;
 
     @Transactional
     public ReferenceDataImportResult importExcel(MultipartFile file) {
@@ -64,6 +67,8 @@ public class ReferenceDataImportService {
         } catch (Exception ex) {
             throw new BusinessException("IMPORT_FAILED", "Failed to read Excel file: " + ex.getMessage(), 400);
         }
+
+        cacheEvictionService.evictReferenceCatalogs();
 
         return ReferenceDataImportResult.builder()
                 .fileName(fileName)
@@ -102,6 +107,8 @@ public class ReferenceDataImportService {
         } catch (Exception ex) {
             throw new BusinessException("IMPORT_FAILED", "Failed to read Excel file: " + ex.getMessage(), 400);
         }
+
+        cacheEvictionService.evict(CacheNames.SKILLS);
 
         return ReferenceDataImportResult.builder()
                 .fileName(fileName)

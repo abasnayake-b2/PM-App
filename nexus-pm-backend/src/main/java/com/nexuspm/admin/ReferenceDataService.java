@@ -25,7 +25,10 @@ import com.nexuspm.user.repository.RoleRepository;
 import com.nexuspm.user.repository.StreamRepository;
 import com.nexuspm.user.repository.WorkTypeRepository;
 import com.nexuspm.user.repository.SkillRepository;
+import com.nexuspm.shared.cache.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,11 +55,13 @@ public class ReferenceDataService {
     private static final Set<String> SYSTEM_ROLE_CODES = Set.of(
             "SUPER_ADMIN", "ADMIN", "CXO", "VP", "MANAGER", "EMPLOYEE");
 
+    @Cacheable(cacheNames = CacheNames.DEPARTMENTS, key = "'all'")
     @Transactional(readOnly = true)
     public List<Department> listDepartments() {
         return auditNameEnricher.enrichAll(departmentRepository.findAll());
     }
 
+    @CacheEvict(cacheNames = CacheNames.DEPARTMENTS, allEntries = true)
     @Transactional
     public Department createDepartment(String name) {
         if (departmentRepository.findAll().stream().anyMatch(d -> d.getName().equalsIgnoreCase(name.trim()))) {
@@ -68,6 +73,7 @@ public class ReferenceDataService {
         return auditNameEnricher.enrich(departmentRepository.save(department));
     }
 
+    @CacheEvict(cacheNames = CacheNames.DEPARTMENTS, allEntries = true)
     @Transactional
     public Department updateDepartment(UUID id, String name) {
         Department department = departmentRepository.findById(id)
@@ -76,6 +82,7 @@ public class ReferenceDataService {
         return auditNameEnricher.enrich(departmentRepository.save(department));
     }
 
+    @CacheEvict(cacheNames = CacheNames.DEPARTMENTS, allEntries = true)
     @Transactional
     public void deleteDepartment(UUID id) {
         if (employeeRepository.findAll().stream().anyMatch(e -> e.getDepartment() != null && e.getDepartment().getId().equals(id))) {
@@ -87,6 +94,7 @@ public class ReferenceDataService {
         departmentRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.STREAMS, key = "'all'")
     @Transactional(readOnly = true)
     public List<StreamResponse> listStreams() {
         List<Stream> streams = streamRepository.findAllWithDepartment();
@@ -94,6 +102,7 @@ public class ReferenceDataService {
         return streams.stream().map(this::toStreamResponse).toList();
     }
 
+    @CacheEvict(cacheNames = CacheNames.STREAMS, allEntries = true)
     @Transactional
     public StreamResponse createStream(String name, UUID departmentId) {
         if (streamRepository.findAll().stream().anyMatch(s -> s.getName().equalsIgnoreCase(name.trim()))) {
@@ -108,6 +117,7 @@ public class ReferenceDataService {
         return toStreamResponse(auditNameEnricher.enrich(streamRepository.save(stream)));
     }
 
+    @CacheEvict(cacheNames = CacheNames.STREAMS, allEntries = true)
     @Transactional
     public StreamResponse updateStream(UUID id, String name, UUID departmentId) {
         Stream stream = streamRepository.findById(id)
@@ -119,6 +129,7 @@ public class ReferenceDataService {
         return toStreamResponse(auditNameEnricher.enrich(streamRepository.save(stream)));
     }
 
+    @CacheEvict(cacheNames = {CacheNames.STREAMS, CacheNames.DESIGNATIONS}, allEntries = true)
     @Transactional
     public void deleteStream(UUID id) {
         if (designationRepository.existsByStream_Id(id)) {
@@ -127,6 +138,7 @@ public class ReferenceDataService {
         streamRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.DESIGNATIONS, key = "'all'")
     @Transactional(readOnly = true)
     public List<DesignationResponse> listDesignations() {
         List<Designation> designations = designationRepository.findAllWithDepartment();
@@ -134,6 +146,7 @@ public class ReferenceDataService {
         return designations.stream().map(this::toDesignationResponse).toList();
     }
 
+    @CacheEvict(cacheNames = CacheNames.DESIGNATIONS, allEntries = true)
     @Transactional
     public DesignationResponse createDesignation(String name, String code, UUID streamId) {
         Stream stream = streamRepository.findById(streamId)
@@ -155,6 +168,7 @@ public class ReferenceDataService {
         return toDesignationResponse(auditNameEnricher.enrich(designationRepository.save(designation)));
     }
 
+    @CacheEvict(cacheNames = CacheNames.DESIGNATIONS, allEntries = true)
     @Transactional
     public DesignationResponse updateDesignation(UUID id, String name, String code, UUID streamId) {
         Designation designation = designationRepository.findById(id)
@@ -176,6 +190,7 @@ public class ReferenceDataService {
         return toDesignationResponse(auditNameEnricher.enrich(designationRepository.save(designation)));
     }
 
+    @CacheEvict(cacheNames = CacheNames.DESIGNATIONS, allEntries = true)
     @Transactional
     public void deleteDesignation(UUID id) {
         if (employeeRepository.findAll().stream().anyMatch(e -> e.getDesignation() != null && e.getDesignation().getId().equals(id))) {
@@ -184,6 +199,7 @@ public class ReferenceDataService {
         designationRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.ROLES, key = "'all'")
     @Transactional(readOnly = true)
     public List<ReferenceRoleResponse> listRoles() {
         List<Role> roles = roleRepository.findAll();
@@ -197,11 +213,13 @@ public class ReferenceDataService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = {CacheNames.ROLES, CacheNames.ACCESS_ROLES}, allEntries = true)
     @Transactional
     public ReferenceRoleResponse createRole(String name, String code) {
         throw new BusinessException("NOT_ALLOWED", "Create roles under Admin → Roles & access.", 400);
     }
 
+    @CacheEvict(cacheNames = {CacheNames.ROLES, CacheNames.ACCESS_ROLES}, allEntries = true)
     @Transactional
     public ReferenceRoleResponse updateRole(UUID id, String name) {
         Role role = roleRepository.findById(id)
@@ -210,6 +228,7 @@ public class ReferenceDataService {
         return toRoleResponse(auditNameEnricher.enrich(roleRepository.save(role)));
     }
 
+    @CacheEvict(cacheNames = {CacheNames.ROLES, CacheNames.ACCESS_ROLES}, allEntries = true)
     @Transactional
     public void deleteRole(UUID id) {
         Role role = roleRepository.findById(id)
@@ -236,11 +255,13 @@ public class ReferenceDataService {
         };
     }
 
+    @Cacheable(cacheNames = CacheNames.ISSUE_TYPES, key = "'admin-all'")
     @Transactional(readOnly = true)
     public List<IssueType> listIssueTypes() {
         return IssueTypeCatalog.filterAndSort(issueTypeRepository.findAll());
     }
 
+    @CacheEvict(cacheNames = CacheNames.ISSUE_TYPES, allEntries = true)
     @Transactional
     public IssueType createIssueType(String name, String workflowCode, String description) {
         IssueType issueType = new IssueType();
@@ -251,6 +272,7 @@ public class ReferenceDataService {
         return issueTypeRepository.save(issueType);
     }
 
+    @CacheEvict(cacheNames = CacheNames.ISSUE_TYPES, allEntries = true)
     @Transactional
     public IssueType updateIssueType(UUID id, String name, String workflowCode, String description) {
         IssueType issueType = issueTypeRepository.findById(id)
@@ -261,16 +283,19 @@ public class ReferenceDataService {
         return issueTypeRepository.save(issueType);
     }
 
+    @CacheEvict(cacheNames = CacheNames.ISSUE_TYPES, allEntries = true)
     @Transactional
     public void deleteIssueType(UUID id) {
         issueTypeRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.ISSUE_STATUSES, key = "'admin-all'")
     @Transactional(readOnly = true)
     public List<IssueStatus> listIssueStatuses() {
         return issueStatusRepository.findAllByOrderBySequenceAsc();
     }
 
+    @CacheEvict(cacheNames = CacheNames.ISSUE_STATUSES, allEntries = true)
     @Transactional
     public IssueStatus createIssueStatus(String name, int sequence, boolean terminal, String colour) {
         IssueStatus status = new IssueStatus();
@@ -282,6 +307,7 @@ public class ReferenceDataService {
         return issueStatusRepository.save(status);
     }
 
+    @CacheEvict(cacheNames = CacheNames.ISSUE_STATUSES, allEntries = true)
     @Transactional
     public IssueStatus updateIssueStatus(UUID id, String name, int sequence, boolean terminal, String colour) {
         IssueStatus status = issueStatusRepository.findById(id)
@@ -293,16 +319,19 @@ public class ReferenceDataService {
         return issueStatusRepository.save(status);
     }
 
+    @CacheEvict(cacheNames = CacheNames.ISSUE_STATUSES, allEntries = true)
     @Transactional
     public void deleteIssueStatus(UUID id) {
         issueStatusRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.PRIORITIES, key = "'admin-all'")
     @Transactional(readOnly = true)
     public List<Priority> listPriorities() {
         return priorityRepository.findAllByOrderByLevelAsc();
     }
 
+    @CacheEvict(cacheNames = CacheNames.PRIORITIES, allEntries = true)
     @Transactional
     public Priority createPriority(String label, int level, int slaResponseHrs, int slaResolveHrs, String colour) {
         Priority priority = new Priority();
@@ -315,6 +344,7 @@ public class ReferenceDataService {
         return priorityRepository.save(priority);
     }
 
+    @CacheEvict(cacheNames = CacheNames.PRIORITIES, allEntries = true)
     @Transactional
     public Priority updatePriority(UUID id, String label, int level, int slaResponseHrs, int slaResolveHrs, String colour) {
         Priority priority = priorityRepository.findById(id)
@@ -327,16 +357,19 @@ public class ReferenceDataService {
         return priorityRepository.save(priority);
     }
 
+    @CacheEvict(cacheNames = CacheNames.PRIORITIES, allEntries = true)
     @Transactional
     public void deletePriority(UUID id) {
         priorityRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.WORK_TYPES, key = "'all'")
     @Transactional(readOnly = true)
     public List<WorkType> listWorkTypes() {
         return auditNameEnricher.enrichAll(workTypeRepository.findAll());
     }
 
+    @CacheEvict(cacheNames = CacheNames.WORK_TYPES, allEntries = true)
     @Transactional
     public WorkType createWorkType(String name) {
         if (workTypeRepository.findAll().stream().anyMatch(w -> w.getName().equalsIgnoreCase(name.trim()))) {
@@ -348,6 +381,7 @@ public class ReferenceDataService {
         return auditNameEnricher.enrich(workTypeRepository.save(workType));
     }
 
+    @CacheEvict(cacheNames = CacheNames.WORK_TYPES, allEntries = true)
     @Transactional
     public WorkType updateWorkType(UUID id, String name) {
         WorkType workType = workTypeRepository.findById(id)
@@ -356,16 +390,19 @@ public class ReferenceDataService {
         return auditNameEnricher.enrich(workTypeRepository.save(workType));
     }
 
+    @CacheEvict(cacheNames = CacheNames.WORK_TYPES, allEntries = true)
     @Transactional
     public void deleteWorkType(UUID id) {
         workTypeRepository.deleteById(id);
     }
 
+    @Cacheable(cacheNames = CacheNames.SKILLS, key = "'all'")
     @Transactional(readOnly = true)
     public List<Skill> listSkills() {
         return auditNameEnricher.enrichAll(skillRepository.findAll());
     }
 
+    @CacheEvict(cacheNames = CacheNames.SKILLS, allEntries = true)
     @Transactional
     public Skill createSkill(String name, String description) {
         if (skillRepository.findAll().stream().anyMatch(s -> s.getName().equalsIgnoreCase(name.trim()))) {
@@ -378,6 +415,7 @@ public class ReferenceDataService {
         return auditNameEnricher.enrich(skillRepository.save(skill));
     }
 
+    @CacheEvict(cacheNames = CacheNames.SKILLS, allEntries = true)
     @Transactional
     public Skill updateSkill(UUID id, String name, String description) {
         Skill skill = skillRepository.findById(id)
@@ -387,6 +425,7 @@ public class ReferenceDataService {
         return auditNameEnricher.enrich(skillRepository.save(skill));
     }
 
+    @CacheEvict(cacheNames = CacheNames.SKILLS, allEntries = true)
     @Transactional
     public void deleteSkill(UUID id) {
         skillRepository.deleteById(id);
