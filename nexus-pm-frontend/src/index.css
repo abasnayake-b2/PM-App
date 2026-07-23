@@ -441,3 +441,257 @@
     box-shadow: none;
   }
 }
+
+/* ─── Login — DirectFN corporate energy ─────────────────────────────────── */
+.login-shell {
+  --login-blue: #1d4ed8;
+  --login-blue-deep: #0b2a6b;
+  --login-cyan: #38bdf8;
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.login-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 85% 15%, rgb(56 189 248 / 0.18), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 70% 90%, rgb(37 99 235 / 0.16), transparent 50%),
+    linear-gradient(160deg, #f4f8ff 0%, #e8f1ff 45%, #dbeafe 100%);
+  z-index: 0;
+}
+
+[data-theme='dark'] .login-shell::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 85% 10%, rgb(56 189 248 / 0.14), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 75% 95%, rgb(37 99 235 / 0.2), transparent 50%),
+    linear-gradient(160deg, #07111f 0%, #0b1730 48%, #0f1f3d 100%);
+}
+
+[data-theme='blue'] .login-shell::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 85% 15%, rgb(96 165 250 / 0.28), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 70% 90%, rgb(29 78 216 / 0.18), transparent 50%),
+    linear-gradient(160deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+}
+
+.login-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(40px);
+  pointer-events: none;
+  z-index: 0;
+  animation: login-orb-float 12s ease-in-out infinite;
+}
+
+.login-orb-a {
+  width: 11rem;
+  height: 11rem;
+  top: 8%;
+  right: 4%;
+  background: rgb(56 189 248 / 0.35);
+}
+
+.login-orb-b {
+  width: 9rem;
+  height: 9rem;
+  bottom: 12%;
+  right: 10%;
+  background: rgb(37 99 235 / 0.28);
+  animation-delay: -4s;
+}
+
+.login-orb-c {
+  width: 7rem;
+  height: 7rem;
+  top: 42%;
+  right: 2%;
+  background: rgb(125 211 252 / 0.25);
+  animation-delay: -7s;
+}
+
+@keyframes login-orb-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(12px, -18px, 0) scale(1.06);
+  }
+}
+
+.login-brand-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.login-brand-media {
+  z-index: 1;
+}
+
+.login-brand-fallback {
+  z-index: 0;
+}
+
+.login-brand-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Light bottom fade only — keep video text readable */
+  background: linear-gradient(
+    to top,
+    rgb(7 18 48 / 0.78) 0%,
+    rgb(7 18 48 / 0.28) 22%,
+    transparent 42%
+  );
+  z-index: 2;
+  pointer-events: none;
+}
+
+.login-brand-content {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1.25rem 1.75rem 1.5rem;
+  color: #fff;
+}
+
+.login-brand-mark {
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  font-weight: 800;
+  font-style: italic;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+}
+
+.login-brand-headline {
+  display: none;
+}
+
+.login-brand-copy {
+  display: none;
+}
+
+.login-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  max-width: 36rem;
+}
+
+.login-stat {
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.65rem;
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.login-stat-value {
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.login-stat-label {
+  margin-top: 0.15rem;
+  font-size: 0.65rem;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(226 239 255 / 0.78);
+}
+
+.login-form-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.login-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  background: color-mix(in srgb, var(--bg-elevated) 92%, white);
+  box-shadow:
+    0 24px 60px rgb(29 78 216 / 0.14),
+    0 4px 16px rgb(15 23 42 / 0.06);
+  animation: login-card-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-theme='dark'] .login-card {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, #1e3a8a);
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.45),
+    0 0 0 1px rgb(96 165 250 / 0.12);
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #0ea5e9, #2563eb 45%, #1d4ed8 100%);
+}
+
+@keyframes login-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-product-title {
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.login-submit {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #0ea5e9 140%);
+  box-shadow: 0 10px 24px rgb(37 99 235 / 0.35);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.login-submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgb(37 99 235 / 0.42);
+}
+
+.login-submit:disabled {
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+.login-mobile-banner {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 9rem;
+  overflow: hidden;
+}
+
+.login-mobile-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(to bottom, rgb(7 18 48 / 0.15), var(--bg));
+}

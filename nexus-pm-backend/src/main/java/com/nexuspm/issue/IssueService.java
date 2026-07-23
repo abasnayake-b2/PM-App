@@ -4,6 +4,10 @@ import com.nexuspm.admin.repository.WorkflowRuleRepository;
 import com.nexuspm.issue.dto.*;
 import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.field.IssueCustomFieldService;
+import com.nexuspm.issue.field.entity.IssueFieldDefinition;
+import com.nexuspm.issue.field.entity.IssueFieldValue;
+import com.nexuspm.issue.field.repository.IssueFieldDefinitionRepository;
+import com.nexuspm.issue.field.repository.IssueFieldValueRepository;
 import com.nexuspm.issue.mapper.IssueMapper;
 import com.nexuspm.issue.repository.RdIssueRepository;
 import com.nexuspm.lookup.IssueTypeCatalog;
@@ -32,6 +36,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -62,6 +67,9 @@ public class IssueService {
     private final AllocationRepository allocationRepository;
     private final SoftDeleteService softDeleteService;
     private final IssueCustomFieldService customFieldService;
+    private final BacklogExcelExportService backlogExcelExportService;
+    private final IssueFieldDefinitionRepository fieldDefinitionRepository;
+    private final IssueFieldValueRepository fieldValueRepository;
 
     @Transactional(readOnly = true)
     public Page<IssueResponse> listIssues(
@@ -113,7 +121,136 @@ public class IssueService {
                         pageable)
                 .map(issueMapper::toResponse);
         enrichWithAllocations(page.getContent());
+        enrichWithCustomFields(page.getContent());
         return page;
+    }
+
+    /**
+     * Full-set status counts for the RD overview board — independent of grid pagination.
+     * Ignores status filters so every stage remains visible with totals.
+     */
+    @Transactional(readOnly = true)
+    public IssueStatusCountsResponse getStatusCounts(
+            UUID projectId,
+            Boolean unreleasedOnly,
+            UUID priorityId,
+            UUID issueTypeId) {
+        verifyListAccess(null, projectId);
+        List<UUID> scopedProjectIds = resolveScopedProjectIds(projectId, null);
+        if (scopedProjectIds != null && scopedProjectIds.isEmpty()) {
+            return IssueStatusCountsResponse.builder()
+                    .countsByStatusId(Map.of())
+                    .total(0)
+                    .build();
+        }
+
+        Map<UUID, Long> counts = new LinkedHashMap<>();
+        long total = 0;
+        for (Object[] row : issueRepository.countByStatusFiltered(
+                projectId,
+                scopedProjectIds,
+                Boolean.TRUE.equals(unreleasedOnly),
+                priorityId,
+                issueTypeId)) {
+            UUID statusId = (UUID) row[0];
+            long count = ((Number) row[1]).longValue();
+            counts.put(statusId, count);
+            total += count;
+        }
+        return IssueStatusCountsResponse.builder()
+                .countsByStatusId(counts)
+                .total(total)
+                .build();
+    }
+
+    private void enrichWithCustomFields(List<IssueResponse> issues) {
+        if (issues.isEmpty()) {
+            return;
+        }
+        List<UUID> ids = issues.stream().map(IssueResponse::getId).toList();
+        Map<UUID, Map<String, String>> byIssue = customFieldService.loadValuesAsMaps(ids);
+        for (IssueResponse issue : issues) {
+            issue.setCustomFields(byIssue.getOrDefault(issue.getId(), Map.of()));
+        }
+    }
+
+    /**
+     * Excel export for Main Backlog: Summary sheet + one sheet per project with RD/CR detail rows.
+     * Respects the same filters/scoping as {@link #listIssues}. Top-level items only (no children).
+     */
+    @Transactional(readOnly = true)
+    public byte[] exportBacklogExcel(
+            UUID projectId,
+            UUID statusId,
+            List<UUID> statusIds,
+            UUID priorityId,
+            UUID issueTypeId,
+            String q) throws IOException {
+        verifyListAccess(null, projectId);
+        List<UUID> scopedProjectIds = resolveScopedProjectIds(projectId, null);
+        if (scopedProjectIds != null && scopedProjectIds.isEmpty()) {
+            return backlogExcelExportService.export(List.of(), issueStatusRepository.findAllByOrderBySequenceAsc(), Map.of());
+        }
+
+        List<UUID> resolvedStatusIds = resolveStatusFilter(statusId, statusIds);
+        boolean filterByStatusIds = resolvedStatusIds != null && !resolvedStatusIds.isEmpty();
+        String search = normalizeSearch(q);
+        String idHint = extractIssueIdHint(search);
+        boolean hasSearch = search != null;
+        boolean hasIdHint = idHint != null;
+        String searchPattern = hasSearch ? "%" + escapeLike(search.toLowerCase()) + "%" : "%";
+        String idHintPattern = hasIdHint
+                ? (idHint.length() <= 4 ? "%" + idHint.toLowerCase() : "%" + idHint.toLowerCase() + "%")
+                : "%";
+        String idHintDashedPattern = hasIdHint ? "%" + idHint.toLowerCase() + "%" : "%";
+
+        List<RdIssue> issues = issueRepository.findTopLevelForExport(
+                projectId,
+                scopedProjectIds,
+                filterByStatusIds,
+                filterByStatusIds ? resolvedStatusIds : List.of(),
+                priorityId,
+                issueTypeId,
+                hasSearch,
+                searchPattern,
+                hasIdHint,
+                idHintPattern,
+                idHintDashedPattern);
+
+        Map<UUID, Map<String, BacklogExcelExportService.FieldVal>> fieldsByIssue =
+                loadExportFieldValues(issues.stream().map(RdIssue::getId).toList());
+        List<IssueStatus> statuses = issueStatusRepository.findAllByOrderBySequenceAsc();
+        return backlogExcelExportService.export(issues, statuses, fieldsByIssue);
+    }
+
+    private Map<UUID, Map<String, BacklogExcelExportService.FieldVal>> loadExportFieldValues(List<UUID> issueIds) {
+        if (issueIds.isEmpty()) {
+            return Map.of();
+        }
+        List<String> keys = List.of(BacklogExcelExportService.fieldKeys());
+        List<IssueFieldDefinition> defs = fieldDefinitionRepository.findByFieldKeyIn(keys);
+        if (defs.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> keyByDefId = new HashMap<>();
+        for (IssueFieldDefinition def : defs) {
+            keyByDefId.put(def.getId(), def.getFieldKey());
+        }
+
+        Map<UUID, Map<String, BacklogExcelExportService.FieldVal>> out = new HashMap<>();
+        final int batchSize = 500;
+        for (int i = 0; i < issueIds.size(); i += batchSize) {
+            List<UUID> batch = issueIds.subList(i, Math.min(i + batchSize, issueIds.size()));
+            for (IssueFieldValue value : fieldValueRepository.findByIssue_IdIn(batch)) {
+                String key = keyByDefId.get(value.getFieldDefinition().getId());
+                if (key == null) {
+                    continue;
+                }
+                out.computeIfAbsent(value.getIssue().getId(), ignored -> new HashMap<>())
+                        .put(key, BacklogExcelExportService.FieldVal.from(value));
+            }
+        }
+        return out;
     }
 
     /**

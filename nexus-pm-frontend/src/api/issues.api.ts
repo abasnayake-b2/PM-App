@@ -32,6 +32,31 @@ export async function fetchIssues(params: IssueListParams = {}): Promise<PageRes
   return data;
 }
 
+export interface IssueStatusCounts {
+  /** statusId → total across the full filtered set (not the current page) */
+  countsByStatusId: Record<string, number>;
+  total: number;
+}
+
+export async function fetchIssueStatusCounts(params: {
+  projectId?: string;
+  unreleasedOnly?: boolean;
+  priorityId?: string;
+  issueTypeId?: string;
+} = {}): Promise<IssueStatusCounts> {
+  const { data } = await api.get<IssueStatusCounts>('/issues/status-counts', { params });
+  // Backend may serialize UUID keys; normalize to string keys + number values
+  const raw = data?.countsByStatusId ?? {};
+  const countsByStatusId: Record<string, number> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    countsByStatusId[key] = Number(value) || 0;
+  }
+  return {
+    countsByStatusId,
+    total: Number(data?.total) || 0,
+  };
+}
+
 export async function fetchIssue(id: string): Promise<Issue> {
   const { data } = await api.get<Issue>(`/issues/${id}`);
   return data;
@@ -126,4 +151,38 @@ export async function importBacklogAllProjects(file: File): Promise<IssueImportR
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
+}
+
+export async function exportBacklogExcel(params: {
+  projectId?: string;
+  statusId?: string;
+  statusIds?: string[];
+  priorityId?: string;
+  issueTypeId?: string;
+  q?: string;
+} = {}): Promise<void> {
+  const { statusIds, ...rest } = params;
+  const response = await api.get<Blob>('/issues/export', {
+    params: {
+      ...rest,
+      ...(statusIds?.length ? { statusIds } : {}),
+    },
+    paramsSerializer: {
+      indexes: null,
+    },
+    responseType: 'blob',
+  });
+
+  const disposition = response.headers['content-disposition'] as string | undefined;
+  const match = disposition?.match(/filename="?([^"]+)"?/i);
+  const filename = match?.[1] ?? `backlog-rds-by-project.xlsx`;
+
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

@@ -55,6 +55,7 @@ export function useCreateIssue(options?: { redirectTo?: string | false }) {
     mutationFn: createIssue,
     onSuccess: (issue) => {
       qc.invalidateQueries({ queryKey: ['issues'] });
+      qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
       qc.invalidateQueries({ queryKey: ['projects'] });
       qc.invalidateQueries({ queryKey: ['project', issue.projectId] });
@@ -74,6 +75,7 @@ export function useUpdateIssue() {
     mutationFn: ({ id, ...payload }: UpdateIssuePayload & { id: string }) => updateIssue(id, payload),
     onSuccess: (issue) => {
       qc.invalidateQueries({ queryKey: ['issues'] });
+      qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
       qc.invalidateQueries({ queryKey: ['issue'] });
       qc.invalidateQueries({ queryKey: ['issue-children'] });
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
@@ -91,6 +93,7 @@ export function useTransitionIssue() {
     mutationFn: ({ id, statusId }: { id: string; statusId: string }) => transitionIssue(id, statusId),
     onSuccess: (issue) => {
       qc.invalidateQueries({ queryKey: ['issues'] });
+      qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
       qc.invalidateQueries({ queryKey: ['issue'] });
       qc.invalidateQueries({ queryKey: ['issue-children'] });
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
@@ -108,6 +111,7 @@ export function useDeleteIssue(options?: { redirectTo?: string | false }) {
     mutationFn: deleteIssue,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['issues'] });
+      qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
       qc.invalidateQueries({ queryKey: ['issue'] });
       qc.invalidateQueries({ queryKey: ['issue-children'] });
       qc.invalidateQueries({ queryKey: ['dashboard-overview'] });
@@ -128,6 +132,7 @@ export function useRestoreIssue() {
     mutationFn: restoreIssue,
     onSuccess: (issue) => {
       qc.invalidateQueries({ queryKey: ['issues'] });
+      qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
       qc.invalidateQueries({ queryKey: ['issue', issue.id] });
       qc.invalidateQueries({ queryKey: ['project', issue.projectId] });
     },
@@ -136,6 +141,7 @@ export function useRestoreIssue() {
 
 function invalidateBacklogQueries(qc: ReturnType<typeof useQueryClient>, projectId?: string) {
   qc.invalidateQueries({ queryKey: ['issues'] });
+  qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
   qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
   qc.invalidateQueries({ queryKey: ['projects'] });
   if (projectId) {

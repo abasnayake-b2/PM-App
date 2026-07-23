@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
+import { Download, Plus, Search } from 'lucide-react';
 import { ListViewToggle, type ListViewMode } from '@/components/ListViewToggle';
 import { IssueCard } from '@/components/IssueCard';
 import { IssueTrackerTable } from '@/components/IssueTrackerTable';
@@ -12,6 +12,7 @@ import { RdStatusSummary } from '@/components/RdStatusSummary';
 import { ListPagination } from '@/components/ListPagination';
 import { MultiStatusFilter } from '@/components/MultiStatusFilter';
 import { fetchProjects } from '@/api/projects.api';
+import { exportBacklogExcel, fetchIssueStatusCounts } from '@/api/issues.api';
 import { fetchPriorities, fetchIssueTypes, fetchIssueStatuses } from '@/api/lookup.api';
 import { useIssues, useDeleteIssue } from '@/hooks/useIssues';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -40,6 +41,7 @@ export function IssuesPage() {
   const [pageSize, setPageSize] = useState(100);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const canDeleteIssue = can(P.ISSUES_DELETE);
   const deleteIssue = useDeleteIssue({ redirectTo: false });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -61,18 +63,22 @@ export function IssuesPage() {
     setPage(0);
   }, [projectId, issueTypeId, priorityId, statusIds.join(','), deferredSearch, pageSize]);
 
-  // Counts for RD board — exclude status filter so all stages stay visible.
-  const { data: countData, isFetching: countsFetching } = useIssues(
-    {
-      projectId: projectId || undefined,
-      issueTypeId: issueTypeId || undefined,
-      priorityId: priorityId || undefined,
-      page: 0,
-      size: 2000,
-      sort: ['project.name,asc', 'rdNumber,asc', 'childNumber,asc'],
-    },
-    { enabled: canQuery && trackerTab === 'list' },
-  );
+  // Full-set status counts for RD overview — never tied to grid pagination.
+  const { data: statusCounts, isFetching: countsFetching } = useQuery({
+    queryKey: [
+      'issue-status-counts',
+      projectId || null,
+      issueTypeId || null,
+      priorityId || null,
+    ],
+    queryFn: () =>
+      fetchIssueStatusCounts({
+        projectId: projectId || undefined,
+        issueTypeId: issueTypeId || undefined,
+        priorityId: priorityId || undefined,
+      }),
+    enabled: canQuery && trackerTab === 'list',
+  });
 
   const { data, isLoading, error } = useIssues(
     {
@@ -88,14 +94,7 @@ export function IssuesPage() {
     { enabled: canQuery && trackerTab === 'list' },
   );
 
-  const countsByStatusId = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const issue of countData?.content ?? []) {
-      if (!issue.statusId) continue;
-      map[issue.statusId] = (map[issue.statusId] ?? 0) + 1;
-    }
-    return map;
-  }, [countData]);
+  const countsByStatusId = statusCounts?.countsByStatusId ?? {};
 
   const issues = useMemo(() => {
     const list = canQuery ? (data?.content ?? []) : [];
@@ -122,7 +121,7 @@ export function IssuesPage() {
       }`;
     }
 
-    const total = data?.totalElements ?? countData?.totalElements ?? 0;
+    const total = statusCounts?.total ?? data?.totalElements ?? 0;
     const scope = projectId ? 'in this project' : isAdmin ? 'across all projects' : 'across my projects';
     return `${total} issue${total !== 1 ? 's' : ''} ${scope}`;
   }, [
@@ -131,7 +130,7 @@ export function IssuesPage() {
     initialLoad,
     error,
     data,
-    countData,
+    statusCounts,
     projectId,
     isAdmin,
     search,
@@ -153,6 +152,24 @@ export function IssuesPage() {
     });
   };
 
+  const handleExportExcel = async () => {
+    if (!canQuery || exporting) return;
+    setExporting(true);
+    try {
+      await exportBacklogExcel({
+        projectId: projectId || undefined,
+        issueTypeId: issueTypeId || undefined,
+        priorityId: priorityId || undefined,
+        statusIds: statusFiltering ? statusIds : undefined,
+        q: deferredSearch || undefined,
+      });
+    } catch {
+      window.alert('Failed to export backlog Excel. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const selectedProjectLabel = projectsData?.content?.find((p) => p.id === projectId)?.name;
 
   return (
@@ -163,6 +180,17 @@ export function IssuesPage() {
           <p className="mt-1 text-sm text-text2">{summaryLine}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canQuery && trackerTab === 'list' && can(P.ISSUES_VIEW) && (
+            <button
+              type="button"
+              onClick={() => void handleExportExcel()}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg3 disabled:opacity-60"
+            >
+              <Download size={16} />
+              {exporting ? 'Exporting…' : 'Export Excel'}
+            </button>
+          )}
           {can(P.ALLOCATIONS_CREATE) && (
             <Link
               to="/resources"
@@ -320,7 +348,7 @@ export function IssuesPage() {
             statuses={statuses ?? []}
             countsByStatusId={countsByStatusId}
             selectedStatusIds={statusIds}
-            loading={countsFetching && !countData}
+            loading={countsFetching && !statusCounts}
             onSelectStatus={(statusId) => setStatusIds(statusId ? [statusId] : [])}
           />
 

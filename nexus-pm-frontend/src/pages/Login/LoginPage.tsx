@@ -1,19 +1,35 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Globe2, ShieldCheck, Sparkles } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { login } from '@/api/auth.api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authUserFromToken } from '@/utils/permissions';
+import {
+  clearRememberedLogin,
+  loadRememberedLogin,
+  saveRememberedLogin,
+} from '@/utils/rememberLogin';
 
 const DIRECTFN_LOGO = '/directfn-login-bg.png';
+const DIRECTFN_VIDEO = '/directfn-login-bg.mp4';
+
+const remembered = loadRememberedLogin();
+
+const STATS = [
+  { value: '100+', label: 'Corporate clients' },
+  { value: '13', label: 'Countries' },
+  { value: '05', label: 'Offices' },
+  { value: '500+', label: 'Professionals' },
+] as const;
 
 export function LoginPage() {
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(remembered?.email ?? '');
+  const [password, setPassword] = useState(remembered?.password ?? '');
+  const [rememberMe, setRememberMe] = useState(!!remembered);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +40,11 @@ export function LoginPage() {
     setLoading(true);
     try {
       const data = await login({ email, password });
+      if (rememberMe) {
+        saveRememberedLogin(email, password);
+      } else {
+        clearRememberedLogin();
+      }
       setSession(data.accessToken, authUserFromToken(data));
       navigate(data.passwordChangeDue ? '/account/change-password' : '/');
     } catch (err) {
@@ -47,43 +68,93 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen">
-      <div className="absolute right-4 top-4 z-20">
-        <ThemeToggle />
+    <div className="login-shell relative flex min-h-screen">
+      <div className="absolute right-4 top-4 z-30">
+        <ThemeToggle className="bg-bg2/80 backdrop-blur-md" />
       </div>
 
-      {/* DirectFN brand panel — full height on large screens */}
-      <aside className="relative hidden w-[52%] overflow-hidden lg:block">
-        <img
-          src={DIRECTFN_LOGO}
-          alt="DirectFN"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-        />
-      </aside>
-
-      {/* Mobile brand strip */}
-      <div className="absolute inset-x-0 top-0 h-28 overflow-hidden lg:hidden">
+      <aside className="login-brand-panel relative hidden w-[78%] bg-[#07122f] lg:block">
+        <video
+          className="login-brand-media absolute inset-0 h-full w-full object-contain object-center"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster={DIRECTFN_LOGO}
+          aria-hidden
+        >
+          <source src={DIRECTFN_VIDEO} type="video/mp4" />
+        </video>
         <img
           src={DIRECTFN_LOGO}
           alt=""
-          className="h-full w-full object-cover object-center"
+          className="login-brand-fallback absolute inset-0 h-full w-full object-contain object-center"
           aria-hidden
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-bg/90" />
+        <div className="login-brand-content">
+          <p className="login-brand-mark">DirectFN</p>
+          <div className="login-stats">
+            {STATS.map((stat) => (
+              <div key={stat.label} className="login-stat">
+                <div className="login-stat-value">{stat.value}</div>
+                <div className="login-stat-label">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </aside>
+
+      <div className="login-mobile-banner bg-[#07122f] lg:hidden">
+        <video
+          className="login-brand-media absolute inset-0 h-full w-full object-contain object-center"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster={DIRECTFN_LOGO}
+          aria-hidden
+        >
+          <source src={DIRECTFN_VIDEO} type="video/mp4" />
+        </video>
+        <img
+          src={DIRECTFN_LOGO}
+          alt=""
+          className="login-brand-fallback absolute inset-0 h-full w-full object-contain object-center"
+          aria-hidden
+        />
+        <div className="absolute inset-x-0 bottom-3 z-10 px-4 text-center">
+          <p
+            className="text-2xl font-extrabold italic tracking-tight text-white drop-shadow-md"
+            style={{ fontFamily: "'Plus Jakarta Sans', Inter, system-ui, sans-serif" }}
+          >
+            DirectFN
+          </p>
+        </div>
       </div>
 
-      <div className="relative flex w-full flex-1 items-center justify-center bg-bg px-4 pb-8 pt-32 lg:w-[48%] lg:pt-8">
-        <div className="w-full max-w-md">
-          <div className="card p-8 shadow-theme-lg">
-            <div className="mb-8 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text3">DirectFN</p>
-              <h1 className="mt-2 text-2xl font-bold tracking-tight">DFN-PlanX</h1>
-              <p className="mt-2 text-text2">Sign in to your account</p>
+      <div className="login-form-panel relative flex w-full flex-1 items-center justify-center px-3 pb-10 pt-36 lg:w-[22%] lg:px-3 lg:pt-8">
+        <div className="login-orb login-orb-a hidden lg:block" aria-hidden />
+        <div className="login-orb login-orb-b hidden lg:block" aria-hidden />
+        <div className="login-orb login-orb-c hidden lg:block" aria-hidden />
+
+        <div className="relative z-10 w-full max-w-[20rem]">
+          <div className="login-card p-5 sm:p-6">
+            <div className="mb-7 text-center">
+              <div className="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent)]/25 bg-[color:var(--accent-muted)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">
+                <Sparkles size={12} />
+                DirectFN
+              </div>
+              <h2 className="login-product-title text-2xl text-text">DFN-PlanX</h2>
+              <p className="mt-2 text-sm text-text2">
+                Sign in to plan projects, capacity, and delivery.
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="email" className="mb-1 block text-sm font-medium text-text2">
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-text2">
                   Email
                 </label>
                 <input
@@ -91,13 +162,13 @@ export function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="input-field"
+                  className="input-field bg-bg2"
                   autoComplete="username"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="password" className="mb-1 block text-sm font-medium text-text2">
+                <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-text2">
                   Password
                 </label>
                 <div className="relative">
@@ -106,7 +177,7 @@ export function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input-field pr-11"
+                    className="input-field bg-bg2 pr-11"
                     autoComplete="current-password"
                     required
                   />
@@ -121,16 +192,48 @@ export function LoginPage() {
                 </div>
               </div>
 
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-text2">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberMe(checked);
+                    if (!checked) {
+                      clearRememberedLogin();
+                    }
+                  }}
+                  className="rounded border-border accent-[var(--accent)]"
+                />
+                Remember me on this device
+              </label>
+
               {error && (
                 <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
                   {error}
                 </p>
               )}
 
-              <button type="submit" disabled={loading} className="btn-primary w-full py-2.5">
+              <button
+                type="submit"
+                disabled={loading}
+                className="login-submit btn-primary w-full py-2.5 text-[15px] font-semibold"
+                style={{ color: 'var(--accent-fg)' }}
+              >
                 {loading ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
+
+            <div className="mt-6 grid grid-cols-1 gap-2.5 border-t border-border/80 pt-4 text-xs text-text2">
+              <div className="flex items-start gap-2">
+                <Globe2 size={14} className="mt-0.5 shrink-0 text-accent" />
+                <span>Built for DirectFN delivery teams worldwide</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <ShieldCheck size={14} className="mt-0.5 shrink-0 text-accent" />
+                <span>Secure access to backlog & capacity planning</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

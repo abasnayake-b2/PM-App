@@ -9,6 +9,7 @@ import { RdStatusSummary } from '@/components/RdStatusSummary';
 import { ListPagination } from '@/components/ListPagination';
 import { MultiStatusFilter } from '@/components/MultiStatusFilter';
 import { fetchPriorities, fetchIssueTypes, fetchIssueStatuses } from '@/api/lookup.api';
+import { fetchIssueStatusCounts } from '@/api/issues.api';
 import { useIssues } from '@/hooks/useIssues';
 import { filterIssuesBySearch } from '@/utils/issueUi';
 
@@ -48,15 +49,22 @@ export function ProjectBacklogTab({
     setPage(0);
   }, [issueTypeId, priorityId, statusIds.join(','), search, pageSize]);
 
-  // Full project backlog (minus status filter) — powers the status board counts.
-  const { data: countData, isFetching: countsFetching } = useIssues({
-    projectId,
-    unreleasedOnly: true,
-    issueTypeId: issueTypeId || undefined,
-    priorityId: priorityId || undefined,
-    page: 0,
-    size: 2000,
-    sort: ['rdNumber,asc', 'childNumber,asc'],
+  // Full-set status counts for RD overview — never tied to grid pagination.
+  const { data: statusCounts, isFetching: countsFetching } = useQuery({
+    queryKey: [
+      'issue-status-counts',
+      projectId,
+      true,
+      issueTypeId || null,
+      priorityId || null,
+    ],
+    queryFn: () =>
+      fetchIssueStatusCounts({
+        projectId,
+        unreleasedOnly: true,
+        issueTypeId: issueTypeId || undefined,
+        priorityId: priorityId || undefined,
+      }),
   });
 
   const { data, isLoading, isFetching, error, refetch } = useIssues({
@@ -70,14 +78,7 @@ export function ProjectBacklogTab({
     sort: ['rdNumber,asc', 'childNumber,asc'],
   });
 
-  const countsByStatusId = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const issue of countData?.content ?? []) {
-      if (!issue.statusId) continue;
-      map[issue.statusId] = (map[issue.statusId] ?? 0) + 1;
-    }
-    return map;
-  }, [countData]);
+  const countsByStatusId = statusCounts?.countsByStatusId ?? {};
 
   const issues = useMemo(() => {
     const list = data?.content ?? [];
@@ -94,13 +95,13 @@ export function ProjectBacklogTab({
         <p className="text-sm text-text2">
           {searching || statusFiltering
             ? `${issues.length} match${issues.length !== 1 ? 'es' : ''} in this project`
-            : `${data?.totalElements ?? countData?.totalElements ?? 0} backlog item${
-                (data?.totalElements ?? countData?.totalElements ?? 0) !== 1 ? 's' : ''
+            : `${statusCounts?.total ?? data?.totalElements ?? 0} backlog item${
+                (statusCounts?.total ?? data?.totalElements ?? 0) !== 1 ? 's' : ''
               } not yet assigned to a release`}
           {isFetching && data ? ' …' : ''}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {(countData?.totalElements ?? 0) > 0 && canImportBacklog && (
+          {(statusCounts?.total ?? 0) > 0 && canImportBacklog && (
             <BacklogExcelUpload
               variant="project"
               projectId={projectId}
@@ -127,7 +128,7 @@ export function ProjectBacklogTab({
         statuses={statuses ?? []}
         countsByStatusId={countsByStatusId}
         selectedStatusIds={statusIds}
-        loading={countsFetching && !countData}
+        loading={countsFetching && !statusCounts}
         onSelectStatus={(statusId) => setStatusIds(statusId ? [statusId] : [])}
       />
 

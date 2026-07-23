@@ -44,6 +44,28 @@ public class IssueCustomFieldService {
         return result;
     }
 
+    /** Bulk-load custom field maps for list/grid views. */
+    @Transactional(readOnly = true)
+    public Map<UUID, Map<String, String>> loadValuesAsMaps(List<UUID> issueIds) {
+        if (issueIds == null || issueIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Map<String, String>> out = new LinkedHashMap<>();
+        final int batchSize = 500;
+        for (int i = 0; i < issueIds.size(); i += batchSize) {
+            List<UUID> batch = issueIds.subList(i, Math.min(i + batchSize, issueIds.size()));
+            for (IssueFieldValue value : valueRepository.findByIssue_IdIn(batch)) {
+                String stringValue = toStringValue(value);
+                if (stringValue == null) {
+                    continue;
+                }
+                out.computeIfAbsent(value.getIssue().getId(), ignored -> new LinkedHashMap<>())
+                        .put(value.getFieldDefinition().getFieldKey(), stringValue);
+            }
+        }
+        return out;
+    }
+
     /**
      * Upserts custom field values for an issue. Empty / blank values delete stored rows.
      * When {@code enforceRequired} is true (create), every active required field must be present and non-blank.

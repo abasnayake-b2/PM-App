@@ -186,6 +186,55 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             @Param("idHintDashedPattern") String idHintDashedPattern,
             Pageable pageable);
 
+    @Query(value = """
+            SELECT i FROM RdIssue i
+            JOIN FETCH i.project p
+            LEFT JOIN FETCH i.release r
+            JOIN FETCH i.issueType
+            JOIN FETCH i.priority
+            JOIN FETCH i.status
+            LEFT JOIN FETCH i.reportedBy
+            LEFT JOIN FETCH i.assignedTo
+            WHERE i.parentIssue IS NULL
+              AND (:projectId IS NULL OR p.id = :projectId)
+              AND (:scopedProjectIds IS NULL OR p.id IN :scopedProjectIds)
+              AND (:filterByStatusIds = FALSE OR i.status.id IN :statusIds)
+              AND (:priorityId IS NULL OR i.priority.id = :priorityId)
+              AND (:issueTypeId IS NULL OR i.issueType.id = :issueTypeId)
+              AND (
+                    :hasSearch = FALSE
+                    OR LOWER(i.title) LIKE :searchPattern
+                    OR LOWER(p.name) LIKE :searchPattern
+                    OR (p.product IS NOT NULL AND LOWER(p.product) LIKE :searchPattern)
+                    OR (i.component IS NOT NULL AND LOWER(i.component) LIKE :searchPattern)
+                    OR LOWER(i.status.name) LIKE :searchPattern
+                    OR (i.assignedTo IS NOT NULL AND (
+                        LOWER(CONCAT(i.assignedTo.firstName, ' ', i.assignedTo.lastName)) LIKE :searchPattern
+                        OR LOWER(i.assignedTo.firstName) LIKE :searchPattern
+                        OR LOWER(i.assignedTo.lastName) LIKE :searchPattern
+                    ))
+                    OR (:hasIdHint = TRUE AND (
+                        LOWER(REPLACE(CAST(i.id AS string), '-', '')) LIKE :idHintPattern
+                        OR LOWER(CAST(i.id AS string)) LIKE :idHintDashedPattern
+                    ))
+                    OR (i.displayKey IS NOT NULL AND LOWER(i.displayKey) LIKE :searchPattern)
+              )
+              AND i.deleted = false
+            ORDER BY p.name ASC, i.rdNumber ASC, i.createdAt ASC
+            """)
+    List<RdIssue> findTopLevelForExport(
+            @Param("projectId") UUID projectId,
+            @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds,
+            @Param("filterByStatusIds") boolean filterByStatusIds,
+            @Param("statusIds") List<UUID> statusIds,
+            @Param("priorityId") UUID priorityId,
+            @Param("issueTypeId") UUID issueTypeId,
+            @Param("hasSearch") boolean hasSearch,
+            @Param("searchPattern") String searchPattern,
+            @Param("hasIdHint") boolean hasIdHint,
+            @Param("idHintPattern") String idHintPattern,
+            @Param("idHintDashedPattern") String idHintDashedPattern);
+
     @Query("""
             SELECT COUNT(i) FROM RdIssue i
             JOIN i.status s
@@ -279,6 +328,24 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             GROUP BY i.project.id
             """)
     java.util.List<Object[]> countIssueProgressByProjectIds(java.util.Collection<UUID> projectIds);
+
+    @Query("""
+            SELECT i.status.id, COUNT(i)
+            FROM RdIssue i
+            WHERE i.deleted = false
+              AND (:projectId IS NULL OR i.project.id = :projectId)
+              AND (:scopedProjectIds IS NULL OR i.project.id IN :scopedProjectIds)
+              AND (:unreleasedOnly = FALSE OR i.release IS NULL)
+              AND (:priorityId IS NULL OR i.priority.id = :priorityId)
+              AND (:issueTypeId IS NULL OR i.issueType.id = :issueTypeId)
+            GROUP BY i.status.id
+            """)
+    List<Object[]> countByStatusFiltered(
+            @Param("projectId") UUID projectId,
+            @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds,
+            @Param("unreleasedOnly") boolean unreleasedOnly,
+            @Param("priorityId") UUID priorityId,
+            @Param("issueTypeId") UUID issueTypeId);
 
     @Query("""
             SELECT i.project.id, i.status.id, COUNT(i)
