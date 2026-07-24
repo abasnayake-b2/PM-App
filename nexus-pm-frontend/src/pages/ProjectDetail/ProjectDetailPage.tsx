@@ -37,7 +37,7 @@ export function ProjectDetailPage() {
   const canEditProject = can(P.PROJECTS_UPDATE);
   const canDeleteProject = can(P.PROJECTS_DELETE);
   const canCreateRelease = can(P.RELEASES_CREATE);
-  const canImportBacklog = can(P.IMPORT_CREATE);
+  const canImportBacklog = superAdmin;
   const canCreateIssue = can(P.ISSUES_CREATE);
   const canEditAllocations = can(P.ALLOCATIONS_CREATE) || can(P.ALLOCATIONS_UPDATE);
 

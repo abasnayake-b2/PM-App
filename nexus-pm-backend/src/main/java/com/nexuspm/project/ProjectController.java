@@ -59,7 +59,7 @@ public class ProjectController {
 
     @PostMapping("/{id}/issues/import")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("@perm.can('IMPORT_CREATE')")
+    @PreAuthorize("@perm.superAdmin()")
     public IssueImportResult importProjectBacklog(@PathVariable UUID id, @RequestParam("file") MultipartFile file) {
         return issueImportService.importBacklogExcel(file, id);
     }

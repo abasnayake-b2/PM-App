@@ -206,10 +206,10 @@ export function AdminPage() {
         </div>
       )}
 
-      {tab === 'projects' && can(P.IMPORT_CREATE) && (
+      {tab === 'projects' && (
         <div className="mt-6 space-y-6">
-          <ProjectExcelUpload />
-          <BacklogExcelUpload variant="admin" />
+          {can(P.IMPORT_CREATE) && <ProjectExcelUpload />}
+          {superAdmin && <BacklogExcelUpload variant="admin" />}
         </div>
       )}
 

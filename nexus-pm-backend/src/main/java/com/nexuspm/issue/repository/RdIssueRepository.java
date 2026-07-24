@@ -187,8 +187,12 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             Pageable pageable);
 
     @Query(value = """
-            SELECT i FROM RdIssue i
+            SELECT DISTINCT i FROM RdIssue i
             JOIN FETCH i.project p
+            LEFT JOIN FETCH p.client c
+            LEFT JOIN FETCH c.country
+            LEFT JOIN FETCH p.engineeringManagerManagement em
+            LEFT JOIN FETCH em.supervisor
             LEFT JOIN FETCH i.release r
             JOIN FETCH i.issueType
             JOIN FETCH i.priority

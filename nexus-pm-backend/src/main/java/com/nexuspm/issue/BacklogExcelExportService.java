@@ -3,6 +3,11 @@ package com.nexuspm.issue;
 import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.field.entity.IssueFieldValue;
 import com.nexuspm.lookup.entity.IssueStatus;
+import com.nexuspm.organisation.entity.Client;
+import com.nexuspm.organisation.entity.Country;
+import com.nexuspm.project.entity.Project;
+import com.nexuspm.report.ManagementHierarchyUtils;
+import com.nexuspm.teamroster.entity.TeamManagement;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -36,7 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Builds a multi-sheet backlog workbook: Summary tab + one tab per project with RD/CR rows.
+ * Builds a multi-sheet backlog workbook: Summary tab + All RDs tab + one tab per project.
  */
 @Service
 public class BacklogExcelExportService {
@@ -47,6 +52,7 @@ public class BacklogExcelExportService {
     private enum ValueType { TEXT, NUMBER, DATE, WRAP }
 
     private enum CoreField {
+        PROJECT, EM, COUNTRY, VP,
         DISPLAY_KEY, TITLE, DESCRIPTION, STATUS, PRIORITY, CAPITALIZABLE, ASSIGNEE
     }
 
@@ -123,6 +129,18 @@ public class BacklogExcelExportService {
             ColumnDef.field("Other", "Notes", "notes", ValueType.WRAP)
     );
 
+    /** All RDs tab: project context columns + full RD detail set. */
+    private static final List<ColumnDef> ALL_RD_COLUMNS;
+    static {
+        List<ColumnDef> all = new ArrayList<>();
+        all.add(ColumnDef.core("Context", "Project", CoreField.PROJECT, ValueType.TEXT));
+        all.add(ColumnDef.core("Context", "EM", CoreField.EM, ValueType.TEXT));
+        all.add(ColumnDef.core("Context", "Country", CoreField.COUNTRY, ValueType.TEXT));
+        all.add(ColumnDef.core("Context", "VP", CoreField.VP, ValueType.TEXT));
+        all.addAll(COLUMNS);
+        ALL_RD_COLUMNS = List.copyOf(all);
+    }
+
     private static final String[] FIELD_KEYS = COLUMNS.stream()
             .map(ColumnDef::fieldKey)
             .filter(k -> k != null && !k.isBlank())
@@ -153,6 +171,8 @@ public class BacklogExcelExportService {
             writeSummarySheet(workbook, styles, byProject, statuses, fieldsByIssueId);
             Set<String> usedSheetNames = new HashSet<>();
             usedSheetNames.add("Summary");
+            usedSheetNames.add("All RDs");
+            writeAllRdsSheet(workbook, styles, issues, fieldsByIssueId);
             for (Map.Entry<String, List<RdIssue>> entry : byProject.entrySet()) {
                 String sheetName = uniqueSheetName(entry.getKey(), usedSheetNames);
                 writeProjectSheet(workbook, styles, sheetName, entry.getKey(), entry.getValue(), statuses, fieldsByIssueId);
@@ -251,6 +271,55 @@ public class BacklogExcelExportService {
         sheet.createFreezePane(0, 1);
     }
 
+    private void writeAllRdsSheet(
+            XSSFWorkbook workbook,
+            Styles styles,
+            List<RdIssue> issues,
+            Map<UUID, Map<String, FieldVal>> fieldsByIssueId) {
+
+        Sheet sheet = workbook.createSheet("All RDs");
+        int rowIdx = 0;
+
+        Row title = sheet.createRow(rowIdx++);
+        Cell titleCell = title.createCell(0);
+        titleCell.setCellValue("All RDs — Project / EM / Country / VP");
+        titleCell.setCellStyle(styles.title);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 6));
+
+        Row meta = sheet.createRow(rowIdx++);
+        meta.createCell(0).setCellValue("Last updated");
+        meta.getCell(0).setCellStyle(styles.label);
+        meta.createCell(1).setCellValue(STAMP_FMT.format(LocalDateTime.now()));
+        meta.getCell(1).setCellStyle(styles.text);
+        meta.createCell(3).setCellValue("Total RDs");
+        meta.getCell(3).setCellStyle(styles.label);
+        meta.createCell(4).setCellValue(issues.size());
+        meta.getCell(4).setCellStyle(styles.intNumber);
+
+        rowIdx++;
+        int headerStart = rowIdx;
+        writeDetailHeaders(sheet, styles, headerStart, ALL_RD_COLUMNS);
+        rowIdx = headerStart + 2;
+
+        List<RdIssue> sorted = new ArrayList<>(issues);
+        sorted.sort(Comparator
+                .comparing((RdIssue i) -> nullToEmpty(projectName(i)), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(i -> i.getRdNumber() != null ? i.getRdNumber() : Integer.MAX_VALUE)
+                .thenComparing(i -> nullToEmpty(i.getDisplayKey()), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(i -> nullToEmpty(i.getTitle()), String.CASE_INSENSITIVE_ORDER));
+
+        for (RdIssue issue : sorted) {
+            Map<String, FieldVal> fields = fieldsByIssueId.getOrDefault(issue.getId(), Map.of());
+            Row row = sheet.createRow(rowIdx++);
+            for (int c = 0; c < ALL_RD_COLUMNS.size(); c++) {
+                writeDetailCell(row, c, ALL_RD_COLUMNS.get(c), issue, fields, styles);
+            }
+        }
+
+        applyDetailColumnWidths(sheet, ALL_RD_COLUMNS);
+        sheet.createFreezePane(5, headerStart + 2);
+    }
+
     private void writeProjectSheet(
             XSSFWorkbook workbook,
             Styles styles,
@@ -305,7 +374,7 @@ public class BacklogExcelExportService {
 
         rowIdx += 2;
         int headerStart = rowIdx;
-        writeDetailHeaders(sheet, styles, headerStart);
+        writeDetailHeaders(sheet, styles, headerStart, COLUMNS);
         rowIdx = headerStart + 2;
 
         for (RdIssue issue : issues) {
@@ -316,30 +385,44 @@ public class BacklogExcelExportService {
             }
         }
 
-        sheet.setColumnWidth(0, 22 * 256);
-        sheet.setColumnWidth(1, 42 * 256);
-        sheet.setColumnWidth(2, 36 * 256);
-        for (int c = 3; c < COLUMNS.size(); c++) {
-            ColumnDef col = COLUMNS.get(c);
-            int width = col.type == ValueType.WRAP ? 28 : 16;
-            if ("Risk Description".equals(col.header) || "Risk Mitigation".equals(col.header) || "Notes".equals(col.header)) {
-                width = 32;
-            }
-            sheet.setColumnWidth(c, width * 256);
-        }
+        applyDetailColumnWidths(sheet, COLUMNS);
         sheet.createFreezePane(2, headerStart + 2);
     }
 
-    private void writeDetailHeaders(Sheet sheet, Styles styles, int startRow) {
+    private void applyDetailColumnWidths(Sheet sheet, List<ColumnDef> columns) {
+        for (int c = 0; c < columns.size(); c++) {
+            ColumnDef col = columns.get(c);
+            int width;
+            if (col.core == CoreField.PROJECT) {
+                width = 28;
+            } else if (col.core == CoreField.TITLE || col.core == CoreField.DESCRIPTION) {
+                width = col.core == CoreField.TITLE ? 42 : 36;
+            } else if (col.core == CoreField.DISPLAY_KEY) {
+                width = 22;
+            } else if (col.type == ValueType.WRAP
+                    || "Risk Description".equals(col.header)
+                    || "Risk Mitigation".equals(col.header)
+                    || "Notes".equals(col.header)) {
+                width = 32;
+            } else if (col.core == CoreField.EM || col.core == CoreField.VP || col.core == CoreField.COUNTRY) {
+                width = 20;
+            } else {
+                width = 16;
+            }
+            sheet.setColumnWidth(c, width * 256);
+        }
+    }
+
+    private void writeDetailHeaders(Sheet sheet, Styles styles, int startRow, List<ColumnDef> columns) {
         Row categoryRow = sheet.createRow(startRow);
         Row headerRow = sheet.createRow(startRow + 1);
 
         int col = 0;
-        while (col < COLUMNS.size()) {
-            String category = COLUMNS.get(col).category;
+        while (col < columns.size()) {
+            String category = columns.get(col).category;
             CategoryPalette palette = styles.paletteFor(category);
             int start = col;
-            while (col < COLUMNS.size() && COLUMNS.get(col).category.equals(category)) {
+            while (col < columns.size() && columns.get(col).category.equals(category)) {
                 col++;
             }
             int end = col - 1;
@@ -357,7 +440,7 @@ public class BacklogExcelExportService {
 
             for (int c = start; c <= end; c++) {
                 Cell cell = headerRow.createCell(c);
-                cell.setCellValue(COLUMNS.get(c).header);
+                cell.setCellValue(columns.get(c).header);
                 cell.setCellStyle(palette.fieldHeader);
             }
         }
@@ -373,6 +456,10 @@ public class BacklogExcelExportService {
         CategoryPalette palette = styles.paletteFor(def.category);
         if (def.core != null) {
             switch (def.core) {
+                case PROJECT -> setText(row, col, projectName(issue), palette.text);
+                case EM -> setText(row, col, engineeringManagerName(issue), palette.text);
+                case COUNTRY -> setText(row, col, countryName(issue), palette.text);
+                case VP -> setText(row, col, vpName(issue), palette.text);
                 case DISPLAY_KEY -> setText(row, col, displayKey(issue), palette.text);
                 case TITLE -> setText(row, col, issue.getTitle(), palette.text);
                 case DESCRIPTION -> setText(row, col, issue.getDescription(), palette.wrap);
@@ -588,6 +675,46 @@ public class BacklogExcelExportService {
         return name.isEmpty() ? "Unassigned" : name;
     }
 
+    private static String projectName(RdIssue issue) {
+        Project project = issue.getProject();
+        if (project == null || project.getName() == null || project.getName().isBlank()) {
+            return "Unknown project";
+        }
+        return project.getName().trim();
+    }
+
+    private static String engineeringManagerName(RdIssue issue) {
+        Project project = issue.getProject();
+        if (project == null) {
+            return "";
+        }
+        TeamManagement em = project.getEngineeringManagerManagement();
+        return em != null ? em.getFullName() : "";
+    }
+
+    private static String countryName(RdIssue issue) {
+        Project project = issue.getProject();
+        if (project == null) {
+            return "";
+        }
+        Client client = project.getClient();
+        if (client == null) {
+            return "";
+        }
+        Country country = client.getCountry();
+        return country != null && country.getName() != null ? country.getName() : "";
+    }
+
+    private static String vpName(RdIssue issue) {
+        Project project = issue.getProject();
+        if (project == null) {
+            return "";
+        }
+        TeamManagement vp = ManagementHierarchyUtils.resolveVpFromEngineeringManager(
+                project.getEngineeringManagerManagement());
+        return vp != null ? vp.getFullName() : "";
+    }
+
     private static String yesNo(Boolean value) {
         if (value == null) {
             return "";
@@ -774,6 +901,8 @@ public class BacklogExcelExportService {
             // Light schema: soft banner + softer field header + very light data tint
             // Dark text on all header cells for contrast on light fills
             categoryPalettes = new LinkedHashMap<>();
+            categoryPalettes.put("Context", buildPalette(workbook, darkHeaderFont,
+                    rgb(186, 230, 253), rgb(224, 242, 254), rgb(240, 249, 255)));
             categoryPalettes.put("Core", buildPalette(workbook, darkHeaderFont,
                     rgb(203, 213, 225), rgb(226, 232, 240), rgb(248, 250, 252)));
             categoryPalettes.put("General", buildPalette(workbook, darkHeaderFont,

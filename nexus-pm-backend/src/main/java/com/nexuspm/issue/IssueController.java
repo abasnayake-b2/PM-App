@@ -32,7 +32,7 @@ public class IssueController {
 
     @PostMapping("/import")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("@perm.can('IMPORT_CREATE')")
+    @PreAuthorize("@perm.superAdmin()")
     public IssueImportResult importBacklog(@RequestParam("file") MultipartFile file) {
         return issueImportService.importBacklogExcel(file, null);
     }

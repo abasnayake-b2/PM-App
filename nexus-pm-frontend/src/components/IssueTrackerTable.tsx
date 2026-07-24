@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Maximize2, Minimize2, Trash2 } from 'lucide-react';
 import type { Issue } from '@/types';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { StatusPill } from '@/components/StatusPill';
 import { IssueTypeIcon } from '@/components/IssueTypeIcon';
-import { ResourceAvatar } from '@/components/ResourceAvatar';
 import { issueAssigneeName, issueDisplayKey, filterIssuesBySearch } from '@/utils/issueUi';
 import { buildIssueTreeRows, collectParentIdsWithChildren } from '@/utils/issueTree';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -16,9 +16,11 @@ import {
   CATEGORY_THEME,
   customFieldKey,
   type BacklogColumn,
+  type BacklogColumnKey,
   type BacklogDensity,
 } from '@/utils/backlogGridColumns';
 
+const MIN_RESIZE_WIDTH = 120;
 interface IssueTrackerTableProps {
   issues: Issue[];
   hideProject?: boolean;
@@ -73,6 +75,7 @@ export function IssueTrackerTable({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
   const [density, setDensity] = useState<BacklogDensity>(defaultDensity);
+  const [columnWidths, setColumnWidths] = useState<Partial<Record<BacklogColumnKey, number>>>({});
 
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,80 @@ export function IssueTrackerTable({
     () => buildBacklogColumns({ hideProject, density }),
     [hideProject, density],
   );
+
+  const resolvedWidth = useCallback(
+    (column: BacklogColumn): number | undefined =>
+      columnWidths[column.key] ?? column.defaultWidthPx,
+    [columnWidths],
+  );
+
+  const columnWidthStyle = useCallback(
+    (column: BacklogColumn): CSSProperties | undefined => {
+      const width = resolvedWidth(column);
+      if (width == null) return undefined;
+      return { width, minWidth: width, maxWidth: width };
+    },
+    [resolvedWidth],
+  );
+
+  /** Freeze CR No / ID + Change Request Name while scrolling horizontally (expanded view). */
+  const stickyOffset = useCallback(
+    (column: BacklogColumn): number | undefined => {
+      if (density === 'compact' || !column.sticky) return undefined;
+      if (column.key === 'displayKey') return 0;
+      if (column.key === 'title') {
+        const idCol = columns.find((c) => c.key === 'displayKey');
+        return idCol ? (resolvedWidth(idCol) ?? 152) : 152;
+      }
+      return undefined;
+    },
+    [columns, density, resolvedWidth],
+  );
+
+  const stickyProps = useCallback(
+    (column: BacklogColumn, kind: 'header' | 'cell'): { className: string; style: CSSProperties } => {
+      const left = stickyOffset(column);
+      if (left == null) return { className: '', style: {} };
+      const isEdge = column.key === 'title';
+      const solidBg = kind === 'header' ? 'bg-bg2' : 'bg-bg2';
+      return {
+        className: `sticky z-[2] ${solidBg} ${isEdge ? 'shadow-[2px_0_6px_rgba(0,0,0,0.08)]' : ''}`,
+        style: { left },
+      };
+    },
+    [stickyOffset],
+  );
+
+  const beginColumnResize = useCallback(
+    (column: BacklogColumn, event: ReactPointerEvent<HTMLSpanElement>) => {
+      if (column.resizable === false) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const th = (event.currentTarget.parentElement as HTMLElement | null);
+      const startX = event.clientX;
+      const startWidth = resolvedWidth(column) ?? th?.getBoundingClientRect().width ?? MIN_RESIZE_WIDTH;
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const next = Math.max(MIN_RESIZE_WIDTH, Math.round(startWidth + (moveEvent.clientX - startX)));
+        setColumnWidths((prev) => ({ ...prev, [column.key]: next }));
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [resolvedWidth],
+  );
+
+  const isColumnResizable = (column: BacklogColumn) => column.resizable !== false;
 
   const visibleIssues = useMemo(
     () => filterIssuesBySearch(issues, searchQuery),
@@ -108,7 +185,7 @@ export function IssueTrackerTable({
 
   useLayoutEffect(() => {
     measureScrollWidth();
-  }, [treeRows, columns, density, hideProject, canDeleteIssue]);
+  }, [treeRows, columns, density, hideProject, canDeleteIssue, columnWidths]);
 
   useEffect(() => {
     const onResize = () => measureScrollWidth();
@@ -149,9 +226,10 @@ export function IssueTrackerTable({
 
   const hasHierarchy = parentIdsWithChildren.length > 0;
   const compact = density === 'compact';
-  const cellPad = compact ? 'px-2 py-1' : 'px-3 py-2.5';
-  const headPad = compact ? 'px-2 py-1' : 'px-3 py-2';
-  const textSize = compact ? 'text-xs' : 'text-sm';
+  // Keep row height identical in compact and expanded — density only changes which columns show.
+  const cellPad = 'px-2 py-1';
+  const headPad = 'px-2 py-1';
+  const textSize = 'text-xs';
 
   const handleDelete = (issue: Issue, hasChildren: boolean) => {
     if (!window.confirm(deleteConfirmMessage(issue, hasChildren))) {
@@ -166,21 +244,24 @@ export function IssueTrackerTable({
   const renderCell = (column: BacklogColumn, issue: Issue, depth: number, hasChildren: boolean, childCount: number) => {
     const theme = CATEGORY_THEME[column.category];
     const isCollapsed = collapsedIds.has(issue.id);
+    const widthStyle = columnWidthStyle(column);
+    const freeze = stickyProps(column, 'cell');
     const base = compact
       ? `${cellPad} border-b border-border align-middle`
-      : `${cellPad} ${theme.cell} border-r border-black/5 align-middle`;
-    const stickyId = column.key === 'displayKey' && !compact ? 'sticky left-0 z-[1]' : '';
+      : `${cellPad} ${freeze.className ? '' : theme.cell} border-r border-black/5 align-middle`;
+    const cellStyle: CSSProperties = { ...widthStyle, ...freeze.style };
 
     switch (column.key) {
       case 'displayKey': {
         return (
           <td
             key={column.key}
-            className={`${base} ${stickyId} font-mono ${compact ? 'text-[10px]' : 'text-xs'} ${compact ? 'text-text2' : theme.text}`}
+            style={cellStyle}
+            className={`${base} ${freeze.className} font-mono text-[10px] ${compact ? 'text-text2' : theme.text}`}
           >
             <div
               className="flex min-w-0 items-center gap-0.5"
-              style={{ paddingLeft: `${depth * (compact ? 0.75 : 1.1)}rem` }}
+              style={{ paddingLeft: `${depth * 0.75}rem` }}
             >
               {hasChildren ? (
                 <button
@@ -190,7 +271,7 @@ export function IssueTrackerTable({
                   aria-expanded={!isCollapsed}
                   aria-label={isCollapsed ? `Expand ${issue.title}` : `Collapse ${issue.title}`}
                 >
-                  {isCollapsed ? <ChevronRight size={compact ? 14 : 16} /> : <ChevronDown size={compact ? 14 : 16} />}
+                  {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 </button>
               ) : (
                 <span className="inline-block w-4 shrink-0" aria-hidden />
@@ -219,70 +300,71 @@ export function IssueTrackerTable({
       }
       case 'title':
         return (
-          <td key={column.key} className={`${base} max-w-xs font-medium ${theme.text}`}>
+          <td
+            key={column.key}
+            style={cellStyle}
+            className={`${base} ${freeze.className} font-medium ${theme.text}`}
+          >
             {onIssueClick ? (
-              <button type="button" onClick={() => onIssueClick(issue)} className="text-left hover:text-accent">
-                <span className={compact ? 'line-clamp-1' : 'line-clamp-2'}>{issue.title}</span>
+              <button type="button" onClick={() => onIssueClick(issue)} className="block w-full min-w-0 text-left hover:text-accent">
+                <span className="block truncate">{issue.title}</span>
               </button>
             ) : (
-              <Link to={`/issues/${issue.id}`} className="hover:text-accent">
-                <span className={compact ? 'line-clamp-1' : 'line-clamp-2'}>{issue.title}</span>
+              <Link to={`/issues/${issue.id}`} className="block min-w-0 hover:text-accent">
+                <span className="block truncate">{issue.title}</span>
               </Link>
             )}
           </td>
         );
       case 'description':
         return (
-          <td key={column.key} className={`${base} max-w-sm text-text2`}>
-            <span className={compact ? 'line-clamp-1' : 'line-clamp-2'}>
+          <td key={column.key} style={cellStyle} className={`${base} text-text2`}>
+            <span className="block truncate">
               {issue.description?.trim() ? issue.description : '—'}
             </span>
           </td>
         );
       case 'status':
         return (
-          <td key={column.key} className={base}>
+          <td key={column.key} style={cellStyle} className={base}>
             <StatusPill label={issue.statusName ?? '—'} colour={issue.statusColour} />
           </td>
         );
       case 'priority':
         return (
-          <td key={column.key} className={base}>
+          <td key={column.key} style={cellStyle} className={base}>
             <PriorityBadge label={issue.priorityLabel ?? '—'} colour={issue.priorityColour} />
           </td>
         );
       case 'type':
         return (
-          <td key={column.key} className={`${base} text-text2`}>
+          <td key={column.key} style={cellStyle} className={`${base} text-text2`}>
             <IssueTypeIcon
               name={issue.issueTypeName}
               workflowCode={issue.issueTypeWorkflowCode}
-              size={compact ? 12 : 14}
+              size={12}
               showLabel
             />
           </td>
         );
       case 'project':
         return (
-          <td key={column.key} className={`${base} text-text2`}>
+          <td key={column.key} style={cellStyle} className={`${base} text-text2`}>
             {issue.projectName ?? '—'}
           </td>
         );
       case 'capitalizable':
         return (
-          <td key={column.key} className={`${base} text-text2`}>
+          <td key={column.key} style={cellStyle} className={`${base} text-text2`}>
             {issue.capitalizable == null ? '—' : issue.capitalizable ? 'Yes' : 'No'}
           </td>
         );
       case 'assignee': {
         const assignee = issueAssigneeName(issue);
         return (
-          <td key={column.key} className={base}>
+          <td key={column.key} style={cellStyle} className={base}>
             {assignee ? (
-              <div className="flex items-center gap-1.5">
-                {!compact && <ResourceAvatar name={assignee.split(',')[0].trim()} size="sm" />}
-                <span className={`text-text2 ${compact ? 'line-clamp-1' : ''}`}>{assignee}</span>
-              </div>
+              <span className="block truncate text-text2">{assignee}</span>
             ) : (
               <span className="text-text2">Unassigned</span>
             )}
@@ -291,7 +373,7 @@ export function IssueTrackerTable({
       }
       case 'utilization':
         return (
-          <td key={column.key} className={`${base} text-text2`}>
+          <td key={column.key} style={cellStyle} className={`${base} text-text2`}>
             {issue.utilizationPct != null && issue.utilizationPct > 0 ? (
               <span
                 className={
@@ -311,15 +393,19 @@ export function IssueTrackerTable({
         );
       default: {
         const fieldKey = customFieldKey(column.key);
-        if (!fieldKey) return <td key={column.key} className={base}>—</td>;
+        if (!fieldKey) {
+          return (
+            <td key={column.key} style={cellStyle} className={base}>
+              —
+            </td>
+          );
+        }
         const raw = cfValue(issue, fieldKey);
         const looksDate = fieldKey.includes('_date') || fieldKey.endsWith('_eta');
         const display = looksDate ? formatCellDate(raw) : raw;
         return (
-          <td key={column.key} className={`${base} whitespace-nowrap text-text2`}>
-            <span className={compact ? 'line-clamp-1' : fieldKey.includes('description') || fieldKey === 'notes' || fieldKey === 'risk_mitigation' ? 'line-clamp-2 whitespace-normal' : ''}>
-              {display}
-            </span>
+          <td key={column.key} style={cellStyle} className={`${base} whitespace-nowrap text-text2`}>
+            <span className="block truncate">{display}</span>
           </td>
         );
       }
@@ -402,6 +488,13 @@ export function IssueTrackerTable({
             density === 'compact' ? 'w-full min-w-0' : 'w-max min-w-full'
           }`}
         >
+          <colgroup>
+            {columns.map((column) => {
+              const width = resolvedWidth(column);
+              return <col key={column.key} style={width != null ? { width, minWidth: width } : undefined} />;
+            })}
+            {canDeleteIssue && <col style={{ width: 56, minWidth: 56 }} />}
+          </colgroup>
           <thead className={maxHeightClassName ? 'sticky top-0 z-10' : ''}>
             {categorySpans.length > 0 && (
               <tr>
@@ -429,15 +522,32 @@ export function IssueTrackerTable({
             <tr>
               {columns.map((column) => {
                 const theme = CATEGORY_THEME[column.category];
+                const canResize = isColumnResizable(column);
+                const widthStyle = columnWidthStyle(column);
+                const freeze = stickyProps(column, 'header');
                 const headerClass =
                   density === 'compact'
-                    ? `${headPad} ${column.minWidth} border-b border-border bg-bg2 text-[10px] font-semibold uppercase tracking-wide text-text2`
-                    : `${headPad} ${column.minWidth} border-b border-r border-black/10 text-[10px] font-semibold uppercase tracking-wide ${theme.header} ${
-                        column.sticky ? 'sticky left-0 z-[2]' : ''
+                    ? `${headPad} ${widthStyle ? '' : column.minWidth} relative border-b border-border bg-bg2 text-[10px] font-semibold uppercase tracking-wide text-text2`
+                    : `${headPad} ${widthStyle ? '' : column.minWidth} relative border-b border-r border-black/10 text-[10px] font-semibold uppercase tracking-wide ${
+                        freeze.className ? freeze.className : theme.header
                       }`;
                 return (
-                  <th key={column.key} className={headerClass}>
-                    {column.header}
+                  <th
+                    key={column.key}
+                    className={headerClass}
+                    style={{ ...widthStyle, ...freeze.style }}
+                  >
+                    <span className="pr-2">{column.header}</span>
+                    {canResize && (
+                      <span
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label={`Resize ${column.header} column`}
+                        title="Drag to resize"
+                        onPointerDown={(event) => beginColumnResize(column, event)}
+                        className="absolute inset-y-0 -right-1 z-[3] w-3 cursor-col-resize touch-none hover:bg-accent/35 active:bg-accent/50"
+                      />
+                    )}
                   </th>
                 );
               })}
