@@ -7,6 +7,7 @@ import com.nexuspm.auth.repository.UserAuthRepository;
 import com.nexuspm.shared.audit.AuditLogService;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.shared.security.SecurityUtils;
+import com.nexuspm.teamroster.TeamRosterService;
 import com.nexuspm.teamroster.entity.TeamManagement;
 import com.nexuspm.teamroster.repository.TeamManagementRepository;
 import com.nexuspm.user.dto.*;
@@ -24,10 +25,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +42,7 @@ public class UserManagementService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final EmployeeRepository employeeRepository;
     private final TeamManagementRepository managementRepository;
+    private final TeamRosterService teamRosterService;
     private final DepartmentRepository departmentRepository;
     private final DesignationRepository designationRepository;
     private final RoleRepository roleRepository;
@@ -61,6 +67,14 @@ public class UserManagementService {
     }
 
     @Transactional(readOnly = true)
+    public List<EligibleEmployeeOption> listEligibleEmployees(String search) {
+        String term = search != null && !search.isBlank() ? search.trim() : null;
+        return employeeRepository.findEligibleForUserAccount(term).stream()
+                .map(this::toEligibleEmployeeOption)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public UserAccountResponse getUserAccount(UUID employeeId) {
         UserAuth auth = userAuthRepository.findByEmployeeId(employeeId)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "User account not found", 404));
@@ -69,6 +83,26 @@ public class UserManagementService {
 
     @Transactional
     public UserAccountResponse createUserAccount(CreateUserAccountRequest request) {
+        boolean hasManagement = request.getManagementId() != null;
+        boolean hasEmployee = request.getEmployeeId() != null;
+        if (hasManagement == hasEmployee) {
+            throw new BusinessException(
+                    "VALIDATION",
+                    "Provide exactly one of managementId or employeeId",
+                    400);
+        }
+
+        Set<Role> roles = resolveRoles(request.getRoleCodes(), request.getRoleCode());
+        Role primary = pickPrimaryRole(roles);
+
+        if (hasManagement) {
+            return createFromManagement(request, roles, primary);
+        }
+        return createFromEmployee(request, roles, primary);
+    }
+
+    private UserAccountResponse createFromManagement(
+            CreateUserAccountRequest request, Set<Role> roles, Role primary) {
         TeamManagement management = managementRepository.findById(request.getManagementId())
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
         if (!"ACTIVE".equalsIgnoreCase(management.getStatus())) {
@@ -81,35 +115,63 @@ public class UserManagementService {
             throw new BusinessException("EMAIL_EXISTS", "Email already registered", 400);
         }
 
-        validateAssignableRole(request.getRoleCode());
-        Role role = roleRepository.findByCodeWithOrgLevel(request.getRoleCode())
-                .orElseThrow(() -> new BusinessException("INVALID_ROLE", "Role not found", 400));
-
         Employee employee = new Employee();
         employee.setId(UUID.randomUUID());
         employee.setEmail(request.getEmail().toLowerCase());
         employee.setFirstName(management.getFirstName());
         employee.setLastName(management.getLastName());
         employee.setStatus("ACTIVE");
-        employee.setRoles(Set.of(role));
+        employee.setRoles(new LinkedHashSet<>(roles));
         employee.setTeamManagement(management);
 
         applyDepartment(employee, request.getDepartmentId());
         applyDesignation(employee, request.getDesignationId());
-        applyManager(employee, request.getManagerId(), role, management);
-        applyOrgWideVisibility(employee, role.getCode(), request.getOrgWideVisibility());
+        applyManager(employee, request.getManagerId(), primary, management);
+        applyOrgWideVisibility(employee, primary.getCode(), request.getOrgWideVisibility());
 
         employeeRepository.save(employee);
+        createAuth(employee, request.getPassword());
+        return getUserAccount(employee.getId());
+    }
 
+    private UserAccountResponse createFromEmployee(
+            CreateUserAccountRequest request, Set<Role> roles, Role primary) {
+        Employee employee = employeeRepository.findDetailedById(request.getEmployeeId())
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
+        if (userAuthRepository.existsByEmployeeId(employee.getId())) {
+            throw new BusinessException("ALREADY_LINKED", "This employee already has a login account", 400);
+        }
+        if (!"ACTIVE".equalsIgnoreCase(employee.getStatus())) {
+            throw new BusinessException("VALIDATION", "Employee is not active", 400);
+        }
+
+        String email = request.getEmail().toLowerCase().trim();
+        if (!email.equalsIgnoreCase(employee.getEmail()) && employeeRepository.existsByEmail(email)) {
+            throw new BusinessException("EMAIL_EXISTS", "Email already registered", 400);
+        }
+
+        employee.setEmail(email);
+        employee.setRoles(new LinkedHashSet<>(roles));
+        employee.setStatus("ACTIVE");
+
+        applyDepartment(employee, request.getDepartmentId());
+        applyDesignation(employee, request.getDesignationId());
+        applyManager(employee, request.getManagerId(), primary, employee.getTeamManagement());
+        applyOrgWideVisibility(employee, primary.getCode(), request.getOrgWideVisibility());
+
+        employeeRepository.save(employee);
+        createAuth(employee, request.getPassword());
+        return getUserAccount(employee.getId());
+    }
+
+    private void createAuth(Employee employee, String password) {
         UserAuth auth = new UserAuth();
         auth.setId(UUID.randomUUID());
         auth.setEmployee(employee);
-        AuthService.applyNewPassword(auth, request.getPassword(), passwordEncoder);
+        AuthService.applyNewPassword(auth, password, passwordEncoder);
         auth.setActive(true);
         auth.setFailedAttempts(0);
         userAuthRepository.save(auth);
-
-        return getUserAccount(employee.getId());
     }
 
     @Transactional
@@ -131,12 +193,12 @@ public class UserManagementService {
             auth.setActive("ACTIVE".equalsIgnoreCase(request.getStatus()));
         }
 
-        if (request.getRoleCode() != null && !request.getRoleCode().isBlank()) {
-            validateAssignableRole(request.getRoleCode());
-            Role role = roleRepository.findByCodeWithOrgLevel(request.getRoleCode().trim().toUpperCase())
-                    .orElseThrow(() -> new BusinessException("INVALID_ROLE", "Role not found", 400));
+        if (request.getRoleCodes() != null || (request.getRoleCode() != null && !request.getRoleCode().isBlank())) {
+            Set<Role> roles = resolveRoles(request.getRoleCodes(), request.getRoleCode());
+            Role primary = pickPrimaryRole(roles);
             employee.getRoles().clear();
-            employee.getRoles().add(role);
+            employee.getRoles().addAll(roles);
+            syncRosterForRoleChange(employee, primary.getCode());
         }
 
         if (request.getDepartmentId() != null) {
@@ -146,15 +208,18 @@ public class UserManagementService {
             applyDesignation(employee, request.getDesignationId());
         }
         if (request.getManagerId() != null) {
-            Role primaryRole = employee.getRoles().stream().findFirst()
+            String primaryCode = employee.getPrimaryRoleCode();
+            Role roleForManagerCheck = roleRepository.findByCodeWithOrgLevel(primaryCode)
                     .orElseThrow(() -> new BusinessException("INVALID_ROLE", "User has no role", 400));
-            // Ensure org-level graph is loaded for hierarchy checks after a role change.
-            Role roleForManagerCheck = roleRepository.findByCodeWithOrgLevel(primaryRole.getCode())
-                    .orElse(primaryRole);
+            // Reload management link after possible promote/demote above.
+            Employee refreshed = employeeRepository.findDetailedById(employee.getId()).orElse(employee);
+            employee.setTeamManagement(refreshed.getTeamManagement());
             applyManager(employee, request.getManagerId(), roleForManagerCheck, employee.getTeamManagement());
         }
 
-        if (request.getOrgWideVisibility() != null || request.getRoleCode() != null) {
+        if (request.getOrgWideVisibility() != null
+                || request.getRoleCode() != null
+                || request.getRoleCodes() != null) {
             String roleCode = employee.getPrimaryRoleCode();
             Boolean requested = request.getOrgWideVisibility() != null
                     ? request.getOrgWideVisibility()
@@ -260,6 +325,105 @@ public class UserManagementService {
         }
     }
 
+    /**
+     * Resolve one or more roles from {@code roleCodes} and/or legacy single {@code roleCode}.
+     */
+    private Set<Role> resolveRoles(List<String> roleCodes, String roleCode) {
+        LinkedHashSet<String> codes = new LinkedHashSet<>();
+        if (roleCodes != null) {
+            for (String code : roleCodes) {
+                if (code != null && !code.isBlank()) {
+                    codes.add(code.trim().toUpperCase());
+                }
+            }
+        }
+        if (roleCode != null && !roleCode.isBlank()) {
+            codes.add(roleCode.trim().toUpperCase());
+        }
+        if (codes.isEmpty()) {
+            throw new BusinessException("INVALID_ROLE", "Select at least one application role", 400);
+        }
+
+        Set<Role> roles = new LinkedHashSet<>();
+        for (String code : codes) {
+            validateAssignableRole(code);
+            Role role = roleRepository.findByCodeWithOrgLevel(code)
+                    .orElseThrow(() -> new BusinessException("INVALID_ROLE", "Role not found: " + code, 400));
+            roles.add(role);
+        }
+        return roles;
+    }
+
+    private static Role pickPrimaryRole(Set<Role> roles) {
+        // Prefer org/hierarchy roles over SUPER_ADMIN/ADMIN when multiple are assigned,
+        // so adding Super Admin does not wipe the reporting line for VP/Manager/etc.
+        List<Role> orgRoles = roles.stream()
+                .filter(r -> {
+                    String code = r.getCode() != null ? r.getCode().toUpperCase() : "";
+                    return !"SUPER_ADMIN".equals(code) && !"ADMIN".equals(code);
+                })
+                .toList();
+        Set<Role> pool = orgRoles.isEmpty() ? roles : new LinkedHashSet<>(orgRoles);
+        return pool.stream()
+                .min(Comparator.comparingInt(UserManagementService::roleSortOrder))
+                .orElseThrow(() -> new BusinessException("INVALID_ROLE", "Select at least one application role", 400));
+    }
+
+    private static int roleSortOrder(Role role) {
+        if (role.getOrgLevel() != null) {
+            return role.getOrgLevel().getLevelOrder();
+        }
+        return switch (role.getCode()) {
+            case "SUPER_ADMIN" -> 0;
+            case "ADMIN" -> 1;
+            default -> 4;
+        };
+    }
+
+    /**
+     * Keep team_management in sync with app role:
+     * Employee → Manager+ creates a management row; Manager+ → Employee removes it.
+     */
+    private void syncRosterForRoleChange(Employee employee, String newRole) {
+        if (requiresManagementRoster(newRole) && employee.getTeamManagement() == null) {
+            teamRosterService.ensureManagementLink(employee, defaultManagementRoleTitle(newRole));
+        } else if (isEmployeeAppRole(newRole) && employee.getTeamManagement() != null) {
+            teamRosterService.removeManagementLink(employee);
+        }
+    }
+
+    private static boolean isEmployeeAppRole(String roleCode) {
+        return roleCode != null && "EMPLOYEE".equalsIgnoreCase(roleCode.trim());
+    }
+
+    private static boolean requiresManagementRoster(String roleCode) {
+        if (roleCode == null || roleCode.isBlank()) {
+            return false;
+        }
+        return switch (roleCode.trim().toUpperCase()) {
+            case "CXO", "CTO", "VP", "VP_ENG", "MANAGER", "SEM", "SR_SEM", "TECH_LEAD",
+                 "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER" -> true;
+            default -> false;
+        };
+    }
+
+    private static String defaultManagementRoleTitle(String roleCode) {
+        if (roleCode == null || roleCode.isBlank()) {
+            return "Manager";
+        }
+        return switch (roleCode.trim().toUpperCase()) {
+            case "CXO" -> "CXO";
+            case "CTO" -> "CTO";
+            case "VP", "VP_ENG" -> "VP";
+            case "SR_SEM" -> "Senior Engineering Manager";
+            case "SEM" -> "Engineering Manager";
+            case "TECH_LEAD" -> "Tech Lead";
+            case "PM", "PROJECT_MANAGER" -> "Project Manager";
+            case "DM", "DELIVERY_MANAGER" -> "Delivery Manager";
+            default -> "Manager";
+        };
+    }
+
     private UserAccountResponse toResponse(UserAuth auth) {
         Employee employee = auth.getEmployee();
         TeamManagement management = employee.getTeamManagement();
@@ -271,6 +435,10 @@ public class UserManagementService {
                 .fullName(employee.getFullName())
                 .status(employee.getStatus())
                 .roleCode(employee.getPrimaryRoleCode())
+                .roleCodes(employee.getRoles().stream()
+                        .sorted(Comparator.comparingInt(UserManagementService::roleSortOrder))
+                        .map(Role::getCode)
+                        .collect(Collectors.toCollection(ArrayList::new)))
                 .departmentId(employee.getDepartment() != null ? employee.getDepartment().getId() : null)
                 .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : null)
                 .designationId(employee.getDesignation() != null ? employee.getDesignation().getId() : null)
@@ -290,7 +458,10 @@ public class UserManagementService {
 
     private void applyOrgWideVisibility(Employee employee, String roleCode, Boolean requested) {
         String code = roleCode == null ? "" : roleCode.trim().toUpperCase();
-        boolean toggleRole = Set.of("MANAGER", "SEM", "SR_SEM", "VP", "VP_ENG").contains(code);
+        boolean toggleRole = Set.of(
+                "MANAGER", "SEM", "SR_SEM",
+                "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER",
+                "VP", "VP_ENG").contains(code);
         if (!toggleRole) {
             employee.setOrgWideVisibility(false);
             return;
@@ -299,7 +470,7 @@ public class UserManagementService {
             employee.setOrgWideVisibility(requested);
             return;
         }
-        // Defaults: VP org-wide, Manager own-team
+        // Defaults: VP org-wide; Manager / PM own-team
         employee.setOrgWideVisibility("VP".equals(code) || "VP_ENG".equals(code));
     }
 
@@ -326,6 +497,51 @@ public class UserManagementService {
                 .supervisorEmployeeId(supervisorEmployeeId)
                 .supervisorEmployeeName(supervisorEmployeeName)
                 .status(management.getStatus())
+                .build();
+    }
+
+    private EligibleEmployeeOption toEligibleEmployeeOption(Employee employee) {
+        TeamManagement management = employee.getTeamManagement();
+        UUID departmentId = employee.getDepartment() != null
+                ? employee.getDepartment().getId()
+                : (employee.getDesignation() != null && employee.getDesignation().getDepartment() != null
+                        ? employee.getDesignation().getDepartment().getId()
+                        : null);
+        String departmentName = employee.getDepartment() != null
+                ? employee.getDepartment().getName()
+                : (employee.getDesignation() != null && employee.getDesignation().getDepartment() != null
+                        ? employee.getDesignation().getDepartment().getName()
+                        : null);
+
+        UUID managerId = employee.getManager() != null ? employee.getManager().getId() : null;
+        String managerName = employee.getManager() != null ? employee.getManager().getFullName() : null;
+        if (managerId == null && employee.getEngineeringManagerManagement() != null) {
+            Optional<Employee> emLogin = employeeRepository.findByTeamManagementId(
+                    employee.getEngineeringManagerManagement().getId());
+            if (emLogin.isPresent()) {
+                managerId = emLogin.get().getId();
+                managerName = emLogin.get().getFullName();
+            }
+        }
+
+        return EligibleEmployeeOption.builder()
+                .id(employee.getId())
+                .firstName(employee.getFirstName())
+                .lastName(employee.getLastName())
+                .fullName(employee.getFullName())
+                .email(employee.getEmail())
+                .departmentId(departmentId)
+                .departmentName(departmentName)
+                .designationId(employee.getDesignation() != null ? employee.getDesignation().getId() : null)
+                .designationName(employee.getDesignation() != null ? employee.getDesignation().getName() : null)
+                .managerId(managerId)
+                .managerName(managerName)
+                .engineeringManagerName(employee.getEngineeringManagerManagement() != null
+                        ? employee.getEngineeringManagerManagement().getFullName()
+                        : null)
+                .managementId(management != null ? management.getId() : null)
+                .managementRoleTitle(management != null ? management.getRoleTitle() : null)
+                .status(employee.getStatus())
                 .build();
     }
 }

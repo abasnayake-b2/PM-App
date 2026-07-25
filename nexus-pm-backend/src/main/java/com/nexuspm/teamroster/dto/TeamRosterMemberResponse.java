@@ -20,6 +20,8 @@ public class TeamRosterMemberResponse {
     private String teamName;
     private UUID engineeringManagerManagementId;
     private String engineeringManagerName;
+    private UUID managementId;
+    private String managementRoleTitle;
     private UUID workTypeId;
     private String workType;
     private UUID countryId;

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createUserAccount,
   deleteUserAccount,
+  fetchEligibleEmployees,
   fetchEligibleManagement,
   fetchUserAccounts,
   unlockUserAccount,
@@ -25,6 +26,14 @@ export function useEligibleManagement(search = '', enabled = true) {
   });
 }
 
+export function useEligibleEmployees(search = '', enabled = true) {
+  return useQuery({
+    queryKey: ['eligible-employees', search],
+    queryFn: () => fetchEligibleEmployees(search || undefined),
+    enabled,
+  });
+}
+
 export function useCreateUserAccount() {
   const qc = useQueryClient();
   return useMutation({
@@ -32,7 +41,9 @@ export function useCreateUserAccount() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-accounts'] });
       qc.invalidateQueries({ queryKey: ['eligible-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-employees'] });
       qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
     },
   });
 }
@@ -44,6 +55,10 @@ export function useUpdateUserAccount(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-accounts'] });
       qc.invalidateQueries({ queryKey: ['employee', id] });
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
+      qc.invalidateQueries({ queryKey: ['team-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-employees'] });
     },
   });
 }

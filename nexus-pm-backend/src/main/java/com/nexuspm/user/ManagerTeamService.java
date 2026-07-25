@@ -31,20 +31,27 @@ public class ManagerTeamService {
             return employeeRepository.findActiveRosterFiltered(null, null, null, null);
         }
         if (("VP".equals(role) || "VP_ENG".equals(role)
-                || "MANAGER".equals(role) || "SEM".equals(role) || "SR_SEM".equals(role))
+                || "MANAGER".equals(role) || "SEM".equals(role) || "SR_SEM".equals(role)
+                || "PM".equals(role) || "PROJECT_MANAGER".equals(role)
+                || "DM".equals(role) || "DELIVERY_MANAGER".equals(role))
                 && manager.isOrgWideVisibility()) {
             return employeeRepository.findActiveRosterFiltered(null, null, null, null);
         }
         return resolveTeamDefault(manager);
     }
 
-    private List<Employee> resolveTeamDefault(Employee manager) {
+    private List<Employee> resolveTeamDefault(Employee viewer) {
         Map<UUID, Employee> teamById = new LinkedHashMap<>();
-        teamById.put(manager.getId(), manager);
-        employeeRepository.findDirectReports(manager.getId())
+        teamById.put(viewer.getId(), viewer);
+        employeeRepository.findDirectReports(viewer.getId())
                 .forEach(member -> teamById.put(member.getId(), member));
 
-        UUID managementId = manager.getTeamManagement() != null ? manager.getTeamManagement().getId() : null;
+        // Managers: people under their own management node.
+        UUID managementId = viewer.getTeamManagement() != null ? viewer.getTeamManagement().getId() : null;
+        // Engineers: peers under the same Engineering Manager.
+        if (managementId == null && viewer.getEngineeringManagerManagement() != null) {
+            managementId = viewer.getEngineeringManagerManagement().getId();
+        }
         if (managementId != null) {
             employeeRepository.findByEngineeringManagerManagementId(managementId)
                     .forEach(member -> teamById.putIfAbsent(member.getId(), member));

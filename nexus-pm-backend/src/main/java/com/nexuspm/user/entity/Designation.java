@@ -36,4 +36,8 @@ public class Designation extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stream_id")
     private Stream stream;
+
+    /** When true, this designation is treated as a management title. */
+    @Column(name = "is_management", nullable = false)
+    private boolean management = false;
 }

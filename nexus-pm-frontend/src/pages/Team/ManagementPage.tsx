@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowDownLeft, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { TeamExcelUpload } from '@/components/TeamExcelUpload';
 import { TeamManagementPanel } from '@/components/TeamManagementPanel';
 import { SlideOverPanel } from '@/components/SlideOverPanel';
@@ -12,6 +12,7 @@ import {
   useDeleteTeamManagement,
   useUploadTeamManagementPhoto,
   useDeleteTeamManagementPhoto,
+  useDemoteManagementToEmployee,
   type TeamManagementPayload,
 } from '@/hooks/useTeamRoster';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -20,6 +21,79 @@ import type { TeamManagement } from '@/api/teamRoster.api';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
+
+function apiErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const data = error.response?.data as { detail?: string; message?: string } | undefined;
+    return data?.detail || data?.message || error.message || 'Request failed';
+  }
+  return 'Request failed';
+}
+
+function DemoteToEmployeeForm({
+  member,
+  engineeringManagers,
+  loading,
+  error,
+  onCancel,
+  onSubmit,
+}: {
+  member: TeamManagement;
+  engineeringManagers: TeamManagement[];
+  loading?: boolean;
+  error?: unknown;
+  onCancel: () => void;
+  onSubmit: (payload: { engineeringManagerManagementId?: string }) => void;
+}) {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const engineeringManagerManagementId =
+      (fd.get('engineeringManagerManagementId') as string) || undefined;
+    onSubmit({ engineeringManagerManagementId });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error != null && (
+        <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          {apiErrorMessage(error)}
+        </div>
+      )}
+      <p className="text-sm text-text2">
+        Move <span className="font-medium text-text">{member.fullName}</span> back to the employee
+        roster. They will leave Management and appear under Employees. If they have a login, their
+        app role becomes Employee.
+      </p>
+      <label className="block text-sm">
+        <span className="text-text2">Engineering manager (optional)</span>
+        <select name="engineeringManagerManagementId" className={inputClass} defaultValue="">
+          <option value="">None</option>
+          {engineeringManagers
+            .filter((m) => m.id !== member.id)
+            .map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.fullName} — {m.roleTitle}
+              </option>
+            ))}
+        </select>
+      </label>
+      <div className="flex gap-3 pt-2">
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
+          style={{ color: 'var(--accent-fg)' }}
+        >
+          {loading ? 'Moving…' : 'Move to employee'}
+        </button>
+        <button type="button" onClick={onCancel} className="rounded-lg border border-border px-4 py-2 text-sm">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function ManagementForm({
   initial,
@@ -199,16 +273,19 @@ function ManagementForm({
 export function ManagementPage() {
   const { can } = usePermissions();
   const canManageHierarchy = can(P.TEAM_CREATE);
+  const canDemote = can(P.TEAM_CREATE);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [dialog, setDialog] = useState<'create' | 'edit' | null>(null);
+  const [dialog, setDialog] = useState<'create' | 'edit' | 'demote' | null>(null);
   const [editing, setEditing] = useState<TeamManagement | null>(null);
   const [selected, setSelected] = useState<TeamManagement | null>(null);
+  const [demoting, setDemoting] = useState<TeamManagement | null>(null);
 
   const { data: rows, isLoading, error } = useTeamManagement(search);
   const createRow = useCreateTeamManagement();
   const updateRow = useUpdateTeamManagement(editing?.id ?? '');
   const deleteRow = useDeleteTeamManagement();
+  const demoteRow = useDemoteManagementToEmployee();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
@@ -218,12 +295,19 @@ export function ManagementPage() {
   const closeDialog = () => {
     setDialog(null);
     setEditing(null);
+    setDemoting(null);
   };
 
   const openEdit = (row: TeamManagement) => {
     setSelected(null);
     setEditing(row);
     setDialog('edit');
+  };
+
+  const openDemote = (row: TeamManagement) => {
+    setSelected(null);
+    setDemoting(row);
+    setDialog('demote');
   };
 
   const cellClass = 'whitespace-nowrap px-4 py-2';
@@ -311,6 +395,16 @@ export function ManagementPage() {
                           >
                             <Pencil size={16} />
                           </button>
+                          {canDemote && (
+                            <button
+                              type="button"
+                              onClick={() => openDemote(row)}
+                              className="rounded p-1 text-text2 hover:bg-bg3 hover:text-accent"
+                              title="Move to employee"
+                            >
+                              <ArrowDownLeft size={16} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -369,7 +463,7 @@ export function ManagementPage() {
         />
       )}
 
-      {dialog && canManageHierarchy && (
+      {(dialog === 'create' || dialog === 'edit') && canManageHierarchy && (
         <SlideOverPanel
           title={dialog === 'create' ? 'Add management' : `Edit ${editing?.fullName ?? ''}`}
           subtitle={dialog === 'edit' ? 'Management roster' : undefined}
@@ -387,6 +481,40 @@ export function ManagementPage() {
               } else if (editing) {
                 updateRow.mutate(payload, { onSuccess: closeDialog });
               }
+            }}
+          />
+        </SlideOverPanel>
+      )}
+
+      {dialog === 'demote' && canDemote && demoting && (
+        <SlideOverPanel
+          title={`Move ${demoting.fullName} to employee`}
+          subtitle="Management → employee roster"
+          onClose={closeDialog}
+        >
+          <DemoteToEmployeeForm
+            member={demoting}
+            engineeringManagers={rows ?? []}
+            loading={demoteRow.isPending}
+            error={demoteRow.error}
+            onCancel={closeDialog}
+            onSubmit={(payload) => {
+              demoteRow.reset();
+              demoteRow.mutate(
+                {
+                  managementId: demoting.id,
+                  payload: {
+                    engineeringManagerManagementId: payload.engineeringManagerManagementId,
+                    setEmployeeRole: true,
+                  },
+                },
+                {
+                  onSuccess: () => {
+                    if (selected?.id === demoting.id) setSelected(null);
+                    closeDialog();
+                  },
+                },
+              );
             }}
           />
         </SlideOverPanel>

@@ -12,6 +12,15 @@ import {
   type RoleAccessItem,
 } from '@/api/roleAccess.api';
 
+const EMPLOYEE_DEFAULT_PERMISSIONS = [
+  'PROJECTS_VIEW',
+  'ISSUES_VIEW',
+  'ALLOCATIONS_VIEW',
+  'REPORTS_VIEW',
+  'RELEASES_VIEW',
+  'IMPORT_VIEW',
+] as const;
+
 const MODULE_LABELS: Record<string, string> = {
   USERS: 'User accounts',
   PROJECTS: 'Projects',
@@ -21,6 +30,7 @@ const MODULE_LABELS: Record<string, string> = {
   ORGANISATIONS: 'Organisation',
   TEAM: 'Management and employees',
   ORG_STRUCTURE: 'Organization — Org structure',
+  PMO: 'PMO pages',
   ADMIN: 'Admin (system)',
   REFERENCE: 'Reference data',
   IMPORT: 'Excel import',
@@ -77,7 +87,7 @@ export function AdminRolePermissionsSection() {
   const [draft, setDraft] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!roles.length) return;
+    if (!roles.length || showCreate) return;
     const role = roles.find((r) => r.id === selectedRoleId) ?? roles[0];
     if (role && role.id !== selectedRoleId) {
       setSelectedRoleId(role.id);
@@ -85,7 +95,7 @@ export function AdminRolePermissionsSection() {
     if (role) {
       setDraft(new Set(role.permissionCodes));
     }
-  }, [roles, selectedRoleId]);
+  }, [roles, selectedRoleId, showCreate]);
 
   const grouped = useMemo(() => groupPermissions(permissions), [permissions]);
 
@@ -150,8 +160,8 @@ export function AdminRolePermissionsSection() {
   return (
     <div>
       <p className="text-sm text-text2">
-        Permissions map to menus and functions: Dashboard, Projects, Main Backlog, Resource
-        utilization, Organization (Org structure), Organisation, Management and employees, Admin,
+        Permissions map to menus and functions: Dashboard, PMO pages, Projects, Main Backlog, Resource
+        utilization, Organization (Org structure), Region, Management and employees, Admin,
         Reference data, Excel import, and Releases. Built-in roles can be adjusted here; assign roles
         to users on User management.
       </p>
@@ -177,7 +187,7 @@ export function AdminRolePermissionsSection() {
             <button
               type="button"
               onClick={() => {
-                setDraft(new Set());
+                setDraft(new Set(EMPLOYEE_DEFAULT_PERMISSIONS));
                 setShowCreate(true);
               }}
               className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-sm hover:bg-bg3"
@@ -238,6 +248,10 @@ export function AdminRolePermissionsSection() {
           {showCreate && (
             <div className="mt-6 rounded-xl border border-border p-5">
               <h2 className="text-lg font-semibold">New custom role</h2>
+              <p className="mt-1 text-sm text-text2">
+                Defaults to Employee-level access (own projects only). Uncheck anything they should not
+                see — do not copy Manager’s full View matrix unless intentional.
+              </p>
               <form onSubmit={handleCreate} className="mt-4 space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block text-sm">

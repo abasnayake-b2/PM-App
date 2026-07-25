@@ -39,6 +39,7 @@ function detailFields(tab: RefTab, item: ReferenceItem): { label: string; value?
         { label: 'Code', value: item.code },
         { label: 'Stream', value: item.stream?.name ?? item.streamName },
         { label: 'Department', value: item.department?.name ?? item.departmentName ?? item.stream?.department?.name },
+        { label: 'Type', value: item.management ? 'Management' : 'Employee' },
       ];
     case 'work-types':
       return [{ label: 'Name', value: item.name }];
@@ -140,6 +141,7 @@ export function itemSearchText(item: ReferenceItem): string {
     item.sequence != null ? String(item.sequence) : null,
     item.level != null ? String(item.level) : null,
     item.terminal ? 'terminal' : null,
+    item.management ? 'management' : 'employee',
   ]
     .filter(Boolean)
     .join(' ')

@@ -28,7 +28,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/roles")
-    @PreAuthorize("@perm.can('USERS_VIEW')")
+    @PreAuthorize("@perm.canAny('USERS_VIEW', 'TEAM_VIEW', 'TEAM_CREATE')")
     public List<RoleOptionResponse> listRoles() {
         return employeeService.listRoles();
     }

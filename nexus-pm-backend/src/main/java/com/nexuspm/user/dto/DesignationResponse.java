@@ -17,6 +17,7 @@ public class DesignationResponse {
     private String departmentName;
     private UUID streamId;
     private String streamName;
+    private boolean management;
     private Instant createdAt;
     private Instant updatedAt;
     private UUID createdBy;

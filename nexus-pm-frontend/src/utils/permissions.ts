@@ -38,6 +38,10 @@ export const P = {
   RELEASES_VIEW: 'RELEASES_VIEW',
   RELEASES_CREATE: 'RELEASES_CREATE',
   ORG_STRUCTURE_VIEW: 'ORG_STRUCTURE_VIEW',
+  PMO_VIEW: 'PMO_VIEW',
+  PMO_CREATE: 'PMO_CREATE',
+  PMO_UPDATE: 'PMO_UPDATE',
+  PMO_DELETE: 'PMO_DELETE',
 } as const;
 
 export type PermissionCode = (typeof P)[keyof typeof P];

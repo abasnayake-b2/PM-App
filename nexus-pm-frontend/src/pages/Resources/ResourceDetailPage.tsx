@@ -7,7 +7,6 @@ import { useAllocations } from '@/hooks/useResources';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/store/useAuthStore';
 import { P } from '@/utils/permissions';
-import { isManagerOrAboveRole } from '@/utils/orgRoles';
 import { partitionAllocations, sumAllocationPercent } from '@/utils/allocationUi';
 import type { Allocation } from '@/types';
 
@@ -41,7 +40,7 @@ export function ResourceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const role = useAuthStore((s) => s.user?.role);
   const { can } = usePermissions();
-  const showTeamView = can(P.ALLOCATIONS_VIEW) && isManagerOrAboveRole(role);
+  const showTeamView = can(P.ALLOCATIONS_VIEW);
   const canDeleteAllocation = can(P.ALLOCATIONS_DELETE);
 
   const { data: employee, isLoading, error } = useEmployee(id);

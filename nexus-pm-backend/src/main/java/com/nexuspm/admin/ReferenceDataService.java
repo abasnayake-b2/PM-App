@@ -148,7 +148,7 @@ public class ReferenceDataService {
 
     @CacheEvict(cacheNames = CacheNames.DESIGNATIONS, allEntries = true)
     @Transactional
-    public DesignationResponse createDesignation(String name, String code, UUID streamId) {
+    public DesignationResponse createDesignation(String name, String code, UUID streamId, boolean management) {
         Stream stream = streamRepository.findById(streamId)
                 .orElseThrow(() -> new BusinessException("INVALID_STREAM", "Stream not found", 400));
         String trimmedName = name.trim();
@@ -165,12 +165,14 @@ public class ReferenceDataService {
         designation.setCode(normalizedCode);
         designation.setStream(stream);
         designation.setDepartment(stream.getDepartment());
+        designation.setManagement(management);
         return toDesignationResponse(auditNameEnricher.enrich(designationRepository.save(designation)));
     }
 
     @CacheEvict(cacheNames = CacheNames.DESIGNATIONS, allEntries = true)
     @Transactional
-    public DesignationResponse updateDesignation(UUID id, String name, String code, UUID streamId) {
+    public DesignationResponse updateDesignation(
+            UUID id, String name, String code, UUID streamId, boolean management) {
         Designation designation = designationRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Designation not found", 404));
         Stream stream = streamRepository.findById(streamId)
@@ -187,6 +189,7 @@ public class ReferenceDataService {
         designation.setCode(normalizedCode);
         designation.setStream(stream);
         designation.setDepartment(stream.getDepartment());
+        designation.setManagement(management);
         return toDesignationResponse(auditNameEnricher.enrich(designationRepository.save(designation)));
     }
 
@@ -466,6 +469,7 @@ public class ReferenceDataService {
                 .departmentName(department != null ? department.getName() : null)
                 .streamId(stream != null ? stream.getId() : null)
                 .streamName(stream != null ? stream.getName() : null)
+                .management(designation.isManagement())
                 .createdAt(designation.getCreatedAt())
                 .updatedAt(designation.getUpdatedAt())
                 .createdBy(designation.getCreatedBy())

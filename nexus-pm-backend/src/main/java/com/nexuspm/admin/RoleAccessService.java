@@ -4,9 +4,11 @@ import com.nexuspm.admin.dto.CreateAccessRoleRequest;
 import com.nexuspm.admin.dto.PermissionResponse;
 import com.nexuspm.admin.dto.RoleAccessResponse;
 import com.nexuspm.shared.exception.BusinessException;
+import com.nexuspm.user.entity.OrgLevel;
 import com.nexuspm.user.entity.Permission;
 import com.nexuspm.user.entity.Role;
 import com.nexuspm.user.repository.EmployeeRepository;
+import com.nexuspm.user.repository.OrgLevelRepository;
 import com.nexuspm.user.repository.PermissionRepository;
 import com.nexuspm.user.repository.RoleRepository;
 import com.nexuspm.shared.cache.CacheNames;
@@ -29,6 +31,7 @@ public class RoleAccessService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final OrgLevelRepository orgLevelRepository;
     private final EmployeeRepository employeeRepository;
 
     @Cacheable(cacheNames = CacheNames.PERMISSIONS, key = "'all'")
@@ -74,6 +77,11 @@ public class RoleAccessService {
         role.setId(UUID.randomUUID());
         role.setName(name);
         role.setCode(code);
+        // Custom roles sit on the Employee reporting line (must have a Manager).
+        // Leaving org_level null made them look like Super Admin / Admin.
+        OrgLevel employeeLevel = orgLevelRepository.findByCode("EMPLOYEE")
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee org level not configured", 500));
+        role.setOrgLevel(employeeLevel);
         roleRepository.save(role);
 
         replacePermissions(role.getId(), request.getPermissionCodes());

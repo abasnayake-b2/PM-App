@@ -14,7 +14,7 @@ import { useIssues } from '@/hooks/useIssues';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
-import { isManagerOrAboveRole, hasOrgWideVisibility } from '@/utils/orgRoles';
+import { isManagerOrAboveRole, hasOrgWideVisibility, isScopedEngineeringManagerRole, isDeliveryManagerRole } from '@/utils/orgRoles';
 import { defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
 import type { Capacity } from '@/types';
 
@@ -24,9 +24,16 @@ export function ResourcesPage() {
   const role = useAuthStore((s) => s.user?.role);
   const orgWideVisibility = useAuthStore((s) => s.user?.orgWideVisibility);
   const { can } = usePermissions();
-  // VP / CXO / Manager get VIEW-only allocation perms but still need the team capacity board
-  const showTeamCapacity = can(P.ALLOCATIONS_VIEW) && isManagerOrAboveRole(role);
-  const canEditAllocations = can(P.ALLOCATIONS_CREATE) || can(P.ALLOCATIONS_UPDATE);
+  // Employees with ALLOCATIONS_VIEW see their EM team; managers see own team / org-wide.
+  const showTeamCapacity = can(P.ALLOCATIONS_VIEW);
+  // Employees may VIEW capacity under their EM; only managers get profile / allocate actions.
+  const canEditAllocations =
+    isManagerOrAboveRole(role) && (can(P.ALLOCATIONS_CREATE) || can(P.ALLOCATIONS_UPDATE));
+  const showProfileLink = isManagerOrAboveRole(role);
+  const locksEmFilter =
+    showTeamCapacity &&
+    !hasOrgWideVisibility(role, orgWideVisibility) &&
+    (isScopedEngineeringManagerRole(role) || isDeliveryManagerRole(role) || isManagerOrAboveRole(role));
   const isScopedManager = showTeamCapacity && !hasOrgWideVisibility(role, orgWideVisibility);
   const userName = useAuthStore((s) => s.user?.name);
 
@@ -40,10 +47,12 @@ export function ResourcesPage() {
   const userId = useAuthStore((s) => s.user?.userId);
 
   useEffect(() => {
-    if (isScopedManager && userName) {
+    // Only lock EM filter to the viewer's own name for EM/manager roles — not for engineers
+    // (backend already scopes engineers to their EM team).
+    if (locksEmFilter && userName) {
       setEngineeringManagerFilter(userName);
     }
-  }, [isScopedManager, userName]);
+  }, [locksEmFilter, userName]);
   const [fromDate, setFromDate] = useState(defaults.from);
   const [toDate, setToDate] = useState(defaults.to);
   const [selectedRow, setSelectedRow] = useState<Capacity | null>(null);
@@ -157,7 +166,9 @@ export function ResourcesPage() {
           <h1 className="text-2xl font-bold">Resource Utilization</h1>
           <p className="mt-1 text-text2">
             {isScopedManager
-              ? 'Your team and allocations on your projects'
+              ? isManagerOrAboveRole(role)
+                ? 'Your team and allocations on your projects'
+                : 'Your Engineering Manager’s team and project allocations'
               : 'Team capacity from the employee roster and issue-level allocations'}
           </p>
         </div>
@@ -247,9 +258,12 @@ export function ResourcesPage() {
           <select
             value={engineeringManagerFilter}
             onChange={(e) => setEngineeringManagerFilter(e.target.value)}
-            className="mt-1 block min-w-[10rem] max-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+            disabled={locksEmFilter}
+            className="mt-1 block min-w-[10rem] max-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm disabled:opacity-70"
           >
-            <option value="">All managers</option>
+            <option value="">
+              {isScopedManager && !locksEmFilter ? 'Your EM team' : 'All managers'}
+            </option>
             {engineeringManagers.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -349,6 +363,7 @@ export function ResourcesPage() {
           issues={assignedIssues?.content ?? []}
           issuesLoading={assignedIssuesLoading}
           canEdit={canEditAllocations}
+          showProfileLink={showProfileLink}
           initialEditingAllocationId={panelEditAllocationId}
           onClose={() => {
             setSelectedRow(null);

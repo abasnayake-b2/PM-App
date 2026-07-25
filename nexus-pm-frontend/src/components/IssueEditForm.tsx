@@ -10,6 +10,11 @@ import {
   rdFieldInputClass,
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
+import {
+  firstCustomFieldErrorMessage,
+  sanitizePercentageCompletionInput,
+  validateIssueCustomFields,
+} from '@/utils/issueFieldValidation';
 
 interface IssueEditFormProps {
   issue: Issue;
@@ -19,6 +24,14 @@ interface IssueEditFormProps {
   submitError?: unknown;
   onCancel: () => void;
   onSave: (payload: UpdateIssuePayload, nextStatusId: string) => void;
+}
+
+function normalizeCustomFields(raw: Record<string, string> | null | undefined): Record<string, string> {
+  const next = { ...(raw ?? {}) };
+  if (next.percentage_completion != null && next.percentage_completion !== '') {
+    next.percentage_completion = sanitizePercentageCompletionInput(next.percentage_completion);
+  }
+  return next;
 }
 
 export function IssueEditForm({
@@ -43,8 +56,10 @@ export function IssueEditForm({
     issue.capitalizable == null ? '' : issue.capitalizable ? 'true' : 'false',
   );
   const [customFields, setCustomFields] = useState<Record<string, string>>(
-    () => ({ ...(issue.customFields ?? {}) }),
+    () => normalizeCustomFields(issue.customFields),
   );
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     setTitle(issue.title);
@@ -52,10 +67,13 @@ export function IssueEditForm({
     setPriorityId(issue.priorityId);
     setStatusId(issue.statusId);
     setCapitalizable(issue.capitalizable == null ? '' : issue.capitalizable ? 'true' : 'false');
-    setCustomFields({ ...(issue.customFields ?? {}) });
+    setCustomFields(normalizeCustomFields(issue.customFields));
+    setFieldErrors({});
+    setLocalError(null);
   }, [issue]);
 
   const errorMessage = (() => {
+    if (localError) return localError;
     if (!submitError) return null;
     if (isAxiosError(submitError)) {
       const data = submitError.response?.data as { detail?: string; message?: string } | undefined;
@@ -65,16 +83,37 @@ export function IssueEditForm({
     return 'Failed to save issue.';
   })();
 
+  const handleCustomChange = (key: string, value: string) => {
+    setCustomFields((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setLocalError(null);
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
 
+    const normalizedFields = normalizeCustomFields(customFields);
+    setCustomFields(normalizedFields);
+    const errors = validateIssueCustomFields(normalizedFields);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setLocalError(firstCustomFieldErrorMessage(errors));
+      return;
+    }
+    setLocalError(null);
+
     const payload: UpdateIssuePayload = {
       title: trimmedTitle,
       description,
       priorityId,
-      customFields,
+      customFields: normalizedFields,
     };
 
     if (capitalizable === 'true') {
@@ -87,7 +126,7 @@ export function IssueEditForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2.5">
+    <form onSubmit={handleSubmit} className="space-y-2.5" noValidate>
       <div className="overflow-hidden rounded-lg border border-accent/30 bg-bg2 shadow-sm">
         <div className="border-b border-accent/20 bg-gradient-to-r from-[color:var(--accent-muted)] to-transparent px-2.5 py-1.5">
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-accent">
@@ -178,7 +217,8 @@ export function IssueEditForm({
       <IssueCustomFieldsEditor
         fields={customFieldDefs}
         values={customFields}
-        onChange={(key, value) => setCustomFields((prev) => ({ ...prev, [key]: value }))}
+        onChange={handleCustomChange}
+        fieldErrors={fieldErrors}
         compact
       />
 

@@ -28,8 +28,19 @@ export function isManagerRole(role?: string | null): boolean {
   return !!role && ORG_LEADER_ROLES.has(role);
 }
 
+/** Custom delivery roles (Roles & access) that use the same Own team / Org-wide toggle as Manager. */
+export function isDeliveryManagerRole(role?: string | null): boolean {
+  const code = (role ?? '').toUpperCase();
+  return (
+    code === 'PM' ||
+    code === 'PROJECT_MANAGER' ||
+    code === 'DM' ||
+    code === 'DELIVERY_MANAGER'
+  );
+}
+
 export function isManagerOrAboveRole(role?: string | null): boolean {
-  return isAdminRole(role) || isManagerRole(role);
+  return isAdminRole(role) || isManagerRole(role) || isDeliveryManagerRole(role);
 }
 
 export function isScopedEngineeringManagerRole(role?: string | null): boolean {
@@ -47,14 +58,19 @@ export function isPortfolioWideRole(role?: string | null): boolean {
 
 /** Roles that can use the Own team / Org-wide visibility toggle. */
 export function supportsVisibilityToggle(role?: string | null): boolean {
-  return isScopedEngineeringManagerRole(role) || role === 'VP' || role === 'VP_ENG';
+  return (
+    isScopedEngineeringManagerRole(role) ||
+    isDeliveryManagerRole(role) ||
+    role === 'VP' ||
+    role === 'VP_ENG'
+  );
 }
 
-/** Effective org-wide data access for dashboards / capacity. */
+/** Effective org-wide data access for dashboards / capacity / project lists. */
 export function hasOrgWideVisibility(role?: string | null, orgWideVisibility?: boolean): boolean {
   if (isAdminRole(role) || role === 'CXO' || role === 'CTO') return true;
   if (role === 'VP' || role === 'VP_ENG') return orgWideVisibility !== false;
-  if (isScopedEngineeringManagerRole(role)) return !!orgWideVisibility;
+  if (isScopedEngineeringManagerRole(role) || isDeliveryManagerRole(role)) return !!orgWideVisibility;
   return false;
 }
 
@@ -82,6 +98,11 @@ const SUPERVISOR_ROLE_RANK: Record<string, number> = {
   MANAGER: 3,
   SEM: 3,
   SR_SEM: 3,
+  // Custom / delivery roles created via Roles & access (often no org_level)
+  PM: 3,
+  PROJECT_MANAGER: 3,
+  DM: 3,
+  DELIVERY_MANAGER: 3,
   EMPLOYEE: 4,
   SW_ENGINEER: 4,
   TECH_LEAD: 4,
@@ -89,7 +110,8 @@ const SUPERVISOR_ROLE_RANK: Record<string, number> = {
 
 /** Minimum supervisor rank required for a role (lower number = more senior). Null = no supervisor allowed. */
 export function requiredSupervisorRank(roleCode?: string | null): number | null {
-  switch (roleCode) {
+  const code = (roleCode ?? '').toUpperCase();
+  switch (code) {
     case 'CXO':
     case 'CTO':
     case 'CEO':
@@ -106,9 +128,15 @@ export function requiredSupervisorRank(roleCode?: string | null): number | null 
     case 'EMPLOYEE':
     case 'SW_ENGINEER':
     case 'TECH_LEAD':
+    case 'PM':
+    case 'PROJECT_MANAGER':
+    case 'DM':
+    case 'DELIVERY_MANAGER':
       return 3; // Manager or more senior
     default:
-      return null;
+      // Custom roles from Roles & access have no org level — treat like employees
+      // so Manager can be selected (previously defaulted to "no manager").
+      return code ? 3 : null;
   }
 }
 
@@ -118,13 +146,15 @@ export function canSuperviseRole(supervisorRole?: string | null, subordinateRole
     return !supervisorRole; // top roles should have no manager
   }
   if (!supervisorRole) return false;
-  if (isAdminRole(supervisorRole)) return true;
-  const rank = SUPERVISOR_ROLE_RANK[supervisorRole];
-  return rank != null && rank <= required;
+  const supervisorCode = supervisorRole.toUpperCase();
+  if (isAdminRole(supervisorCode)) return true;
+  const rank = SUPERVISOR_ROLE_RANK[supervisorCode] ?? 3; // unknown custom roles ≈ manager level
+  return rank <= required;
 }
 
 export function supervisorRequirementHint(roleCode?: string | null): string {
-  switch (roleCode) {
+  const code = (roleCode ?? '').toUpperCase();
+  switch (code) {
     case 'CXO':
     case 'SUPER_ADMIN':
     case 'ADMIN':
@@ -135,8 +165,15 @@ export function supervisorRequirementHint(roleCode?: string | null): string {
       return 'Manager / Senior Manager must report to a VP (or more senior).';
     case 'EMPLOYEE':
       return 'Employee must report to a Manager (or more senior).';
+    case 'PM':
+    case 'PROJECT_MANAGER':
+    case 'DM':
+    case 'DELIVERY_MANAGER':
+      return 'Must report to a Manager (or more senior).';
     default:
-      return 'Select a supervisor that matches the reporting line: CXO → VP → Manager → Employee.';
+      return code
+        ? 'Must report to a Manager (or more senior).'
+        : 'Select a supervisor that matches the reporting line: CXO → VP → Manager → Employee.';
   }
 }
 

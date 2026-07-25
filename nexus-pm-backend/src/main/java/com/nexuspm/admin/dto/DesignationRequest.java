@@ -16,4 +16,7 @@ public class DesignationRequest {
 
     @NotNull
     private UUID streamId;
+
+    /** True = Management designation; false = Employee (default). */
+    private Boolean management;
 }

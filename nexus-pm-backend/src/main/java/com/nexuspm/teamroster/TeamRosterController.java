@@ -23,7 +23,7 @@ public class TeamRosterController {
     private final TeamRosterService teamRosterService;
 
     @GetMapping("/management")
-    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
     public List<TeamManagementResponse> listManagement(@RequestParam(required = false) String search) {
         return teamRosterService.listManagement(search);
     }
@@ -33,6 +33,24 @@ public class TeamRosterController {
     @PreAuthorize("@perm.can('TEAM_CREATE')")
     public TeamManagementResponse createManagement(@Valid @RequestBody TeamManagementRequest request) {
         return teamRosterService.createManagement(request);
+    }
+
+    @PostMapping("/members/{id}/promote-to-management")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perm.can('TEAM_CREATE')")
+    public TeamManagementResponse promoteEmployeeToManagement(
+            @PathVariable UUID id,
+            @Valid @RequestBody PromoteEmployeeToManagementRequest request) {
+        return teamRosterService.promoteEmployeeToManagement(id, request);
+    }
+
+    @PostMapping("/management/{id}/demote-to-employee")
+    @PreAuthorize("@perm.can('TEAM_CREATE')")
+    public TeamRosterMemberResponse demoteManagementToEmployee(
+            @PathVariable UUID id,
+            @RequestBody(required = false) DemoteManagementToEmployeeRequest request) {
+        return teamRosterService.demoteManagementToEmployee(
+                id, request != null ? request : new DemoteManagementToEmployeeRequest());
     }
 
     @PutMapping("/management/{id}")
@@ -51,7 +69,7 @@ public class TeamRosterController {
     }
 
     @GetMapping("/management/{id}/photo")
-    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
     public ResponseEntity<Resource> getManagementPhoto(@PathVariable UUID id) {
         TeamRosterService.ProfilePictureFile photo = teamRosterService.loadManagementPhoto(id);
         return ResponseEntity.ok()
@@ -81,13 +99,13 @@ public class TeamRosterController {
     }
 
     @GetMapping("/members")
-    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
     public List<TeamRosterMemberResponse> listMembers(@RequestParam(required = false) String search) {
         return teamRosterService.listMembers(search);
     }
 
     @GetMapping("/members/engineering-managers")
-    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
     public List<String> listEngineeringManagers() {
         return teamRosterService.listEngineeringManagers();
     }
@@ -115,7 +133,7 @@ public class TeamRosterController {
     }
 
     @GetMapping("/members/{id}/photo")
-    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
     public ResponseEntity<Resource> getMemberPhoto(@PathVariable UUID id) {
         TeamRosterService.ProfilePictureFile photo = teamRosterService.loadMemberPhoto(id);
         return ResponseEntity.ok()

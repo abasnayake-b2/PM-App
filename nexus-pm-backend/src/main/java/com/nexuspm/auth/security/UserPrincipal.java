@@ -21,6 +21,7 @@ public class UserPrincipal implements UserDetails {
     private final String name;
     private final UUID departmentId;
     private final String roleCode;
+    private final boolean orgWideVisibility;
     private final boolean active;
     private final Set<String> permissionCodes;
 
@@ -30,6 +31,7 @@ public class UserPrincipal implements UserDetails {
         this.name = employee.getFullName();
         this.departmentId = employee.getDepartment() != null ? employee.getDepartment().getId() : null;
         this.roleCode = employee.getPrimaryRoleCode();
+        this.orgWideVisibility = employee.isOrgWideVisibility();
         this.active = "ACTIVE".equalsIgnoreCase(employee.getStatus());
         this.permissionCodes = permissionCodes != null ? permissionCodes : Set.of();
     }
@@ -49,7 +51,8 @@ public class UserPrincipal implements UserDetails {
                 roles.add("ROLE_MANAGER");
             }
             case "MANAGER", "CXO", "VP" -> roles.add("ROLE_MANAGER");
-            case "CTO", "VP_ENG", "SR_SEM", "SEM", "TECH_LEAD" -> roles.add("ROLE_MANAGER");
+            case "CTO", "VP_ENG", "SR_SEM", "SEM", "TECH_LEAD",
+                 "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER" -> roles.add("ROLE_MANAGER");
             default -> { }
         }
 

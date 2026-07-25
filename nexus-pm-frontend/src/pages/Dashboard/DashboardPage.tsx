@@ -19,7 +19,7 @@ import { DashboardViewToggle, type DashboardViewMode } from '@/components/Dashbo
 import { PmoDashboardSection } from '@/components/PmoDashboardSection';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
-import { isManagerOrAboveRole, canViewOrgDashboard, isPortfolioWideRole } from '@/utils/orgRoles';
+import { canViewOrgDashboard, isPortfolioWideRole } from '@/utils/orgRoles';
 
 const CAPACITY_WEEK_OPTIONS = [
   { weeks: 4, label: '4 weeks' },
@@ -94,9 +94,8 @@ export function DashboardPage() {
   const showOrgOverview = canViewOrgDashboard(role, user?.orgWideVisibility);
   const isManager = role === 'MANAGER' || role === 'ADMIN' || isPortfolioWideRole(role);
   const { can } = usePermissions();
-  const showCapacityUtilisation =
-    isManagerOrAboveRole(role) && can(P.REPORTS_VIEW) && can(P.ALLOCATIONS_VIEW);
-  const showPmoDashboard = can(P.PROJECTS_VIEW) && (showOrgOverview || isManager);
+  const showCapacityUtilisation = can(P.REPORTS_VIEW) && can(P.ALLOCATIONS_VIEW);
+  const showPmoDashboard = can(P.PMO_VIEW);
   const [dashboardView, setDashboardView] = useState<DashboardViewMode>(readDashboardView);
   const [capacityWeeks, setCapacityWeeks] = useState(12);
   const { data, isLoading, isFetching, dataUpdatedAt, refetch } = useDashboardOverview();
@@ -105,9 +104,12 @@ export function DashboardPage() {
 
   const summary = data?.summary;
   const capacityRangeLabel = `${capacityWeeks} weeks`;
-  const isPmoView = showPmoDashboard && dashboardView === 'pmo';
+  const effectiveView: DashboardViewMode =
+    showPmoDashboard && dashboardView === 'pmo' ? 'pmo' : 'resource';
+  const isPmoView = effectiveView === 'pmo';
 
   const handleDashboardViewChange = (view: DashboardViewMode) => {
+    if (view === 'pmo' && !showPmoDashboard) return;
     setDashboardView(view);
     try {
       sessionStorage.setItem(DASHBOARD_VIEW_KEY, view);
@@ -185,7 +187,7 @@ export function DashboardPage() {
             </Link>
           )}
           {showPmoDashboard && (
-            <DashboardViewToggle view={dashboardView} onChange={handleDashboardViewChange} />
+            <DashboardViewToggle view={effectiveView} onChange={handleDashboardViewChange} />
           )}
         </div>
       </div>

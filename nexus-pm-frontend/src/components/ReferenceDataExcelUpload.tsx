@@ -96,7 +96,7 @@ export function ReferenceDataExcelUpload({
           <p className="mt-1 text-xs text-text2">
             {variant === 'skills'
               ? 'Upload an Excel file with a Skills sheet (or a single sheet), Name column, and optional Description column.'
-              : 'Upload an Excel file with Departments, Streams, and Designations sheets. An optional Skills sheet (Name + Description) is also supported.'}
+              : 'Upload an Excel file with Departments, Streams, and Designations sheets. Designations may include an Is Management column (Yes/No). An optional Skills sheet (Name + Description) is also supported.'}
           </p>
         </div>
         <div>

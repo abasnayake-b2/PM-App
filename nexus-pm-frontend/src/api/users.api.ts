@@ -14,6 +14,7 @@ export interface Designation {
   departmentName?: string;
   streamId?: string;
   streamName?: string;
+  management?: boolean;
 }
 
 export interface RoleOption {

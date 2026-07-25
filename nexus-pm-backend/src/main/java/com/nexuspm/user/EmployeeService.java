@@ -5,6 +5,7 @@ import com.nexuspm.auth.entity.UserAuth;
 import com.nexuspm.auth.repository.UserAuthRepository;
 import com.nexuspm.shared.cache.CacheNames;
 import com.nexuspm.shared.exception.BusinessException;
+import com.nexuspm.shared.security.SecurityUtils;
 import com.nexuspm.user.dto.*;
 import com.nexuspm.user.entity.Department;
 import com.nexuspm.user.entity.Designation;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,13 +43,46 @@ public class EmployeeService {
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final OrgHierarchyService orgHierarchyService;
+    private final ManagerTeamService managerTeamService;
 
     @Transactional(readOnly = true)
     public Page<EmployeeResponse> listEmployees(String search, Pageable pageable) {
         String term = search != null && !search.isBlank() ? search.trim() : null;
+        if (!SecurityUtils.isManagerOrAbove()) {
+            return pageSelfOnly(term, pageable);
+        }
+        if (!SecurityUtils.hasOrgWideVisibility()) {
+            List<Employee> team = managerTeamService.resolveTeam(SecurityUtils.currentUserId());
+            List<EmployeeResponse> filtered = team.stream()
+                    .filter(employee -> term == null
+                            || employee.getFullName().toLowerCase().contains(term.toLowerCase())
+                            || employee.getEmail().toLowerCase().contains(term.toLowerCase()))
+                    .map(employeeMapper::toResponse)
+                    .toList();
+            int start = (int) Math.min(pageable.getOffset(), filtered.size());
+            int end = Math.min(start + pageable.getPageSize(), filtered.size());
+            return new org.springframework.data.domain.PageImpl<>(
+                    filtered.subList(start, end), pageable, filtered.size());
+        }
         return employeeRepository
                 .findFiltered(term, false, List.of(), pageable)
                 .map(employeeMapper::toResponse);
+    }
+
+    private Page<EmployeeResponse> pageSelfOnly(String term, Pageable pageable) {
+        Optional<Employee> self = employeeRepository.findDetailedById(SecurityUtils.currentUserId());
+        if (self.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        Employee employee = self.get();
+        if (term != null) {
+            String hay = (employee.getFullName() + " " + employee.getEmail()).toLowerCase();
+            if (!hay.contains(term.toLowerCase())) {
+                return Page.empty(pageable);
+            }
+        }
+        return new org.springframework.data.domain.PageImpl<>(
+                List.of(employeeMapper.toResponse(employee)), pageable, 1);
     }
 
     @Transactional(readOnly = true)
@@ -197,6 +232,7 @@ public class EmployeeService {
                         .departmentName(d.getDepartment() != null ? d.getDepartment().getName() : null)
                         .streamId(d.getStream() != null ? d.getStream().getId() : null)
                         .streamName(d.getStream() != null ? d.getStream().getName() : null)
+                        .management(d.isManagement())
                         .build())
                 .toList();
     }

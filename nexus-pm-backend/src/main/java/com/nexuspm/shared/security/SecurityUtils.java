@@ -13,7 +13,13 @@ public final class SecurityUtils {
     private static final Set<String> ADMIN_ROLES = Set.of("SUPER_ADMIN", "ADMIN");
     private static final Set<String> MANAGER_ROLES = Set.of(
             "CXO", "VP", "MANAGER",
-            "CTO", "VP_ENG", "SR_SEM", "SEM", "TECH_LEAD");
+            "CTO", "VP_ENG", "SR_SEM", "SEM", "TECH_LEAD",
+            "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER");
+
+    private static final Set<String> VISIBILITY_TOGGLE_ROLES = Set.of(
+            "MANAGER", "SEM", "SR_SEM",
+            "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER",
+            "VP", "VP_ENG");
 
     private SecurityUtils() {
     }
@@ -48,6 +54,26 @@ public final class SecurityUtils {
 
     public static boolean isSuperAdmin() {
         return "SUPER_ADMIN".equals(currentUserRole());
+    }
+
+    /** True when the user may see org-wide projects / team (not own-team-only). */
+    public static boolean hasOrgWideVisibility() {
+        if (isAdmin()) {
+            return true;
+        }
+        String role = currentUserRole();
+        if ("CXO".equals(role) || "CTO".equals(role)) {
+            return true;
+        }
+        if (!VISIBILITY_TOGGLE_ROLES.contains(role)) {
+            return false;
+        }
+        boolean flag = currentUser().isOrgWideVisibility();
+        // VP defaults to org-wide when flag was never set false — stored value is authoritative.
+        if ("VP".equals(role) || "VP_ENG".equals(role)) {
+            return flag;
+        }
+        return flag;
     }
 
     public static boolean hasPermission(String permissionCode) {

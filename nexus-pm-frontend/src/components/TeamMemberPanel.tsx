@@ -23,6 +23,8 @@ interface TeamMemberPanelProps {
   issues: Issue[];
   issuesLoading?: boolean;
   canEdit?: boolean;
+  /** System profile / roster links — managers only; hide for employee viewers. */
+  showProfileLink?: boolean;
   initialEditingAllocationId?: string | null;
   onClose: () => void;
   onEditAllocationClosed?: () => void;
@@ -35,6 +37,7 @@ export function TeamMemberPanel({
   issues,
   issuesLoading,
   canEdit = false,
+  showProfileLink = false,
   initialEditingAllocationId = null,
   onClose,
   onEditAllocationClosed,
@@ -298,47 +301,42 @@ export function TeamMemberPanel({
           </section>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-t border-border p-5">
-          {row.employeeId ? (
-            <Link
-              to={`/resources/${row.employeeId}`}
-              className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg3"
-            >
-              System profile
-            </Link>
-          ) : (
-            <Link
-              to="/team/employees"
-              className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg3"
-            >
-              Employee roster
-            </Link>
-          )}
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={() => {
-                setEditingAllocation(null);
-                onEditAllocationClosed?.();
-                createAllocation.reset();
-                setAllocating(true);
-              }}
-              disabled={allocating}
-              className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
-              style={{ color: 'var(--accent-fg)' }}
-            >
-              Allocate on issue
-            </button>
-          ) : (
-            <Link
-              to="/issues"
-              className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium"
-              style={{ color: 'var(--accent-fg)' }}
-            >
-              Allocate on issue
-            </Link>
-          )}
-        </div>
+        {(showProfileLink || canEdit) && (
+          <div className="flex flex-wrap gap-2 border-t border-border p-5">
+            {showProfileLink &&
+              (row.employeeId ? (
+                <Link
+                  to={`/resources/${row.employeeId}`}
+                  className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg3"
+                >
+                  System profile
+                </Link>
+              ) : (
+                <Link
+                  to="/team/employees"
+                  className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg3"
+                >
+                  Employee roster
+                </Link>
+              ))}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingAllocation(null);
+                  onEditAllocationClosed?.();
+                  createAllocation.reset();
+                  setAllocating(true);
+                }}
+                disabled={allocating}
+                className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ color: 'var(--accent-fg)' }}
+              >
+                Allocate on issue
+              </button>
+            )}
+          </div>
+        )}
       </aside>
 
       <UnsavedChangesDialog

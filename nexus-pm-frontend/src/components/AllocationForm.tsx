@@ -182,10 +182,20 @@ export function AllocationForm({
   }, [employeeId, fromDate, toDate, available, overlapLoading, isEdit]);
 
   const resolvedIssueId = issueId || defaultIssueId || '';
+  const datesInvalid = !!fromDate && !!toDate && fromDate > toDate;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!resolvedIssueId || !employeeId || !toDate || percentage < 1 || percentage > available) return;
+    if (
+      !resolvedIssueId ||
+      !employeeId ||
+      !toDate ||
+      datesInvalid ||
+      percentage < 1 ||
+      percentage > available
+    ) {
+      return;
+    }
 
     setDismissedError(false);
 
@@ -215,6 +225,7 @@ export function AllocationForm({
     !!resolvedIssueId &&
     !!employeeId &&
     !!toDate &&
+    !datesInvalid &&
     percentage >= 1 &&
     percentage <= available &&
     !loading;
@@ -377,7 +388,14 @@ export function AllocationForm({
             type="date"
             required
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            max={toDate || undefined}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFromDate(next);
+              if (toDate && next && toDate < next) {
+                setToDate(next);
+              }
+            }}
             className={inputClass}
           />
         </label>
@@ -388,12 +406,15 @@ export function AllocationForm({
             type="date"
             required
             value={toDate}
-            min={fromDate}
+            min={fromDate || undefined}
             onChange={(e) => setToDate(e.target.value)}
             className={inputClass}
           />
         </label>
       </div>
+      {datesInvalid && (
+        <p className="text-xs text-danger">Start date must be on or before End date.</p>
+      )}
 
       <label className="flex items-center gap-2 text-sm">
         <input name="billable" type="checkbox" checked={billable} onChange={(e) => setBillable(e.target.checked)} className="rounded border-border" />

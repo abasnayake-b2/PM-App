@@ -7,7 +7,10 @@ export interface UserAccount {
   lastName: string;
   fullName: string;
   status: string;
+  /** Primary role (most senior). */
   roleCode: string;
+  /** All assigned application roles. */
+  roleCodes?: string[];
   departmentId?: string;
   departmentName?: string;
   designationId?: string;
@@ -39,11 +42,32 @@ export interface EligibleManagementOption {
   status: string;
 }
 
+export interface EligibleEmployeeOption {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email?: string;
+  departmentId?: string;
+  departmentName?: string;
+  designationId?: string;
+  designationName?: string;
+  managerId?: string;
+  managerName?: string;
+  engineeringManagerName?: string;
+  managementId?: string;
+  managementRoleTitle?: string;
+  status: string;
+}
+
 export interface CreateUserAccountPayload {
-  managementId: string;
+  managementId?: string;
+  employeeId?: string;
   email: string;
   password: string;
-  roleCode: string;
+  /** @deprecated prefer roleCodes; kept for compatibility */
+  roleCode?: string;
+  roleCodes: string[];
   departmentId?: string;
   designationId?: string;
   managerId?: string;
@@ -53,7 +77,9 @@ export interface CreateUserAccountPayload {
 export interface UpdateUserAccountPayload {
   email?: string;
   status?: string;
+  /** @deprecated prefer roleCodes */
   roleCode?: string;
+  roleCodes?: string[];
   departmentId?: string;
   designationId?: string;
   managerId?: string;
@@ -72,6 +98,13 @@ export async function fetchUserAccounts(search?: string): Promise<UserAccount[]>
 
 export async function fetchEligibleManagement(search?: string): Promise<EligibleManagementOption[]> {
   const { data } = await api.get<EligibleManagementOption[]>(`${base}/eligible-management`, {
+    params: { search: search || undefined },
+  });
+  return data;
+}
+
+export async function fetchEligibleEmployees(search?: string): Promise<EligibleEmployeeOption[]> {
+  const { data } = await api.get<EligibleEmployeeOption[]>(`${base}/eligible-employees`, {
     params: { search: search || undefined },
   });
   return data;

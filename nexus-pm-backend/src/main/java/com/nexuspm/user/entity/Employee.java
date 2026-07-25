@@ -127,10 +127,18 @@ public class Employee extends AuditableEntity {
     }
 
     public String getPrimaryRoleCode() {
-        return roles.stream()
+        // Prefer org hierarchy roles when admin roles are combined with them.
+        java.util.List<Role> orgRoles = roles.stream()
+                .filter(r -> {
+                    String code = r.getCode() != null ? r.getCode().toUpperCase() : "";
+                    return !"SUPER_ADMIN".equals(code) && !"ADMIN".equals(code);
+                })
+                .toList();
+        java.util.Collection<Role> pool = orgRoles.isEmpty() ? roles : orgRoles;
+        return pool.stream()
                 .min(Comparator.comparingInt(Employee::roleSortOrder))
                 .map(Role::getCode)
-                .orElse("MANAGER");
+                .orElse("EMPLOYEE");
     }
 
     private static int roleSortOrder(Role role) {
@@ -140,7 +148,8 @@ public class Employee extends AuditableEntity {
         return switch (role.getCode()) {
             case "SUPER_ADMIN" -> 0;
             case "ADMIN" -> 1;
-            default -> 99;
+            // Custom / unknown roles without org_level act as Employee — not senior to everyone.
+            default -> 4;
         };
     }
 }

@@ -182,10 +182,13 @@ export function ResourceIssueAllocateForm({
     });
   }, [fromDate, toDate, available, overlapLoading, row.employeeId]);
 
+  const datesInvalid = !!fromDate && !!toDate && fromDate > toDate;
+
   const canSubmit =
     !!issueId &&
     !!projectId &&
     !!toDate &&
+    !datesInvalid &&
     percentage >= 1 &&
     percentage <= available &&
     !loading &&
@@ -333,7 +336,14 @@ export function ResourceIssueAllocateForm({
             required
             className={inputClass}
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            max={toDate || undefined}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFromDate(next);
+              if (toDate && next && toDate < next) {
+                setToDate(next);
+              }
+            }}
           />
         </label>
         <label className="block text-sm">
@@ -343,11 +353,14 @@ export function ResourceIssueAllocateForm({
             required
             className={inputClass}
             value={toDate}
-            min={fromDate}
+            min={fromDate || undefined}
             onChange={(e) => setToDate(e.target.value)}
           />
         </label>
       </div>
+      {datesInvalid && (
+        <p className="text-xs text-danger">Start date must be on or before End date.</p>
+      )}
 
       <label className="block text-sm">
         <span className="text-text2">

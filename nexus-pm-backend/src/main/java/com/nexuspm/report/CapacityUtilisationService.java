@@ -45,10 +45,6 @@ public class CapacityUtilisationService {
 
     @Transactional(readOnly = true)
     public CapacityUtilisationDashboard getDashboard(Integer weeksParam) {
-        if (!SecurityUtils.isManagerOrAbove()) {
-            throw new BusinessException("ACCESS_DENIED", "Only managers can view capacity utilisation", 403);
-        }
-
         int heatmapWeeks = normalizeWeeks(weeksParam);
         LocalDate today = LocalDate.now();
         LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));

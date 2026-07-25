@@ -30,6 +30,8 @@ export interface TeamRosterMember {
   teamName?: string;
   engineeringManagerManagementId?: string;
   engineeringManagerName?: string;
+  managementId?: string;
+  managementRoleTitle?: string;
   workTypeId?: string;
   workType?: string;
   countryId?: string;
@@ -228,5 +230,39 @@ export interface RelinkSupervisorsResult {
 
 export async function relinkManagementSupervisors(): Promise<RelinkSupervisorsResult> {
   const { data } = await api.post<RelinkSupervisorsResult>('/team-roster/management/relink-supervisors');
+  return data;
+}
+
+export interface PromoteEmployeeToManagementPayload {
+  roleTitle: string;
+  roleCode?: string;
+  supervisorId?: string;
+  status?: string;
+}
+
+export async function promoteEmployeeToManagement(
+  employeeId: string,
+  payload: PromoteEmployeeToManagementPayload,
+): Promise<TeamManagement> {
+  const { data } = await api.post<TeamManagement>(
+    `/team-roster/members/${employeeId}/promote-to-management`,
+    payload,
+  );
+  return data;
+}
+
+export interface DemoteManagementToEmployeePayload {
+  engineeringManagerManagementId?: string;
+  setEmployeeRole?: boolean;
+}
+
+export async function demoteManagementToEmployee(
+  managementId: string,
+  payload: DemoteManagementToEmployeePayload = {},
+): Promise<TeamRosterMember> {
+  const { data } = await api.post<TeamRosterMember>(
+    `/team-roster/management/${managementId}/demote-to-employee`,
+    payload,
+  );
   return data;
 }

@@ -162,9 +162,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.engineeringManagerManagement em
             LEFT JOIN FETCH em.supervisor vp
             LEFT JOIN FETCH vp.supervisor vp2
+            LEFT JOIN FETCH e.teamManagement
             LEFT JOIN FETCH e.department
             WHERE e.status = 'ACTIVE'
-              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+              AND e.teamManagement IS NULL
               AND (:search IS NULL OR :search = '' OR
                    LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(e.firstName, '')) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -211,7 +212,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.engineeringManagerManagement em
             LEFT JOIN FETCH em.supervisor
             WHERE e.status = 'ACTIVE'
-              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+              AND e.teamManagement IS NULL
               AND (:name IS NULL OR :name = '' OR
                    LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :name, '%'))
                    OR LOWER(COALESCE(d.name, '')) LIKE LOWER(CONCAT('%', :name, '%'))
@@ -238,7 +239,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             SELECT DISTINCT CONCAT(em.firstName, ' ', em.lastName) FROM Employee e
             JOIN e.engineeringManagerManagement em
             WHERE e.status = 'ACTIVE'
-              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+              AND e.teamManagement IS NULL
             ORDER BY CONCAT(em.firstName, ' ', em.lastName)
             """)
     List<String> findDistinctEngineeringManagers();
@@ -248,6 +249,25 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             WHERE NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
             """)
     List<UUID> findRosterEmployeeIdsWithoutLogin();
+
+    @Query("""
+            SELECT e FROM Employee e
+            LEFT JOIN FETCH e.department
+            LEFT JOIN FETCH e.designation d
+            LEFT JOIN FETCH d.department
+            LEFT JOIN FETCH e.manager
+            LEFT JOIN FETCH e.engineeringManagerManagement
+            LEFT JOIN FETCH e.teamManagement
+            WHERE e.status = 'ACTIVE'
+              AND e.teamManagement IS NULL
+              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+              AND (:search IS NULL OR :search = ''
+                   OR LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(e.email, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(d.name, '')) LIKE LOWER(CONCAT('%', :search, '%')))
+            ORDER BY e.firstName, e.lastName
+            """)
+    List<Employee> findEligibleForUserAccount(@Param("search") String search);
 
     boolean existsByTeamManagementId(UUID teamManagementId);
 
@@ -269,7 +289,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     @Query("""
             SELECT COUNT(e) FROM Employee e
             WHERE e.status = 'ACTIVE'
-              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+              AND e.teamManagement IS NULL
             """)
     long countActiveRosterEmployees();
 
@@ -277,7 +297,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             SELECT e FROM Employee e
             LEFT JOIN FETCH e.designation
             WHERE e.status = 'ACTIVE'
-              AND NOT EXISTS (SELECT 1 FROM UserAuth ua WHERE ua.employee.id = e.id)
+              AND e.teamManagement IS NULL
             ORDER BY e.firstName, e.lastName
             """)
     List<Employee> findActiveRosterEmployees();

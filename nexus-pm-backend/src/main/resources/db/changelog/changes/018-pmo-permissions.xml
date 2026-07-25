@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <!-- PMO dashboard privileges: Overview, Delivery, Portfolio, Capacity Planning -->
+  <changeSet id="018-pmo-permissions" author="dfnpm">
+    <sql>
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000042', 'PMO pages — View', 'PMO_VIEW', 'PMO', 'VIEW'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'PMO_VIEW');
+
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000043', 'PMO pages — Create', 'PMO_CREATE', 'PMO', 'CREATE'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'PMO_CREATE');
+
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000044', 'PMO pages — Update', 'PMO_UPDATE', 'PMO', 'UPDATE'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'PMO_UPDATE');
+
+      INSERT INTO permission (id, name, code, module, action)
+      SELECT 'b1000001-0000-0000-0000-000000000045', 'PMO pages — Delete', 'PMO_DELETE', 'PMO', 'DELETE'
+      WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = 'PMO_DELETE');
+
+      -- Super Admin — all PMO permissions
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT '11111111-1111-1111-1111-111111111101', p.id
+      FROM permission p
+      WHERE p.module = 'PMO'
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp
+          WHERE rp.role_id = '11111111-1111-1111-1111-111111111101' AND rp.permission_id = p.id
+        );
+
+      -- Admin — view/create/update (no delete), matching other non-admin modules
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT '11111111-1111-1111-1111-111111111102', p.id
+      FROM permission p
+      WHERE p.module = 'PMO'
+        AND p.action <> 'DELETE'
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp
+          WHERE rp.role_id = '11111111-1111-1111-1111-111111111102' AND rp.permission_id = p.id
+        );
+
+      -- CXO / VP / Manager — view + update (capacity planning edits)
+      INSERT INTO role_permission (role_id, permission_id)
+      SELECT r.id, p.id
+      FROM role r
+      CROSS JOIN permission p
+      WHERE r.code IN ('CXO', 'VP', 'MANAGER')
+        AND p.code IN ('PMO_VIEW', 'PMO_UPDATE')
+        AND NOT EXISTS (
+          SELECT 1 FROM role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+        );
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

@@ -66,16 +66,29 @@ public class OrgAccessScopeService {
                         vpEmScope,
                         vpEmScope ? emIds : List.of(EMPTY_EM_SCOPE_ID));
             }
-            case "MANAGER", "SEM", "SR_SEM" -> new ProjectAccessScope(
-                    employeeId,
-                    teamManagementId,
-                    managerFullName,
-                    false,
-                    employee.isOrgWideVisibility(),
-                    false,
-                    List.of(EMPTY_EM_SCOPE_ID));
-            default -> new ProjectAccessScope(
-                    employeeId, teamManagementId, managerFullName, false, false, false, List.of(EMPTY_EM_SCOPE_ID));
+            case "MANAGER", "SEM", "SR_SEM", "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER" ->
+                    new ProjectAccessScope(
+                            employeeId,
+                            teamManagementId,
+                            managerFullName,
+                            false,
+                            employee.isOrgWideVisibility(),
+                            false,
+                            List.of(EMPTY_EM_SCOPE_ID));
+            // Engineers / employees: see the same project portfolio as their Engineering Manager.
+            default -> {
+                var em = employee.getEngineeringManagerManagement();
+                UUID emManagementId = em != null ? em.getId() : null;
+                String emFullName = em != null ? em.getFullName() : null;
+                yield new ProjectAccessScope(
+                        employeeId,
+                        emManagementId,
+                        emFullName,
+                        false,
+                        false,
+                        false,
+                        List.of(EMPTY_EM_SCOPE_ID));
+            }
         };
     }
 

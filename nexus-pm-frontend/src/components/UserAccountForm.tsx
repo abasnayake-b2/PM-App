@@ -2,8 +2,12 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import type { UserAccount } from '@/api/userManagement.api';
-import type { EligibleManagementOption } from '@/api/userManagement.api';
-import type { CreateUserAccountPayload, UpdateUserAccountPayload } from '@/api/userManagement.api';
+import type {
+  EligibleEmployeeOption,
+  EligibleManagementOption,
+  CreateUserAccountPayload,
+  UpdateUserAccountPayload,
+} from '@/api/userManagement.api';
 import { fetchAssignableRoles } from '@/api/users.api';
 import { fetchDepartments, fetchDesignations } from '@/api/users.api';
 import type { SupervisorOption } from '@/components/TeamMemberForm';
@@ -20,6 +24,63 @@ const inputClass =
 
 const STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'] as const;
 
+type PersonSource = 'management' | 'employee';
+
+/** Org/hierarchy primary — skip SUPER_ADMIN/ADMIN when other roles are also assigned. */
+function pickPrimaryRoleCode(codes: string[]): string {
+  const order = [
+    'CXO',
+    'CTO',
+    'VP',
+    'VP_ENG',
+    'MANAGER',
+    'SEM',
+    'SR_SEM',
+    'TECH_LEAD',
+    'PM',
+    'PROJECT_MANAGER',
+    'DM',
+    'DELIVERY_MANAGER',
+    'EMPLOYEE',
+  ];
+  const adminCodes = new Set(['SUPER_ADMIN', 'ADMIN']);
+  const upper = codes.map((c) => c.toUpperCase());
+  const orgPool = upper.filter((c) => !adminCodes.has(c));
+  const pool = orgPool.length > 0 ? orgPool : upper;
+  for (const code of order) {
+    if (pool.includes(code)) return code;
+  }
+  // Prefer admin only when that is the sole assignment
+  if (pool.includes('SUPER_ADMIN')) return 'SUPER_ADMIN';
+  if (pool.includes('ADMIN')) return 'ADMIN';
+  return pool[0] ?? 'EMPLOYEE';
+}
+
+function matchDesignationId(
+  designations: { id: string; name: string; code?: string; departmentId?: string }[],
+  hints: Array<string | undefined | null>,
+): string {
+  for (const hint of hints) {
+    if (!hint?.trim()) continue;
+    const h = hint.trim().toLowerCase();
+    const exact = designations.find((d) => d.name.toLowerCase() === h);
+    if (exact) return exact.id;
+    const byCode = designations.find((d) => (d.code ?? '').toLowerCase() === h);
+    if (byCode) return byCode.id;
+    const fuzzy = designations.find(
+      (d) => d.name.toLowerCase().includes(h) || h.includes(d.name.toLowerCase()),
+    );
+    if (fuzzy) return fuzzy.id;
+  }
+  return '';
+}
+
+function initialRoleCodes(account?: UserAccount): string[] {
+  if (account?.roleCodes?.length) return [...account.roleCodes];
+  if (account?.roleCode) return [account.roleCode];
+  return ['MANAGER'];
+}
+
 function apiErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     const data = error.response?.data as { message?: string; detail?: string } | undefined;
@@ -33,6 +94,7 @@ interface UserAccountFormProps {
   mode: 'create' | 'edit';
   initial?: UserAccount;
   eligibleManagement: EligibleManagementOption[];
+  eligibleEmployees?: EligibleEmployeeOption[];
   supervisors: SupervisorOption[];
   loading?: boolean;
   error?: unknown;
@@ -53,18 +115,35 @@ export function UserAccountForm({
   mode,
   initial,
   eligibleManagement,
+  eligibleEmployees = [],
   supervisors,
   loading,
   error,
   onCancel,
   onSubmit,
 }: UserAccountFormProps) {
+  const [personSource, setPersonSource] = useState<PersonSource>('management');
   const [managementId, setManagementId] = useState(initial?.managementId ?? '');
+  const [employeeId, setEmployeeId] = useState('');
+  const [email, setEmail] = useState(initial?.email ?? '');
+  const [departmentId, setDepartmentId] = useState(initial?.departmentId ?? '');
+  const [designationId, setDesignationId] = useState(initial?.designationId ?? '');
   const [managerId, setManagerId] = useState(initial?.managerId ?? '');
-  const [roleCode, setRoleCode] = useState(initial?.roleCode ?? 'MANAGER');
+  const [roleCodes, setRoleCodes] = useState<string[]>(() => initialRoleCodes(initial));
+  const roleCode = useMemo(() => pickPrimaryRoleCode(roleCodes), [roleCodes]);
   const [orgWideVisibility, setOrgWideVisibility] = useState(
-    initial?.orgWideVisibility ?? defaultOrgWideVisibility(initial?.roleCode ?? 'MANAGER'),
+    initial?.orgWideVisibility ?? defaultOrgWideVisibility(pickPrimaryRoleCode(initialRoleCodes(initial))),
   );
+
+  const toggleRole = (code: string) => {
+    setRoleCodes((prev) => {
+      if (prev.includes(code)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((c) => c !== code);
+      }
+      return [...prev, code];
+    });
+  };
 
   const { data: roleOptions = [] } = useQuery({
     queryKey: ['assignable-roles'],
@@ -84,49 +163,103 @@ export function UserAccountForm({
     [eligibleManagement, managementId],
   );
 
+  const selectedEmployee = useMemo(
+    () => eligibleEmployees.find((person) => person.id === employeeId),
+    [eligibleEmployees, employeeId],
+  );
+
   const autoManagerId = useMemo(
     () => resolveAutoManagerId(managementId, eligibleManagement),
     [managementId, eligibleManagement],
   );
 
   useEffect(() => {
-    if (mode === 'create' && managementId) {
+    if (mode !== 'create') return;
+    if (personSource === 'management' && managementId) {
       setManagerId(autoManagerId);
+      const matched = matchDesignationId(designations, [selectedManagement?.roleTitle]);
+      setDesignationId(matched);
+      const des = designations.find((d) => d.id === matched);
+      setDepartmentId(des?.departmentId ?? '');
     }
-  }, [mode, managementId, autoManagerId]);
+  }, [mode, personSource, managementId, autoManagerId, selectedManagement?.roleTitle, designations]);
+
+  useEffect(() => {
+    if (mode !== 'create' || personSource !== 'employee' || !selectedEmployee) return;
+    if (selectedEmployee.email) setEmail(selectedEmployee.email);
+    setDepartmentId(selectedEmployee.departmentId ?? '');
+    setDesignationId(selectedEmployee.designationId ?? '');
+    setManagerId(selectedEmployee.managerId ?? '');
+  }, [mode, personSource, selectedEmployee]);
+
+  // Edit: fill designation from linked management title when empty.
+  useEffect(() => {
+    if (mode !== 'edit' || designationId || designations.length === 0) return;
+    const matched = matchDesignationId(designations, [
+      initial?.designationName,
+      initial?.managementRoleTitle,
+    ]);
+    if (!matched) return;
+    setDesignationId(matched);
+    if (!departmentId) {
+      const des = designations.find((d) => d.id === matched);
+      if (des?.departmentId) setDepartmentId(des.departmentId);
+    }
+  }, [mode, designations, designationId, departmentId, initial?.designationName, initial?.managementRoleTitle]);
 
   const needsNoManager = requiredSupervisorRank(roleCode) == null;
   const eligibleSupervisors = useMemo(() => {
     if (needsNoManager) return [];
-    return supervisors.filter(
+    const list = supervisors.filter(
       (s) => s.id !== initial?.id && canSuperviseRole(s.roleCode, roleCode),
     );
-  }, [supervisors, initial?.id, roleCode, needsNoManager]);
+    // Keep current manager visible even if not in the filtered supervisor list yet.
+    if (managerId && !list.some((s) => s.id === managerId)) {
+      const fromUsers = supervisors.find((s) => s.id === managerId);
+      const label =
+        fromUsers?.label ??
+        initial?.managerName ??
+        selectedEmployee?.managerName ??
+        selectedManagement?.supervisorEmployeeName ??
+        'Selected manager';
+      list.unshift({
+        id: managerId,
+        label,
+        roleCode: fromUsers?.roleCode ?? '',
+      });
+    }
+    return list;
+  }, [
+    supervisors,
+    initial?.id,
+    initial?.managerName,
+    roleCode,
+    needsNoManager,
+    managerId,
+    selectedEmployee?.managerName,
+    selectedManagement?.supervisorEmployeeName,
+  ]);
 
   useEffect(() => {
     if (!supportsVisibilityToggle(roleCode)) {
       if (orgWideVisibility) setOrgWideVisibility(false);
       return;
     }
-    // When switching into VP, default to org-wide; into Manager, own-team — only if user hasn't
-    // opened an existing record with an explicit value for this same role.
-    if (!initial || initial.roleCode !== roleCode) {
+    if (!initial || pickPrimaryRoleCode(initialRoleCodes(initial)) !== roleCode) {
       setOrgWideVisibility(defaultOrgWideVisibility(roleCode));
     }
   }, [roleCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Drop an incompatible manager when the application role changes (e.g. Manager → VP).
+  // Only clear manager when it is invalid for the org primary role — never wipe just because
+  // an admin role was added alongside a normal org role.
   useEffect(() => {
-    if (needsNoManager) {
-      if (managerId) setManagerId('');
-      return;
-    }
+    if (needsNoManager) return;
     if (!managerId) return;
     const selected = supervisors.find((s) => s.id === managerId);
     if (selected?.roleCode && !canSuperviseRole(selected.roleCode, roleCode)) {
       setManagerId('');
     }
-  }, [roleCode, needsNoManager]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roleCode, needsNoManager, managerId, supervisors]);
 
   const managerHint = useMemo(() => {
     if (needsNoManager) {
@@ -166,32 +299,46 @@ export function UserAccountForm({
     eligibleSupervisors.length,
   ]);
 
+  const createDisabled =
+    mode === 'create' &&
+    (roleCodes.length === 0 ||
+      (personSource === 'management'
+        ? eligibleManagement.length === 0 || !managementId
+        : eligibleEmployees.length === 0 || !employeeId));
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
     if (mode === 'create') {
       const payload: CreateUserAccountPayload = {
-        managementId: fd.get('managementId') as string,
-        email: (fd.get('email') as string).trim().toLowerCase(),
+        email: email.trim().toLowerCase(),
         password: fd.get('password') as string,
-        roleCode: roleCode || 'MANAGER',
-        departmentId: (fd.get('departmentId') as string) || undefined,
-        designationId: (fd.get('designationId') as string) || undefined,
-        managerId: managerId || undefined,
+        roleCodes: roleCodes.length ? roleCodes : ['MANAGER'],
+        roleCode,
+        departmentId: departmentId || undefined,
+        designationId: designationId || undefined,
+        managerId: needsNoManager ? undefined : managerId || undefined,
         orgWideVisibility: supportsVisibilityToggle(roleCode) ? orgWideVisibility : false,
       };
+      if (personSource === 'management') {
+        payload.managementId = managementId;
+      } else {
+        payload.employeeId = employeeId;
+      }
       onSubmit(payload);
       return;
     }
 
     const payload: UpdateUserAccountPayload = {
       email: (fd.get('email') as string).trim().toLowerCase(),
-      roleCode: roleCode || undefined,
+      roleCodes: roleCodes.length ? roleCodes : undefined,
+      roleCode,
       status: (fd.get('status') as string) || undefined,
-      departmentId: (fd.get('departmentId') as string) || undefined,
-      designationId: (fd.get('designationId') as string) || undefined,
-      managerId: managerId || undefined,
+      departmentId: departmentId || undefined,
+      designationId: designationId || undefined,
+      // Preserve existing manager when org-primary needs none (e.g. admin-only); omit field.
+      ...(needsNoManager ? {} : { managerId: managerId || undefined }),
       orgWideVisibility: supportsVisibilityToggle(roleCode) ? orgWideVisibility : false,
     };
     const password = (fd.get('password') as string).trim();
@@ -208,34 +355,98 @@ export function UserAccountForm({
       )}
 
       {mode === 'create' ? (
-        <label className="block text-sm">
-          <span className="text-text2">Management person</span>
-          <select
-            name="managementId"
-            required
-            className={inputClass}
-            value={managementId}
-            onChange={(e) => setManagementId(e.target.value)}
-          >
-            <option value="" disabled>
-              Select from management roster…
-            </option>
-            {eligibleManagement.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.fullName} — {person.roleTitle}
-                {person.supervisorFullName ? ` (reports to ${person.supervisorFullName})` : ''}
-              </option>
-            ))}
-          </select>
-          {eligibleManagement.length === 0 && (
-            <p className="mt-1 text-xs text-text2">
-              No eligible management people. Add them under Admin → Management first.
-            </p>
+        <>
+          <fieldset className="space-y-2">
+            <legend className="text-sm text-text2">Person source</legend>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="personSource"
+                  checked={personSource === 'management'}
+                  onChange={() => {
+                    setPersonSource('management');
+                    setEmployeeId('');
+                  }}
+                />
+                Management roster
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="personSource"
+                  checked={personSource === 'employee'}
+                  onChange={() => {
+                    setPersonSource('employee');
+                    setManagementId('');
+                    setManagerId('');
+                  }}
+                />
+                Employee roster
+              </label>
+            </div>
+          </fieldset>
+
+          {personSource === 'management' ? (
+            <label className="block text-sm">
+              <span className="text-text2">Management person</span>
+              <select
+                name="managementId"
+                required
+                className={inputClass}
+                value={managementId}
+                onChange={(e) => setManagementId(e.target.value)}
+              >
+                <option value="" disabled>
+                  Select from management roster…
+                </option>
+                {eligibleManagement.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.fullName} — {person.roleTitle}
+                    {person.supervisorFullName ? ` (reports to ${person.supervisorFullName})` : ''}
+                  </option>
+                ))}
+              </select>
+              {eligibleManagement.length === 0 && (
+                <p className="mt-1 text-xs text-text2">
+                  No eligible management people. Add them under Admin → Management first, or pick
+                  Employee roster.
+                </p>
+              )}
+            </label>
+          ) : (
+            <label className="block text-sm">
+              <span className="text-text2">Employee</span>
+              <select
+                name="employeeId"
+                required
+                className={inputClass}
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+              >
+                <option value="" disabled>
+                  Select from employee roster…
+                </option>
+                {eligibleEmployees.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.fullName}
+                    {person.designationName ? ` — ${person.designationName}` : ''}
+                    {person.email ? ` (${person.email})` : ''}
+                    {person.managementRoleTitle ? ` · mgmt: ${person.managementRoleTitle}` : ''}
+                  </option>
+                ))}
+              </select>
+              {eligibleEmployees.length === 0 && (
+                <p className="mt-1 text-xs text-text2">
+                  No eligible employees without a login. Add them under Admin → Employees first.
+                </p>
+              )}
+            </label>
           )}
-        </label>
+        </>
       ) : (
         <div className="rounded-lg border border-border bg-bg3 px-3 py-2 text-sm">
-          <div className="text-text2">Management person</div>
+          <div className="text-text2">Linked person</div>
           <div className="font-medium">
             {initial?.managementFullName ?? initial?.fullName ?? '—'}
           </div>
@@ -243,64 +454,93 @@ export function UserAccountForm({
             <div className="text-text2">{initial.managementRoleTitle}</div>
           )}
           {!initial?.managementId && (
-            <p className="mt-1 text-xs text-text2">Legacy account (not linked to management roster)</p>
+            <p className="mt-1 text-xs text-text2">Not linked to management roster</p>
           )}
         </div>
       )}
 
       <label className="block text-sm">
         <span className="text-text2">Email (login)</span>
-        <input
-          name="email"
-          type="email"
-          required
-          defaultValue={initial?.email}
-          className={inputClass}
-          autoComplete="off"
-        />
+        {mode === 'create' ? (
+          <input
+            name="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClass}
+          />
+        ) : (
+          <input
+            name="email"
+            type="email"
+            required
+            defaultValue={initial?.email}
+            className={inputClass}
+          />
+        )}
       </label>
 
       <label className="block text-sm">
         <span className="text-text2">
-          Password{mode === 'edit' ? ' (leave blank to keep current)' : ''}
+          {mode === 'create' ? 'Password' : 'Password (leave blank to keep current)'}
         </span>
         <input
           name="password"
           type="password"
           required={mode === 'create'}
-          minLength={8}
-          className={inputClass}
           autoComplete="new-password"
+          className={inputClass}
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="text-text2">Application role</span>
-        <select
-          name="roleCode"
-          value={roleCode}
-          onChange={(e) => setRoleCode(e.target.value)}
-          className={inputClass}
-        >
+      <fieldset className="space-y-2">
+        <legend className="text-sm text-text2">Application roles</legend>
+        <p className="text-xs text-text2">
+          Select one or more. Permissions are combined. Hierarchy / manager rules use{' '}
+          <span className="font-medium text-text">{roleCode}</span>
+          {roleCodes.some((c) => c === 'SUPER_ADMIN' || c === 'ADMIN') &&
+          roleCode !== 'SUPER_ADMIN' &&
+          roleCode !== 'ADMIN'
+            ? ' (admin roles do not replace org reporting)'
+            : ''}
+          .
+        </p>
+        <div className="max-h-48 space-y-1.5 overflow-auto rounded-lg border border-border bg-bg3 p-3">
+          {roleOptions.map((r) => {
+            const checked = roleCodes.includes(r.code);
+            return (
+              <label key={r.code} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleRole(r.code)}
+                  className="rounded border-border"
+                />
+                <span>
+                  {r.name}
+                  <span className="ml-1 text-xs text-text2">({r.code})</span>
+                </span>
+              </label>
+            );
+          })}
           {roleOptions.length === 0 && (
-            <option value={roleCode}>{roleCode || 'Loading roles…'}</option>
+            <p className="text-sm text-text2">Loading roles…</p>
           )}
-          {roleOptions.map((role) => (
-            <option key={role.id} value={role.code}>
-              {role.name}
-            </option>
-          ))}
-        </select>
-      </label>
+        </div>
+        {roleCodes.length === 0 && (
+          <p className="text-xs text-danger">Select at least one role.</p>
+        )}
+      </fieldset>
 
       {supportsVisibilityToggle(roleCode) && (
-        <div className="rounded-lg border border-border bg-bg3 px-3 py-3">
+        <div className="rounded-lg border border-border px-3 py-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium">Team visibility</p>
               <p className="mt-0.5 text-xs text-text2">
                 {orgWideVisibility
-                  ? 'Sees all teams / org-wide.'
+                  ? 'Sees org-wide projects and team data.'
                   : 'Sees own team only.'}
               </p>
             </div>
@@ -309,26 +549,26 @@ export function UserAccountForm({
               role="switch"
               aria-checked={orgWideVisibility}
               onClick={() => setOrgWideVisibility((v) => !v)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+              className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                 orgWideVisibility ? 'bg-accent' : 'bg-border'
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${
                   orgWideVisibility ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
           </div>
-          <div className="mt-2 flex gap-2 text-xs">
+          <p className="mt-2 text-xs">
             <span className={!orgWideVisibility ? 'font-medium text-accent' : 'text-text2'}>
               Own team
             </span>
-            <span className="text-text2">/</span>
+            {' / '}
             <span className={orgWideVisibility ? 'font-medium text-accent' : 'text-text2'}>
               Org-wide
             </span>
-          </div>
+          </p>
         </div>
       )}
 
@@ -336,9 +576,9 @@ export function UserAccountForm({
         <label className="block text-sm">
           <span className="text-text2">Status</span>
           <select name="status" defaultValue={initial?.status ?? 'ACTIVE'} className={inputClass}>
-            {STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>
-                {status}
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
           </select>
@@ -347,11 +587,16 @@ export function UserAccountForm({
 
       <label className="block text-sm">
         <span className="text-text2">Department</span>
-        <select name="departmentId" defaultValue={initial?.departmentId ?? ''} className={inputClass}>
+        <select
+          name="departmentId"
+          value={departmentId}
+          onChange={(e) => setDepartmentId(e.target.value)}
+          className={inputClass}
+        >
           <option value="">None</option>
-          {departments.map((dept) => (
-            <option key={dept.id} value={dept.id}>
-              {dept.name}
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
             </option>
           ))}
         </select>
@@ -359,7 +604,12 @@ export function UserAccountForm({
 
       <label className="block text-sm">
         <span className="text-text2">Designation</span>
-        <select name="designationId" defaultValue={initial?.designationId ?? ''} className={inputClass}>
+        <select
+          name="designationId"
+          value={designationId}
+          onChange={(e) => setDesignationId(e.target.value)}
+          className={inputClass}
+        >
           <option value="">None</option>
           {designations.map((d) => (
             <option key={d.id} value={d.id}>
@@ -382,7 +632,7 @@ export function UserAccountForm({
           <option value="">
             {needsNoManager
               ? 'None (top of reporting line)'
-              : autoManagerId
+              : autoManagerId && personSource === 'management'
                 ? 'Auto from management supervisor'
                 : 'Select supervisor…'}
           </option>
@@ -398,7 +648,7 @@ export function UserAccountForm({
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          disabled={loading || (mode === 'create' && eligibleManagement.length === 0)}
+          disabled={loading || createDisabled || roleCodes.length === 0}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
           style={{ color: 'var(--accent-fg)' }}
         >

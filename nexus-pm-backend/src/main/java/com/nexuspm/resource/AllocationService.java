@@ -92,9 +92,6 @@ public class AllocationService {
     public List<CapacityResponse> getCapacity(
             LocalDate from, LocalDate to, LocalDate asOf, String team, String designationCode,
             String engineeringManager, String name) {
-        if (!SecurityUtils.isManagerOrAbove()) {
-            throw new BusinessException("ACCESS_DENIED", "Only managers can view team capacity", 403);
-        }
         LocalDate rangeStart = from != null ? from : LocalDate.now().withDayOfMonth(1);
         LocalDate rangeEnd = to != null ? to : rangeStart.plusMonths(5).withDayOfMonth(rangeStart.plusMonths(5).lengthOfMonth());
         LocalDate snapshotAsOf = asOf != null ? asOf : LocalDate.now();
@@ -124,9 +121,9 @@ public class AllocationService {
                 : allocationRepository.findActiveForProjects(scopedProjectIds, null, null, snapshotAsOf);
 
         if (scopedProjectIds != null) {
-            UUID managerId = SecurityUtils.currentUserId();
+            UUID viewerId = SecurityUtils.currentUserId();
             Map<UUID, Employee> teamById = new LinkedHashMap<>();
-            managerTeamService.resolveTeam(managerId).forEach(member -> teamById.put(member.getId(), member));
+            managerTeamService.resolveTeam(viewerId).forEach(member -> teamById.put(member.getId(), member));
 
             Set<UUID> allocatedEmployeeIds = new HashSet<>();
             inRange.forEach(a -> allocatedEmployeeIds.add(a.getEmployee().getId()));
@@ -246,18 +243,24 @@ public class AllocationService {
 
     @Transactional(readOnly = true)
     public List<RosterAllocationResourceResponse> listRosterAllocationResources() {
-        if (!SecurityUtils.isManagerOrAbove()) {
-            throw new BusinessException("ACCESS_DENIED", "Only managers can view roster resources", 403);
+        if (SecurityUtils.isAdmin() || SecurityUtils.hasOrgWideVisibility()) {
+            return employeeRepository.searchRosterMembers(null).stream()
+                    .map(this::toRosterAllocationResource)
+                    .toList();
         }
-        return employeeRepository.searchRosterMembers(null).stream()
-                .map(employee -> RosterAllocationResourceResponse.builder()
-                        .employeeId(employee.getId())
-                        .fullName(employee.getFullName())
-                        .designationName(EmployeeRosterRefs.designationName(employee))
-                        .teamName(EmployeeRosterRefs.teamName(employee))
-                        .engineeringManagerName(EmployeeRosterRefs.engineeringManagerName(employee))
-                        .build())
+        return managerTeamService.resolveTeam(SecurityUtils.currentUserId()).stream()
+                .map(this::toRosterAllocationResource)
                 .toList();
+    }
+
+    private RosterAllocationResourceResponse toRosterAllocationResource(Employee employee) {
+        return RosterAllocationResourceResponse.builder()
+                .employeeId(employee.getId())
+                .fullName(employee.getFullName())
+                .designationName(EmployeeRosterRefs.designationName(employee))
+                .teamName(EmployeeRosterRefs.teamName(employee))
+                .engineeringManagerName(EmployeeRosterRefs.engineeringManagerName(employee))
+                .build();
     }
 
     private boolean matchesRosterFilters(

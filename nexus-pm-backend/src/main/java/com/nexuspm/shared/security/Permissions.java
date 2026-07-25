@@ -52,6 +52,11 @@ public final class Permissions {
 
     public static final String ORG_STRUCTURE_VIEW = "ORG_STRUCTURE_VIEW";
 
+    public static final String PMO_VIEW = "PMO_VIEW";
+    public static final String PMO_CREATE = "PMO_CREATE";
+    public static final String PMO_UPDATE = "PMO_UPDATE";
+    public static final String PMO_DELETE = "PMO_DELETE";
+
     private Permissions() {
     }
 }

@@ -20,6 +20,7 @@ export interface RosterDesignation {
   departmentName?: string;
   streamId?: string;
   streamName?: string;
+  management?: boolean;
 }
 
 export interface RosterSkill {

@@ -374,6 +374,8 @@ public class ReferenceDataImportService {
             String departmentName = cell(row, columns, "departmentname");
             String streamName = firstCell(row, columns, "streams", "stream");
             String roleCode = firstCell(row, columns, "rolecode", "code");
+            String isManagementRaw = firstCell(
+                    row, columns, "ismanagement", "management", "ismanagementrole");
             if (isBlank(designationName) && isBlank(roleCode)) {
                 continue;
             }
@@ -389,6 +391,17 @@ public class ReferenceDataImportService {
                 stats.skipped++;
                 continue;
             }
+
+            Boolean managementFlag = parseYesNo(isManagementRaw);
+            if (!isBlank(isManagementRaw) && managementFlag == null) {
+                errors.add(rowMessage(
+                        "Designations",
+                        rowIdx + 1,
+                        "Is Management must be Yes/No (or true/false, 1/0): " + isManagementRaw.trim()));
+                stats.skipped++;
+                continue;
+            }
+            boolean management = Boolean.TRUE.equals(managementFlag);
 
             String normalizedCode = normalizeCode(roleCode);
             Department department = resolveDepartment(departmentName, departmentByName, streamName, streamByName);
@@ -426,6 +439,7 @@ public class ReferenceDataImportService {
                 designation.setCode(normalizedCode);
                 designation.setDepartment(department);
                 designation.setStream(stream);
+                designation.setManagement(management);
                 designationRepository.save(designation);
                 designationByName.put(nameKey, designation);
                 stats.created++;
@@ -457,6 +471,11 @@ public class ReferenceDataImportService {
             UUID newStreamId = stream != null ? stream.getId() : null;
             if (!Objects.equals(existingStreamId, newStreamId)) {
                 existing.setStream(stream);
+                changed = true;
+            }
+            // Only update management when the column is present in the sheet.
+            if (managementFlag != null && existing.isManagement() != management) {
+                existing.setManagement(management);
                 changed = true;
             }
 
@@ -567,6 +586,21 @@ public class ReferenceDataImportService {
             return null;
         }
         return code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Accepts Yes/No, Y/N, true/false, 1/0 (case-insensitive). Blank → null (column omitted).
+     */
+    private static Boolean parseYesNo(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String v = raw.trim().toLowerCase(Locale.ROOT);
+        return switch (v) {
+            case "yes", "y", "true", "1" -> Boolean.TRUE;
+            case "no", "n", "false", "0" -> Boolean.FALSE;
+            default -> null;
+        };
     }
 
     private static String rowMessage(String sheet, int rowNumber, String message) {

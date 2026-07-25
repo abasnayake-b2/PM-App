@@ -196,7 +196,7 @@ export function AppShell() {
             {can(P.ORGANISATIONS_VIEW) && (
             <NavLink to="/organisation" className={linkClass}>
               <Building2 size={18} />
-              Organisation
+              Region
             </NavLink>
             )}
             {can(P.TEAM_VIEW) && (

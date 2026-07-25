@@ -10,6 +10,10 @@ import {
   rdFieldInputClass,
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
+import {
+  firstCustomFieldErrorMessage,
+  validateIssueCustomFields,
+} from '@/utils/issueFieldValidation';
 
 export interface IssueFormOption {
   id: string;
@@ -82,6 +86,8 @@ export function IssueForm({
   const [projectId, setProjectId] = useState(parentIssue?.projectId ?? initialProjectId ?? '');
   const [issueTypeId, setIssueTypeId] = useState(defaultTypeId);
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [localError, setLocalError] = useState<string | null>(null);
   const selectedIssueType = availableIssueTypes.find((type) => type.id === issueTypeId);
 
   useEffect(() => {
@@ -104,6 +110,14 @@ export function IssueForm({
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const errors = validateIssueCustomFields(customFields);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setLocalError(firstCustomFieldErrorMessage(errors));
+      return;
+    }
+    setLocalError(null);
+
     const fd = new FormData(e.currentTarget);
     const payload: CreateIssuePayload = {
       projectId: projectId || (fd.get('projectId') as string),
@@ -132,6 +146,7 @@ export function IssueForm({
     <form
       onSubmit={handleSubmit}
       className={compact ? 'space-y-3' : 'card space-y-4 p-6'}
+      noValidate
     >
       {parentIssue ? (
         <div
@@ -252,9 +267,25 @@ export function IssueForm({
       <IssueCustomFieldsEditor
         fields={customFieldDefs}
         values={customFields}
-        onChange={(key, value) => setCustomFields((prev) => ({ ...prev, [key]: value }))}
+        onChange={(key, value) => {
+          setCustomFields((prev) => ({ ...prev, [key]: value }));
+          setFieldErrors((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+          setLocalError(null);
+        }}
+        fieldErrors={fieldErrors}
         compact={compact}
       />
+
+      {localError && (
+        <p className="rounded-md border border-danger/30 bg-danger/10 px-2 py-1.5 text-xs text-danger">
+          {localError}
+        </p>
+      )}
 
       <div className={`flex gap-2 ${compact ? 'pt-0.5' : 'pt-2'}`}>
         <button

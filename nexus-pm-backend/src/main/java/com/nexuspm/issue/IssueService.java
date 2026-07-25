@@ -683,10 +683,7 @@ public class IssueService {
             projectService.getProject(release.getProject().getId());
             return;
         }
-        if (SecurityUtils.isAdmin() || SecurityUtils.isManager()) {
-            return;
-        }
-        throw new BusinessException("ACCESS_DENIED", "Specify projectId or releaseId to list issues", 403);
+        // Cross-project lists are always scoped via resolveScopedProjectIds (incl. EM portfolio for employees).
     }
 
     /** Non-null empty list means the user has no accessible projects; null means no extra scope. */

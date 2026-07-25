@@ -19,6 +19,7 @@ export interface ReferenceItem {
   streamId?: string;
   streamName?: string;
   stream?: { id: string; name: string; department?: { id: string; name: string } };
+  management?: boolean;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -113,8 +114,14 @@ export async function createAdminDesignation(
   name: string,
   streamId: string,
   code?: string,
+  management = false,
 ): Promise<ReferenceItem> {
-  const { data } = await api.post<ReferenceItem>(`${base}/designations`, { name, streamId, code });
+  const { data } = await api.post<ReferenceItem>(`${base}/designations`, {
+    name,
+    streamId,
+    code,
+    management,
+  });
   return data;
 }
 
@@ -123,8 +130,14 @@ export async function updateAdminDesignation(
   name: string,
   streamId: string,
   code?: string,
+  management = false,
 ): Promise<ReferenceItem> {
-  const { data } = await api.put<ReferenceItem>(`${base}/designations/${id}`, { name, streamId, code });
+  const { data } = await api.put<ReferenceItem>(`${base}/designations/${id}`, {
+    name,
+    streamId,
+    code,
+    management,
+  });
   return data;
 }
 

@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -16,7 +17,10 @@ public class UserAccountResponse {
     private String lastName;
     private String fullName;
     private String status;
+    /** Primary role (most senior by org level) — used for hierarchy / grids. */
     private String roleCode;
+    /** All assigned application roles. */
+    private List<String> roleCodes;
     private UUID departmentId;
     private String departmentName;
     private UUID designationId;

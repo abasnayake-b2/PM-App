@@ -70,6 +70,16 @@ public class OrgHierarchyAlignRunner implements ApplicationRunner {
         jdbcTemplate.update(
                 "UPDATE role SET org_level_id = '0c000001-0000-0000-0000-000000000004' WHERE code IN ('EMPLOYEE', 'SW_ENGINEER', 'TECH_LEAD')");
         jdbcTemplate.update("UPDATE role SET org_level_id = NULL WHERE code IN ('SUPER_ADMIN', 'ADMIN')");
+        // Custom Roles & access roles must not stay null — null was treated like Admin (outside reporting line).
+        int customFixed = jdbcTemplate.update(
+                """
+                UPDATE role SET org_level_id = '0c000001-0000-0000-0000-000000000004'
+                WHERE org_level_id IS NULL
+                  AND code NOT IN ('SUPER_ADMIN', 'ADMIN')
+                """);
+        if (customFixed > 0) {
+            log.info("Assigned Employee org level to {} custom role(s)", customFixed);
+        }
     }
 
     private boolean tableExists(String table) {

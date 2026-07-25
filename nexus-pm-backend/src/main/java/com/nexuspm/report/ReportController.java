@@ -47,14 +47,14 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard/em-capacity-plan")
-    @PreAuthorize("@perm.can('REPORTS_VIEW') and @perm.can('PROJECTS_VIEW')")
+    @PreAuthorize("@perm.can('REPORTS_VIEW') and @perm.can('PMO_VIEW')")
     public EmCapacityPlanDashboard emCapacityPlan(
             @RequestParam(required = false) Integer weeks) {
         return emCapacityPlanningService.getDashboard(weeks);
     }
 
     @PutMapping("/dashboard/em-capacity-plan/{emId}/additional-resources")
-    @PreAuthorize("@perm.can('REPORTS_VIEW') and @perm.can('PROJECTS_VIEW')")
+    @PreAuthorize("@perm.can('REPORTS_VIEW') and @perm.can('PMO_UPDATE')")
     public EmCapacityPlanDashboard.EmColumn updateAdditionalResources(
             @PathVariable UUID emId,
             @Valid @RequestBody UpdateAdditionalResourcesRequest request) {

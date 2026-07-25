@@ -40,10 +40,19 @@ public class OrgHierarchyService {
 
     @Transactional(readOnly = true)
     public void validateManagerAssignment(Role employeeRole, Employee manager) {
+        String roleCode = employeeRole.getCode() != null ? employeeRole.getCode().toUpperCase() : "";
+        // Only Super Admin / Admin are outside the reporting line — not every null org_level
+        // (custom Roles & access roles previously skipped checks and looked "open").
+        if ("SUPER_ADMIN".equals(roleCode) || "ADMIN".equals(roleCode)) {
+            return;
+        }
+
         OrgLevel employeeLevel = employeeRole.getOrgLevel();
         if (employeeLevel == null) {
-            // App-only roles (Super Admin / Admin) are outside the org reporting line.
-            return;
+            throw new BusinessException(
+                    "INVALID_MANAGER",
+                    "Role " + roleCode + " has no organisation level — assign Employee (or another) org level",
+                    400);
         }
 
         if (employeeLevel.getReportsToOrgLevel() == null) {
@@ -68,10 +77,11 @@ public class OrgHierarchyService {
         OrgLevel requiredSupervisorLevel = employeeLevel.getReportsToOrgLevel();
         Optional<OrgLevel> actualSupervisorLevel = resolveOrgLevel(manager);
 
-        // Super Admin / Admin (no org level) may supervise any org role.
+        // Super Admin / Admin (by role code) may supervise any org role.
         if (actualSupervisorLevel.isEmpty()) {
             boolean adminSupervisor = manager.getRoles().stream()
-                    .anyMatch(role -> role.getOrgLevel() == null);
+                    .map(Role::getCode)
+                    .anyMatch(code -> "SUPER_ADMIN".equals(code) || "ADMIN".equals(code));
             if (adminSupervisor) {
                 return;
             }

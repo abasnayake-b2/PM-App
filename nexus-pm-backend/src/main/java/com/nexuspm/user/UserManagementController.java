@@ -29,6 +29,12 @@ public class UserManagementController {
         return userManagementService.listEligibleManagement(search);
     }
 
+    @GetMapping("/eligible-employees")
+    @PreAuthorize("@perm.can('USERS_VIEW')")
+    public List<EligibleEmployeeOption> listEligibleEmployees(@RequestParam(required = false) String search) {
+        return userManagementService.listEligibleEmployees(search);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("@perm.can('USERS_VIEW')")
     public UserAccountResponse getUserAccount(@PathVariable UUID id) {

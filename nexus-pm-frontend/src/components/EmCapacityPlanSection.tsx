@@ -5,6 +5,8 @@ import {
   updateEmAdditionalResources,
   type EmCapacityMetricCell,
 } from '@/api/emCapacityPlan.api';
+import { usePermissions } from '@/hooks/usePermissions';
+import { P } from '@/utils/permissions';
 
 const WEEK_OPTIONS = [
   { weeks: 4, label: '4 weeks' },
@@ -26,10 +28,12 @@ function AdditionalResourcesInput({
   emId,
   value,
   onSaved,
+  canEdit,
 }: {
   emId: string;
   value: number;
   onSaved: () => void;
+  canEdit: boolean;
 }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => {
@@ -39,6 +43,10 @@ function AdditionalResourcesInput({
     mutationFn: (next: number) => updateEmAdditionalResources(emId, next),
     onSuccess: () => onSaved(),
   });
+
+  if (!canEdit) {
+    return <span className="tabular-nums">{value}</span>;
+  }
 
   return (
     <input
@@ -68,6 +76,8 @@ function AdditionalResourcesInput({
 }
 
 export function EmCapacityPlanSection() {
+  const { can } = usePermissions();
+  const canEditPmo = can(P.PMO_UPDATE);
   const [weeks, setWeeks] = useState(12);
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -174,6 +184,7 @@ export function EmCapacityPlanSection() {
                           emId={cell.emId}
                           value={typeof cell.value === 'number' ? cell.value : 0}
                           onSaved={refresh}
+                          canEdit={canEditPmo}
                         />
                       ) : (
                         formatCell(cell, row.key)

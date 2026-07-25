@@ -145,15 +145,16 @@ CREATE TABLE skill (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE designation (
-    id            CHAR(36)     NOT NULL PRIMARY KEY,
-    name          VARCHAR(100) NOT NULL UNIQUE,
-    code          VARCHAR(30)  NULL,
-    department_id CHAR(36)     NOT NULL,
-    stream_id     CHAR(36)     NULL,
-    created_by    CHAR(36)     NULL,
-    updated_by    CHAR(36)     NULL,
-    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id             CHAR(36)     NOT NULL PRIMARY KEY,
+    name           VARCHAR(100) NOT NULL UNIQUE,
+    code           VARCHAR(30)  NULL,
+    department_id  CHAR(36)     NOT NULL,
+    stream_id      CHAR(36)     NULL,
+    is_management  TINYINT(1)   NOT NULL DEFAULT 0,
+    created_by     CHAR(36)     NULL,
+    updated_by     CHAR(36)     NULL,
+    created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_designation_department FOREIGN KEY (department_id) REFERENCES department(id),
     CONSTRAINT fk_designation_stream     FOREIGN KEY (stream_id)     REFERENCES stream(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

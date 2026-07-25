@@ -17,8 +17,12 @@ import {
   fetchLatestTeamManagementImport,
   fetchLatestTeamMembersImport,
   relinkManagementSupervisors,
+  promoteEmployeeToManagement,
+  demoteManagementToEmployee,
   type TeamManagementPayload,
   type TeamRosterMemberPayload,
+  type PromoteEmployeeToManagementPayload,
+  type DemoteManagementToEmployeePayload,
 } from '@/api/teamRoster.api';
 
 export function useTeamManagement(search = '', enabled = true) {
@@ -165,4 +169,49 @@ export function useDeleteTeamRosterMemberPhoto(id: string) {
   });
 }
 
-export type { TeamManagementPayload, TeamRosterMemberPayload };
+export function usePromoteEmployeeToManagement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      employeeId,
+      payload,
+    }: {
+      employeeId: string;
+      payload: PromoteEmployeeToManagementPayload;
+    }) => promoteEmployeeToManagement(employeeId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
+      qc.invalidateQueries({ queryKey: ['team-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-employees'] });
+      qc.invalidateQueries({ queryKey: ['user-accounts'] });
+    },
+  });
+}
+
+export function useDemoteManagementToEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      managementId,
+      payload,
+    }: {
+      managementId: string;
+      payload?: DemoteManagementToEmployeePayload;
+    }) => demoteManagementToEmployee(managementId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
+      qc.invalidateQueries({ queryKey: ['team-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-management'] });
+      qc.invalidateQueries({ queryKey: ['eligible-employees'] });
+      qc.invalidateQueries({ queryKey: ['user-accounts'] });
+    },
+  });
+}
+
+export type {
+  TeamManagementPayload,
+  TeamRosterMemberPayload,
+  PromoteEmployeeToManagementPayload,
+  DemoteManagementToEmployeePayload,
+};

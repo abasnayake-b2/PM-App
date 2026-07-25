@@ -42,7 +42,8 @@ public class ReportService {
     public DashboardSummaryResponse getDashboardSummary() {
         UUID userId = SecurityUtils.currentUserId();
         ProjectAccessScope scope = projectService.accessScopeForCurrentUser();
-        boolean teamView = SecurityUtils.isManagerOrAbove();
+        // Include EM peers for engineers (resolveTeam uses engineering manager when present).
+        boolean teamView = true;
         List<UUID> scopedProjectIds = scope.admin() ? null : projectService.getAccessibleProjectIds();
 
         long activeProjects = projectRepository.countActiveAccessible(
@@ -81,7 +82,8 @@ public class ReportService {
     public DashboardOverviewResponse getDashboardOverview() {
         UUID userId = SecurityUtils.currentUserId();
         ProjectAccessScope scope = projectService.accessScopeForCurrentUser();
-        boolean teamView = SecurityUtils.isManagerOrAbove();
+        // Include EM peers for engineers (resolveTeam uses engineering manager when present).
+        boolean teamView = true;
         List<UUID> scopedProjectIds = scope.admin() ? null : projectService.getAccessibleProjectIds();
 
         DashboardSummaryResponse summary = getDashboardSummary();

@@ -58,12 +58,12 @@ INSERT INTO work_type (id, name) VALUES
 ('55555555-5555-5555-5555-555555555502', 'NTP'),
 ('55555555-5555-5555-5555-555555555503', 'CLIENT PRODUCTS');
 
-INSERT INTO designation (id, name, code, department_id, stream_id) VALUES
-('33333333-3333-3333-3333-333333333301', 'Software Engineer',        'SE',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401'),
-('33333333-3333-3333-3333-333333333302', 'VP Engineering',           'VP',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401'),
-('33333333-3333-3333-3333-333333333303', 'Tech Lead',                'TL',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401'),
-('33333333-3333-3333-3333-333333333305', 'Engineering Manager',      'EM',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401'),
-('33333333-3333-3333-3333-333333333304', 'Chief Technology Officer', 'CTO', '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401');
+INSERT INTO designation (id, name, code, department_id, stream_id, is_management) VALUES
+('33333333-3333-3333-3333-333333333301', 'Software Engineer',        'SE',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401', 0),
+('33333333-3333-3333-3333-333333333302', 'VP Engineering',           'VP',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401', 1),
+('33333333-3333-3333-3333-333333333303', 'Tech Lead',                'TL',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401', 1),
+('33333333-3333-3333-3333-333333333305', 'Engineering Manager',      'EM',  '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401', 1),
+('33333333-3333-3333-3333-333333333304', 'Chief Technology Officer', 'CTO', '22222222-2222-2222-2222-222222222201', '44444444-4444-4444-4444-444444444401', 1);
 
 -- App reporting line: CXO → VP → Manager (Senior Manager or Manager) → Employee
 INSERT INTO org_level (id, code, name, level_order, reports_to_org_level_id) VALUES
@@ -123,7 +123,11 @@ INSERT INTO permission (id, name, code, module, action) VALUES
 ('b1000001-0000-0000-0000-000000000038', 'Excel import — Run',                'IMPORT_CREATE',       'IMPORT',        'CREATE'),
 ('b1000001-0000-0000-0000-000000000039', 'Releases — View',                   'RELEASES_VIEW',       'RELEASES',      'VIEW'),
 ('b1000001-0000-0000-0000-000000000040', 'Releases — Create',                 'RELEASES_CREATE',     'RELEASES',      'CREATE'),
-('b1000001-0000-0000-0000-000000000041', 'Org structure — View',              'ORG_STRUCTURE_VIEW',  'ORG_STRUCTURE', 'VIEW');
+('b1000001-0000-0000-0000-000000000041', 'Org structure — View',              'ORG_STRUCTURE_VIEW',  'ORG_STRUCTURE', 'VIEW'),
+('b1000001-0000-0000-0000-000000000042', 'PMO pages — View',                  'PMO_VIEW',            'PMO',           'VIEW'),
+('b1000001-0000-0000-0000-000000000043', 'PMO pages — Create',                'PMO_CREATE',          'PMO',           'CREATE'),
+('b1000001-0000-0000-0000-000000000044', 'PMO pages — Update',                'PMO_UPDATE',          'PMO',           'UPDATE'),
+('b1000001-0000-0000-0000-000000000045', 'PMO pages — Delete',                'PMO_DELETE',          'PMO',           'DELETE');
 
 -- Super Admin — all privileges
 INSERT INTO role_permission (role_id, permission_id)
@@ -153,7 +157,8 @@ WHERE r.code IN ('CXO', 'VP', 'MANAGER')
   AND p.code IN (
     'ALLOCATIONS_CREATE',
     'ALLOCATIONS_UPDATE',
-    'ALLOCATIONS_DELETE'
+    'ALLOCATIONS_DELETE',
+    'PMO_UPDATE'
   );
 
 -- Employee — view own work areas only (row-level scoping enforced in application)

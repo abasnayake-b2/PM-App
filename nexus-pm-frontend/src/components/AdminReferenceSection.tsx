@@ -96,6 +96,7 @@ function gridColumns(tab: RefTab): GridColumn[] {
         { key: 'code', header: 'Code', render: (i) => i.code ?? '—' },
         { key: 'stream', header: 'Stream', render: (i) => i.stream?.name ?? i.streamName ?? '—' },
         { key: 'department', header: 'Department', render: (i) => i.department?.name ?? i.departmentName ?? '—' },
+        { key: 'management', header: 'Type', render: (i) => (i.management ? 'Management' : 'Employee') },
       ];
     case 'work-types':
       return [{ key: 'name', header: 'Name', render: (i) => i.name ?? '—' }];
@@ -263,6 +264,17 @@ function ReferenceFormFields({
           ) : (
             <p className="text-sm text-text2">Add a stream first, then create designations.</p>
           )}
+          <label className="block text-sm">
+            <span className="text-text2">Type</span>
+            <select
+              name="management"
+              className={inputClass}
+              defaultValue={initial?.management ? 'true' : 'false'}
+            >
+              <option value="false">Employee</option>
+              <option value="true">Management</option>
+            </select>
+          </label>
         </>
       )}
       {tab === 'issue-types' && (
@@ -359,6 +371,7 @@ export function AdminReferenceSection() {
     qc.invalidateQueries({ queryKey: ['departments'] });
     qc.invalidateQueries({ queryKey: ['streams'] });
     qc.invalidateQueries({ queryKey: ['designations'] });
+    qc.invalidateQueries({ queryKey: ['roster-designations'] });
   };
 
   const saveFromForm = async (fd: FormData, itemId?: string) => {
@@ -377,11 +390,13 @@ export function AdminReferenceSection() {
               name,
               fd.get('streamId') as string,
               (fd.get('code') as string) || undefined,
+              fd.get('management') === 'true',
             )
           : createAdminDesignation(
               name,
               fd.get('streamId') as string,
               (fd.get('code') as string) || undefined,
+              fd.get('management') === 'true',
             );
       case 'work-types':
         return itemId ? updateAdminWorkType(itemId, name) : createAdminWorkType(name);

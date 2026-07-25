@@ -7,6 +7,7 @@ import com.nexuspm.project.repository.ProjectRepository;
 import com.nexuspm.shared.config.DfnPmProperties;
 import com.nexuspm.shared.audit.AuditNameEnricher;
 import com.nexuspm.shared.exception.BusinessException;
+import com.nexuspm.shared.security.Permissions;
 import com.nexuspm.shared.security.SecurityUtils;
 import com.nexuspm.shared.storage.ProfilePictureStorageService;
 import com.nexuspm.shared.util.ExcelUploadValidator;
@@ -18,6 +19,7 @@ import com.nexuspm.teamroster.repository.TeamImportBatchRepository;
 import com.nexuspm.teamroster.repository.TeamManagementRepository;
 import com.nexuspm.user.EmployeeCleanupService;
 import com.nexuspm.user.ManagementUserProvisioningService;
+import com.nexuspm.user.ManagerTeamService;
 import com.nexuspm.user.EmployeeRosterRefs;
 import com.nexuspm.user.entity.Department;
 import com.nexuspm.user.entity.Designation;
@@ -27,9 +29,11 @@ import com.nexuspm.user.entity.Stream;
 import com.nexuspm.user.entity.WorkType;
 import com.nexuspm.user.repository.DesignationRepository;
 import com.nexuspm.user.repository.EmployeeRepository;
+import com.nexuspm.user.repository.RoleRepository;
 import com.nexuspm.user.repository.SkillRepository;
 import com.nexuspm.user.repository.StreamRepository;
 import com.nexuspm.user.repository.WorkTypeRepository;
+import com.nexuspm.user.entity.Role;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -59,6 +63,7 @@ public class TeamRosterService {
     private final WorkTypeRepository workTypeRepository;
     private final SkillRepository skillRepository;
     private final CountryRepository countryRepository;
+    private final RoleRepository roleRepository;
     private final EmployeeCleanupService employeeCleanupService;
     private final ManagementUserProvisioningService managementUserProvisioningService;
     private final UserAuthRepository userAuthRepository;
@@ -66,21 +71,81 @@ public class TeamRosterService {
     private final DfnPmProperties properties;
     private final AuditNameEnricher auditNameEnricher;
     private final ProfilePictureStorageService profilePictureStorageService;
+    private final ManagerTeamService managerTeamService;
 
     @Transactional(readOnly = true)
     public List<TeamManagementResponse> listManagement(String search) {
         String term = normalizeSearch(search);
-        List<TeamManagement> rows = managementRepository.search(term);
-        auditNameEnricher.enrichAll(rows);
-        return rows.stream().map(this::toManagementResponse).toList();
+        if (canReadFullOrgRoster()) {
+            List<TeamManagement> rows = managementRepository.search(term);
+            auditNameEnricher.enrichAll(rows);
+            return rows.stream().map(this::toManagementResponse).toList();
+        }
+        if (!SecurityUtils.isManagerOrAbove()) {
+            return List.of();
+        }
+        // Own-team managers: only their linked management person
+        Employee self = employeeRepository.findDetailedById(SecurityUtils.currentUserId()).orElse(null);
+        if (self == null || self.getTeamManagement() == null) {
+            return List.of();
+        }
+        TeamManagement own = self.getTeamManagement();
+        if (term != null) {
+            String haystack = (own.getFullName() + " " + Optional.ofNullable(own.getRoleTitle()).orElse(""))
+                    .toLowerCase(Locale.ROOT);
+            if (!haystack.contains(term.toLowerCase(Locale.ROOT))) {
+                return List.of();
+            }
+        }
+        auditNameEnricher.enrichAll(List.of(own));
+        return List.of(toManagementResponse(own));
     }
 
     @Transactional(readOnly = true)
     public List<TeamRosterMemberResponse> listMembers(String search) {
         String term = normalizeSearch(search);
-        List<Employee> rows = employeeRepository.searchRosterMembers(term);
-        auditNameEnricher.enrichAll(rows);
-        return rows.stream().map(this::toMemberResponse).toList();
+        if (canReadFullOrgRoster()) {
+            List<Employee> rows = employeeRepository.searchRosterMembers(term);
+            auditNameEnricher.enrichAll(rows);
+            return rows.stream().map(this::toMemberResponse).toList();
+        }
+        if (!SecurityUtils.isManagerOrAbove()) {
+            return employeeRepository.findDetailedById(SecurityUtils.currentUserId())
+                    .filter(employee -> employee.getTeamManagement() == null)
+                    .filter(employee -> matchesMemberSearch(employee, term))
+                    .map(employee -> {
+                        auditNameEnricher.enrichAll(List.of(employee));
+                        return List.of(toMemberResponse(employee));
+                    })
+                    .orElseGet(List::of);
+        }
+        List<Employee> team = managerTeamService.resolveTeam(SecurityUtils.currentUserId()).stream()
+                .filter(employee -> employee.getTeamManagement() == null)
+                .filter(employee -> matchesMemberSearch(employee, term))
+                .toList();
+        auditNameEnricher.enrichAll(team);
+        return team.stream().map(this::toMemberResponse).toList();
+    }
+
+    /**
+     * Full management/engineer roster for org-wide leaders, or for roles granted
+     * {@code ORG_STRUCTURE_VIEW} without Admin→Management ({@code TEAM_VIEW}) — e.g. PM viewing Org structure.
+     */
+    private static boolean canReadFullOrgRoster() {
+        if (SecurityUtils.isAdmin() || SecurityUtils.hasOrgWideVisibility()) {
+            return true;
+        }
+        // Org structure page access without Management admin menu
+        return SecurityUtils.hasPermission(Permissions.ORG_STRUCTURE_VIEW)
+                && !SecurityUtils.hasPermission(Permissions.TEAM_VIEW);
+    }
+
+    private static boolean matchesMemberSearch(Employee employee, String term) {
+        if (term == null) {
+            return true;
+        }
+        String haystack = (employee.getFullName() + " " + employee.getEmail()).toLowerCase(Locale.ROOT);
+        return haystack.contains(term.toLowerCase(Locale.ROOT));
     }
 
     @Transactional(readOnly = true)
@@ -254,6 +319,163 @@ public class TeamRosterService {
         return toManagementResponse(auditNameEnricher.enrich(managementRepository.save(entity)));
     }
 
+    /**
+     * Move an employee onto the management roster (same person — no duplicate employee row).
+     * Works for roster-only employees and login users. After this they leave the Employees list
+     * and appear under Management.
+     */
+    @Transactional
+    public TeamManagementResponse promoteEmployeeToManagement(
+            UUID employeeId, PromoteEmployeeToManagementRequest request) {
+        Employee employee = employeeRepository.findDetailedById(employeeId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
+        if (employee.getTeamManagement() != null) {
+            throw new BusinessException(
+                    "ALREADY_LINKED",
+                    "This employee is already on the management roster",
+                    400);
+        }
+
+        TeamManagement entity = createManagementForEmployee(
+                employee,
+                request.getRoleTitle(),
+                request.getSupervisorId(),
+                request.getStatus());
+        applyAppRoleIfLogin(employee, request.getRoleCode());
+        return toManagementResponse(auditNameEnricher.enrich(entity));
+    }
+
+    /**
+     * Ensure a login employee is on the management roster (used when app role becomes Manager+).
+     */
+    @Transactional
+    public TeamManagement ensureManagementLink(Employee employee, String roleTitle) {
+        if (employee.getTeamManagement() != null) {
+            return employee.getTeamManagement();
+        }
+        String title = (roleTitle != null && !roleTitle.isBlank()) ? roleTitle.trim() : "Manager";
+        return createManagementForEmployee(employee, title, null, "ACTIVE");
+    }
+
+    private void applyAppRoleIfLogin(Employee employee, String roleCode) {
+        if (roleCode == null || roleCode.isBlank()) {
+            return;
+        }
+        if (!userAuthRepository.existsByEmployeeId(employee.getId())) {
+            return;
+        }
+        String code = roleCode.trim().toUpperCase();
+        if ("EMPLOYEE".equals(code) || "ADMIN".equals(code) || "SUPER_ADMIN".equals(code)) {
+            throw new BusinessException("VALIDATION", "Select a management app role", 400);
+        }
+        Role role = roleRepository.findByCodeWithOrgLevel(code)
+                .orElseThrow(() -> new BusinessException("INVALID_ROLE", "Role not found", 400));
+        employee.getRoles().clear();
+        employee.getRoles().add(role);
+        employeeRepository.save(employee);
+    }
+
+    private TeamManagement createManagementForEmployee(
+            Employee employee, String roleTitle, UUID supervisorId, String status) {
+        TeamManagement entity = new TeamManagement();
+        entity.setId(UUID.randomUUID());
+        entity.setFirstName(employee.getFirstName());
+        entity.setLastName(employee.getLastName());
+        entity.setRoleTitle(roleTitle != null ? roleTitle.trim() : "Manager");
+        entity.setStatus(status != null && !status.isBlank()
+                ? status.trim().toUpperCase()
+                : "ACTIVE");
+        if (supervisorId != null) {
+            TeamManagement supervisor = managementRepository.findById(supervisorId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "Supervisor not found", 404));
+            if (supervisor.getId().equals(entity.getId())) {
+                throw new BusinessException("VALIDATION", "Cannot supervise yourself", 400);
+            }
+            entity.setSupervisor(supervisor);
+        }
+
+        managementRepository.saveAndFlush(entity);
+        employee.setTeamManagement(entity);
+        // No longer an engineer reporting to an EM once they are management.
+        employee.setEngineeringManagerManagement(null);
+        employeeRepository.save(employee);
+        return entity;
+    }
+
+    /**
+     * Move a management person back onto the employee roster.
+     * Keeps any existing login; deletes the management row after unlinking.
+     */
+    @Transactional
+    public TeamRosterMemberResponse demoteManagementToEmployee(
+            UUID managementId, DemoteManagementToEmployeeRequest request) {
+        TeamManagement entity = managementRepository.findById(managementId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
+        String picture = entity.getProfilePicture();
+
+        Employee employee = employeeRepository.findByTeamManagementId(managementId).orElse(null);
+        if (employee == null) {
+            employee = new Employee();
+            employee.setId(UUID.randomUUID());
+            employee.setFirstName(entity.getFirstName());
+            employee.setLastName(entity.getLastName());
+            employee.setStatus("ACTIVE");
+            employee.setEmail(null);
+        }
+
+        employee.setTeamManagement(null);
+
+        if (request != null && request.getEngineeringManagerManagementId() != null) {
+            UUID emId = request.getEngineeringManagerManagementId();
+            if (emId.equals(managementId)) {
+                throw new BusinessException("VALIDATION", "Cannot set yourself as engineering manager", 400);
+            }
+            TeamManagement em = managementRepository.findById(emId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "Engineering manager not found", 404));
+            employee.setEngineeringManagerManagement(em);
+        } else {
+            employee.setEngineeringManagerManagement(null);
+        }
+
+        boolean setEmployeeRole = request == null || request.getSetEmployeeRole() == null
+                || Boolean.TRUE.equals(request.getSetEmployeeRole());
+        if (setEmployeeRole && userAuthRepository.existsByEmployeeId(employee.getId())) {
+            Role employeeRole = roleRepository.findByCodeWithOrgLevel("EMPLOYEE")
+                    .orElseThrow(() -> new BusinessException("INVALID_ROLE", "EMPLOYEE role not found", 400));
+            employee.getRoles().clear();
+            employee.getRoles().add(employeeRole);
+            employee.setOrgWideVisibility(false);
+        }
+
+        // Persist unlink (or new roster employee) before deleting the management row.
+        employeeRepository.save(employee);
+        employeeRepository.clearEngineeringManagerManagement(managementId);
+        detachManagementReferences(managementId);
+        entityManager.flush();
+        managementRepository.deleteById(managementId);
+        profilePictureStorageService.deleteIfPresent(picture);
+
+        Employee saved = employeeRepository.findDetailedById(employee.getId()).orElse(employee);
+        return toMemberResponse(auditNameEnricher.enrich(saved));
+    }
+
+    /**
+     * Remove management link for a login employee (used when app role becomes Employee).
+     */
+    @Transactional
+    public void removeManagementLink(Employee employee) {
+        TeamManagement management = employee.getTeamManagement();
+        if (management == null) {
+            return;
+        }
+        DemoteManagementToEmployeeRequest request = new DemoteManagementToEmployeeRequest();
+        request.setSetEmployeeRole(false);
+        demoteManagementToEmployee(management.getId(), request);
+        // Reload link cleared on employee in caller's persistence context
+        employee.setTeamManagement(null);
+        employee.setEngineeringManagerManagement(null);
+    }
+
     @Transactional
     public TeamManagementResponse updateManagement(UUID id, TeamManagementRequest request) {
         TeamManagement entity = managementRepository.findById(id)
@@ -412,8 +634,11 @@ public class TeamRosterService {
     }
 
     private void ensureRosterEmployee(Employee entity) {
-        if (userAuthRepository.existsByEmployeeId(entity.getId())) {
-            throw new BusinessException("VALIDATION", "This record is a system login user, not a roster employee", 400);
+        if (entity.getTeamManagement() != null) {
+            throw new BusinessException(
+                    "VALIDATION",
+                    "This person is on the management roster. Edit them under Management, or move them back to Employees first.",
+                    400);
         }
     }
 
@@ -964,6 +1189,10 @@ public class TeamRosterService {
                         ? employee.getEngineeringManagerManagement().getId()
                         : null)
                 .engineeringManagerName(EmployeeRosterRefs.engineeringManagerName(employee))
+                .managementId(employee.getTeamManagement() != null ? employee.getTeamManagement().getId() : null)
+                .managementRoleTitle(employee.getTeamManagement() != null
+                        ? employee.getTeamManagement().getRoleTitle()
+                        : null)
                 .workTypeId(employee.getWorkType() != null ? employee.getWorkType().getId() : null)
                 .workType(EmployeeRosterRefs.workTypeName(employee))
                 .countryId(employee.getCountry() != null ? employee.getCountry().getId() : null)

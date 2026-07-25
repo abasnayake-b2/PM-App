@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, Plus, Search } from 'lucide-react';
@@ -18,16 +18,14 @@ import { useIssues, useDeleteIssue } from '@/hooks/useIssues';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
-import { isAdminRole, isManagerOrAboveRole } from '@/utils/orgRoles';
+import { isAdminRole } from '@/utils/orgRoles';
 import { filterIssuesBySearch, looksLikeIssueIdSearch } from '@/utils/issueUi';
 import type { Issue } from '@/types';
 
 export function IssuesPage() {
-  const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
   const { can } = usePermissions();
   const isAdmin = isAdminRole(role);
-  const isManagerOrAbove = isManagerOrAboveRole(role);
 
   const [projectId, setProjectId] = useState('');
   const [issueTypeId, setIssueTypeId] = useState('');
@@ -54,7 +52,7 @@ export function IssuesPage() {
   const { data: issueTypes } = useQuery({ queryKey: ['issue-types'], queryFn: fetchIssueTypes });
   const { data: statuses } = useQuery({ queryKey: ['issue-statuses'], queryFn: fetchIssueStatuses });
 
-  const canQuery = can(P.ISSUES_VIEW) && (isManagerOrAbove || !!projectId);
+  const canQuery = can(P.ISSUES_VIEW);
   const searching = deferredSearch.length > 0;
   const statusFiltering = statusIds.length > 0;
   const idSearch = looksLikeIssueIdSearch(deferredSearch);
@@ -104,7 +102,7 @@ export function IssuesPage() {
   const initialLoad = isLoading && !data;
 
   const summaryLine = useMemo(() => {
-    if (!canQuery) return 'Select a project to view your issues.';
+    if (!canQuery) return 'You do not have permission to view issues.';
     if (trackerTab === 'matrix') {
       return projectId
         ? 'EM status matrix for this project'
@@ -171,6 +169,14 @@ export function IssuesPage() {
   };
 
   const selectedProjectLabel = projectsData?.content?.find((p) => p.id === projectId)?.name;
+  const projectOptions = useMemo(
+    () =>
+      (projectsData?.content ?? []).map((project) => ({
+        id: project.id,
+        label: project.name,
+      })),
+    [projectsData],
+  );
 
   return (
     <div>
@@ -202,13 +208,7 @@ export function IssuesPage() {
           {can(P.ISSUES_CREATE) && (
             <button
               type="button"
-              onClick={() => {
-                if (projectId) {
-                  setCreating(true);
-                } else {
-                  void navigate('/issues/new');
-                }
-              }}
+              onClick={() => setCreating(true)}
               className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium"
               style={{ color: 'var(--accent-fg)' }}
             >
@@ -253,7 +253,7 @@ export function IssuesPage() {
             className="mt-1 block min-w-[140px] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
           >
             <option value="">
-              {isAdmin ? 'All projects' : isManagerOrAbove ? 'My projects' : 'Select project…'}
+              {isAdmin ? 'All projects' : 'My projects'}
             </option>
             {projectsData?.content?.map((project) => (
               <option key={project.id} value={project.id}>
@@ -325,7 +325,7 @@ export function IssuesPage() {
         )}
       </div>
 
-      {!canQuery && <p className="mt-8 text-text2">Select a project to view your issues.</p>}
+      {!canQuery && <p className="mt-8 text-text2">You do not have permission to view issues.</p>}
 
       {canQuery && trackerTab === 'matrix' && (
         <EmCrMatrixTab
@@ -392,10 +392,12 @@ export function IssuesPage() {
         </div>
       )}
 
-      {creating && projectId && (
+      {creating && (
         <IssueCreateSlideOverPanel
-          projectId={projectId}
+          projectId={projectId || undefined}
           projectLabel={selectedProjectLabel}
+          projects={projectOptions}
+          lockProject={!!projectId}
           onClose={() => setCreating(false)}
           onCreated={(issueId) => {
             setCreating(false);

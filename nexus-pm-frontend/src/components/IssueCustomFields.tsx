@@ -1,9 +1,17 @@
 import type { ReactNode } from 'react';
 import type { IssueFieldDefinition } from '@/api/issueFields.api';
+import {
+  getDateFieldBounds,
+  isPercentageCompletionField,
+  sanitizePercentageCompletionInput,
+} from '@/utils/issueFieldValidation';
 
 /** Compact controls for RD panel grids — accent focus, soft fill. */
 export const rdFieldInputClass =
   'mt-0.5 box-border h-8 w-full min-w-0 rounded-md border border-border bg-bg px-2 py-1 text-xs text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-[color:var(--accent-muted)]';
+
+export const rdFieldInputErrorClass =
+  'mt-0.5 box-border h-8 w-full min-w-0 rounded-md border border-danger bg-bg px-2 py-1 text-xs text-text outline-none transition focus:border-danger focus:ring-2 focus:ring-danger/30';
 
 export const rdFieldTextareaClass =
   'mt-0.5 box-border w-full min-w-0 rounded-md border border-border bg-bg px-2 py-1.5 text-xs text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-[color:var(--accent-muted)]';
@@ -89,6 +97,8 @@ interface IssueCustomFieldsEditorProps {
   onChange: (fieldKey: string, value: string) => void;
   /** Dense multi-column layout for RD panels. */
   compact?: boolean;
+  /** Per-field validation messages keyed by fieldKey. */
+  fieldErrors?: Record<string, string>;
 }
 
 export function IssueCustomFieldsEditor({
@@ -96,6 +106,7 @@ export function IssueCustomFieldsEditor({
   values,
   onChange,
   compact = true,
+  fieldErrors = {},
 }: IssueCustomFieldsEditorProps) {
   if (fields.length === 0) return null;
 
@@ -117,6 +128,8 @@ export function IssueCustomFieldsEditor({
           <div className={gridClass}>
             {group.items.map((field) => {
               const value = values[field.fieldKey] ?? '';
+              const error = fieldErrors[field.fieldKey];
+              const inputClass = error ? rdFieldInputErrorClass : rdFieldInputClass;
               const label = (
                 <span
                   className={`block truncate font-medium leading-tight text-text2 ${
@@ -127,6 +140,9 @@ export function IssueCustomFieldsEditor({
                   {field.required ? <span className="text-danger"> *</span> : null}
                 </span>
               );
+              const errorHint = error ? (
+                <span className="mt-0.5 block text-[10px] leading-snug text-danger">{error}</span>
+              ) : null;
 
               if (field.dataType === 'DROPDOWN') {
                 return (
@@ -136,7 +152,8 @@ export function IssueCustomFieldsEditor({
                       required={field.required}
                       value={value}
                       onChange={(e) => onChange(field.fieldKey, e.target.value)}
-                      className={rdFieldInputClass}
+                      className={inputClass}
+                      aria-invalid={!!error}
                     >
                       <option value="">Not set</option>
                       {(field.options ?? []).map((opt) => (
@@ -145,11 +162,13 @@ export function IssueCustomFieldsEditor({
                         </option>
                       ))}
                     </select>
+                    {errorHint}
                   </label>
                 );
               }
 
               if (field.dataType === 'DATE') {
+                const bounds = getDateFieldBounds(field.fieldKey, values);
                 return (
                   <label key={field.id} className="min-w-0 block">
                     {label}
@@ -157,9 +176,23 @@ export function IssueCustomFieldsEditor({
                       type="date"
                       required={field.required}
                       value={value}
+                      min={bounds.min}
+                      max={bounds.max}
                       onChange={(e) => onChange(field.fieldKey, e.target.value)}
-                      className={rdFieldInputClass}
+                      className={inputClass}
+                      aria-invalid={!!error}
+                      title={
+                        bounds.min || bounds.max
+                          ? [
+                              bounds.min ? `On or after ${bounds.min}` : null,
+                              bounds.max ? `On or before ${bounds.max}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                          : undefined
+                      }
                     />
+                    {errorHint}
                   </label>
                 );
               }
@@ -176,25 +209,57 @@ export function IssueCustomFieldsEditor({
                       required={field.required}
                       value={value}
                       onChange={(e) => onChange(field.fieldKey, e.target.value)}
-                      className={rdFieldInputClass}
+                      className={inputClass}
                       placeholder="YYYY"
+                      aria-invalid={!!error}
                     />
+                    {errorHint}
                   </label>
                 );
               }
 
-              if (field.dataType === 'NUMBER') {
+              if (field.dataType === 'NUMBER' || isPercentageCompletionField(field.fieldKey)) {
+                const isPct = isPercentageCompletionField(field.fieldKey);
                 return (
                   <label key={field.id} className="min-w-0 block">
                     {label}
                     <input
                       type="number"
-                      step="any"
+                      inputMode="numeric"
+                      step={1}
+                      min={isPct ? 0 : undefined}
+                      max={isPct ? 100 : undefined}
                       required={field.required}
                       value={value}
-                      onChange={(e) => onChange(field.fieldKey, e.target.value)}
-                      className={rdFieldInputClass}
+                      onChange={(e) => {
+                        const next = isPct
+                          ? sanitizePercentageCompletionInput(e.target.value)
+                          : e.target.value;
+                        onChange(field.fieldKey, next);
+                      }}
+                      onBlur={
+                        isPct
+                          ? () => {
+                              if (value === '') return;
+                              onChange(field.fieldKey, sanitizePercentageCompletionInput(value));
+                            }
+                          : undefined
+                      }
+                      onKeyDown={
+                        isPct
+                          ? (e) => {
+                              // Block e/E/+/- which number inputs otherwise allow
+                              if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }
+                          : undefined
+                      }
+                      className={inputClass}
+                      placeholder={isPct ? '0–100' : undefined}
+                      aria-invalid={!!error}
                     />
+                    {errorHint}
                   </label>
                 );
               }
@@ -210,7 +275,9 @@ export function IssueCustomFieldsEditor({
                       value={value}
                       onChange={(e) => onChange(field.fieldKey, e.target.value)}
                       className={rdFieldTextareaClass}
+                      aria-invalid={!!error}
                     />
+                    {errorHint}
                   </label>
                 );
               }
@@ -224,8 +291,10 @@ export function IssueCustomFieldsEditor({
                     maxLength={field.maxLength ?? undefined}
                     value={value}
                     onChange={(e) => onChange(field.fieldKey, e.target.value)}
-                    className={rdFieldInputClass}
+                    className={inputClass}
+                    aria-invalid={!!error}
                   />
+                  {errorHint}
                 </label>
               );
             })}

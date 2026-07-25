@@ -179,13 +179,22 @@ public class AdminController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@perm.can('REFERENCE_CREATE')")
     public DesignationResponse createDesignation(@Valid @RequestBody DesignationRequest request) {
-        return referenceDataService.createDesignation(request.getName(), request.getCode(), request.getStreamId());
+        return referenceDataService.createDesignation(
+                request.getName(),
+                request.getCode(),
+                request.getStreamId(),
+                Boolean.TRUE.equals(request.getManagement()));
     }
 
     @PutMapping("/reference/designations/{id}")
     @PreAuthorize("@perm.can('REFERENCE_UPDATE')")
     public DesignationResponse updateDesignation(@PathVariable UUID id, @Valid @RequestBody DesignationRequest request) {
-        return referenceDataService.updateDesignation(id, request.getName(), request.getCode(), request.getStreamId());
+        return referenceDataService.updateDesignation(
+                id,
+                request.getName(),
+                request.getCode(),
+                request.getStreamId(),
+                Boolean.TRUE.equals(request.getManagement()));
     }
 
     @DeleteMapping("/reference/designations/{id}")
