@@ -1,5 +1,6 @@
 package com.nexuspm.issue.dto;
 
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -10,6 +11,11 @@ import java.util.UUID;
 public class UpdateIssueRequest {
 
     private String title;
+
+    @Size(max = 80)
+    private String jiraId;
+
+    private Boolean clearJiraId;
     private String description;
     private UUID priorityId;
     private UUID assignedToId;

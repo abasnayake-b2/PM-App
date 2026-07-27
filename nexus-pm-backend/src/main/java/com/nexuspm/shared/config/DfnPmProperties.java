@@ -5,7 +5,9 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 @ConfigurationProperties(prefix = "dfnpm")
@@ -19,6 +21,7 @@ public class DfnPmProperties {
     private Security security = new Security();
     private Storage storage = new Storage();
     private Cache cache = new Cache();
+    private Ai ai = new Ai();
 
     @Getter
     @Setter
@@ -96,5 +99,38 @@ public class DfnPmProperties {
         private boolean warmupOnStartup = true;
         /** Cron for daily full refresh (default 02:00 server time). */
         private String dailyRefreshCron = "0 0 2 * * *";
+    }
+
+    /**
+     * OpenAI-compatible Assistant (Ollama, OpenAI, Azure gateway, etc.).
+     * Spring AI 1.0 requires Boot 3.4+; Phase 1–2 use RestClient against the same API shape.
+     * YAML {@code enabled} is the hard kill switch. Soft toggles live in system_settings.
+     */
+    @Getter
+    @Setter
+    public static class Ai {
+        private boolean enabled = false;
+        /** Fallback when no profiles map / selected profile missing. */
+        private String apiKey = "";
+        private String baseUrl = "http://localhost:11434/v1";
+        private String model = "llama3.1";
+        private int maxTokens = 2048;
+        private int maxToolRounds = 4;
+        /** Optional YAML override; Admin system_instructions appends on top. */
+        private String systemPrompt = "";
+        private int timeoutMs = 120_000;
+        /** Default profile key when ai.model_profile setting is empty. */
+        private String defaultProfile = "local-ollama";
+        /** Named LLM endpoints Admin can select (never stores secrets in DB). */
+        private Map<String, AiProfile> profiles = new LinkedHashMap<>();
+    }
+
+    @Getter
+    @Setter
+    public static class AiProfile {
+        private String label = "";
+        private String apiKey = "";
+        private String baseUrl = "";
+        private String model = "";
     }
 }

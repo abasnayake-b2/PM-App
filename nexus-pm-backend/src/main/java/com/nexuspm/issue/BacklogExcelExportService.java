@@ -53,7 +53,7 @@ public class BacklogExcelExportService {
 
     private enum CoreField {
         PROJECT, EM, COUNTRY, VP,
-        DISPLAY_KEY, TITLE, DESCRIPTION, STATUS, PRIORITY, CAPITALIZABLE, ASSIGNEE
+        DISPLAY_KEY, JIRA_ID, TITLE, DESCRIPTION, STATUS, PRIORITY, CAPITALIZABLE, ASSIGNEE
     }
 
     private record ColumnDef(String category, String header, CoreField core, String fieldKey, ValueType type) {
@@ -69,6 +69,7 @@ public class BacklogExcelExportService {
     /** Full RD column set — Core + custom fields in the same section order as Admin RD fields. */
     private static final List<ColumnDef> COLUMNS = List.of(
             ColumnDef.core("Core", "CR No / ID", CoreField.DISPLAY_KEY, ValueType.TEXT),
+            ColumnDef.core("Core", "JIRA ID", CoreField.JIRA_ID, ValueType.TEXT),
             ColumnDef.core("Core", "Change Request Name", CoreField.TITLE, ValueType.TEXT),
             ColumnDef.core("Core", "Description", CoreField.DESCRIPTION, ValueType.WRAP),
             ColumnDef.core("Core", "Current Stage", CoreField.STATUS, ValueType.TEXT),
@@ -399,6 +400,8 @@ public class BacklogExcelExportService {
                 width = col.core == CoreField.TITLE ? 42 : 36;
             } else if (col.core == CoreField.DISPLAY_KEY) {
                 width = 22;
+            } else if (col.core == CoreField.JIRA_ID) {
+                width = 16;
             } else if (col.type == ValueType.WRAP
                     || "Risk Description".equals(col.header)
                     || "Risk Mitigation".equals(col.header)
@@ -461,6 +464,7 @@ public class BacklogExcelExportService {
                 case COUNTRY -> setText(row, col, countryName(issue), palette.text);
                 case VP -> setText(row, col, vpName(issue), palette.text);
                 case DISPLAY_KEY -> setText(row, col, displayKey(issue), palette.text);
+                case JIRA_ID -> setText(row, col, issue.getJiraId(), palette.text);
                 case TITLE -> setText(row, col, issue.getTitle(), palette.text);
                 case DESCRIPTION -> setText(row, col, issue.getDescription(), palette.wrap);
                 case STATUS -> setText(row, col,

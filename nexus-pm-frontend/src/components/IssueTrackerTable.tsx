@@ -103,14 +103,21 @@ export function IssueTrackerTable({
     [resolvedWidth],
   );
 
-  /** Freeze CR No / ID + Change Request Name while scrolling horizontally (expanded view). */
+  /** Freeze CR No / ID + JIRA ID + Change Request Name while scrolling horizontally (expanded view). */
   const stickyOffset = useCallback(
     (column: BacklogColumn): number | undefined => {
       if (density === 'compact' || !column.sticky) return undefined;
       if (column.key === 'displayKey') return 0;
-      if (column.key === 'title') {
+      if (column.key === 'jiraId') {
         const idCol = columns.find((c) => c.key === 'displayKey');
         return idCol ? (resolvedWidth(idCol) ?? 152) : 152;
+      }
+      if (column.key === 'title') {
+        const idCol = columns.find((c) => c.key === 'displayKey');
+        const jiraCol = columns.find((c) => c.key === 'jiraId');
+        const idW = idCol ? (resolvedWidth(idCol) ?? 152) : 152;
+        const jiraW = jiraCol ? (resolvedWidth(jiraCol) ?? 120) : 0;
+        return idW + jiraW;
       }
       return undefined;
     },
@@ -298,6 +305,16 @@ export function IssueTrackerTable({
           </td>
         );
       }
+      case 'jiraId':
+        return (
+          <td
+            key={column.key}
+            style={cellStyle}
+            className={`${base} ${freeze.className} font-mono text-[10px] ${compact ? 'text-text2' : theme.text}`}
+          >
+            <span className="block truncate">{issue.jiraId?.trim() ? issue.jiraId : '—'}</span>
+          </td>
+        );
       case 'title':
         return (
           <td

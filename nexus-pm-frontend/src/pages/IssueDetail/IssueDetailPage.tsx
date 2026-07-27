@@ -412,6 +412,10 @@ export function IssueDetailPage() {
           <h2 className="font-semibold">Details</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between gap-4">
+              <dt className="text-text2">JIRA ID</dt>
+              <dd className="font-mono">{issue.jiraId?.trim() ? issue.jiraId : '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
               <dt className="text-text2">Type</dt>
               <dd>
                 <IssueTypeIcon

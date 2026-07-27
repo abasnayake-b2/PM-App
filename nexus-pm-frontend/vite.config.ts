@@ -15,6 +15,9 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // Keep AI chat SSE open longer than the default proxy timeout
+        timeout: 0,
+        proxyTimeout: 0,
       },
     },
   },

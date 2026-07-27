@@ -79,6 +79,27 @@ dfnpm:
     max-size: ${CACHE_MAX_SIZE:500}
     warmup-on-startup: ${CACHE_WARMUP_ON_STARTUP:true}
     daily-refresh-cron: ${CACHE_DAILY_REFRESH_CRON:0 0 2 * * *}
+  ai:
+    enabled: ${AI_ENABLED:false}
+    api-key: ${AI_API_KEY:}
+    base-url: ${AI_BASE_URL:http://localhost:11434/v1}
+    model: ${AI_MODEL:llama3.1}
+    max-tokens: ${AI_MAX_TOKENS:2048}
+    max-tool-rounds: ${AI_MAX_TOOL_ROUNDS:4}
+    system-prompt: ${AI_SYSTEM_PROMPT:}
+    timeout-ms: ${AI_TIMEOUT_MS:120000}
+    default-profile: ${AI_DEFAULT_PROFILE:local-ollama}
+    profiles:
+      local-ollama:
+        label: Local Ollama (free)
+        base-url: ${AI_OLLAMA_BASE_URL:http://localhost:11434/v1}
+        model: ${AI_OLLAMA_MODEL:llama3.1}
+        api-key: ${AI_OLLAMA_API_KEY:ollama}
+      openai-prod:
+        label: OpenAI GPT-4o mini
+        base-url: ${AI_OPENAI_BASE_URL:https://api.openai.com/v1}
+        model: ${AI_OPENAI_MODEL:gpt-4o-mini}
+        api-key: ${OPENAI_API_KEY:}
 
 management:
   endpoints:

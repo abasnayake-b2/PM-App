@@ -2,6 +2,7 @@ package com.nexuspm.issue.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -18,6 +19,9 @@ public class CreateIssueRequest {
 
     @NotBlank
     private String title;
+
+    @Size(max = 80)
+    private String jiraId;
 
     private String description;
 

@@ -260,6 +260,14 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
             <dl className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
               <div className="col-span-2 min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5 sm:col-span-4">
                 <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+                  JIRA ID
+                </dt>
+                <dd className="mt-0.5 break-words font-mono font-medium text-text">
+                  {issue.jiraId?.trim() ? issue.jiraId : '—'}
+                </dd>
+              </div>
+              <div className="col-span-2 min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5 sm:col-span-4">
+                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
                   Change Request Name
                 </dt>
                 <dd className="mt-0.5 break-words font-medium text-text">{issue.title}</dd>

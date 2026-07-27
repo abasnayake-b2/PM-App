@@ -24,6 +24,28 @@ dfnpm:
     # Set true when Redis/Memurai is running
     redis-enabled: false
     rate-limit-enabled: false
+  # Assistant (OpenAI-compatible). Default off — no LLM cost until enabled.
+  # Local Ollama example: ollama serve && ollama pull llama3.1
+  # Schema/data: apply sql/build.sql + sql/seed.sql (AI tables/permissions included)
+  ai:
+    enabled: false
+    default-profile: local-ollama
+    api-key: ollama
+    base-url: http://localhost:11434/v1
+    model: llama3.1
+    max-tokens: 2048
+    max-tool-rounds: 4
+    profiles:
+      local-ollama:
+        label: Local Ollama (free)
+        base-url: http://localhost:11434/v1
+        model: llama3.1
+        api-key: ollama
+      openai-prod:
+        label: OpenAI GPT-4o mini
+        base-url: https://api.openai.com/v1
+        model: gpt-4o-mini
+        api-key: ${OPENAI_API_KEY:}
 
 management:
   health:

@@ -57,6 +57,8 @@ public final class Permissions {
     public static final String PMO_UPDATE = "PMO_UPDATE";
     public static final String PMO_DELETE = "PMO_DELETE";
 
+    public static final String AI_ASSISTANT_VIEW = "AI_ASSISTANT_VIEW";
+
     private Permissions() {
     }
 }

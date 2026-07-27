@@ -49,6 +49,7 @@ export function IssueEditForm({
   });
 
   const [title, setTitle] = useState(issue.title);
+  const [jiraId, setJiraId] = useState(issue.jiraId ?? '');
   const [description, setDescription] = useState(issue.description ?? '');
   const [priorityId, setPriorityId] = useState(issue.priorityId);
   const [statusId, setStatusId] = useState(issue.statusId);
@@ -63,6 +64,7 @@ export function IssueEditForm({
 
   useEffect(() => {
     setTitle(issue.title);
+    setJiraId(issue.jiraId ?? '');
     setDescription(issue.description ?? '');
     setPriorityId(issue.priorityId);
     setStatusId(issue.statusId);
@@ -116,6 +118,13 @@ export function IssueEditForm({
       customFields: normalizedFields,
     };
 
+    const trimmedJira = jiraId.trim();
+    if (trimmedJira) {
+      payload.jiraId = trimmedJira;
+    } else if (issue.jiraId) {
+      payload.clearJiraId = true;
+    }
+
     if (capitalizable === 'true') {
       payload.capitalizable = true;
     } else if (capitalizable === 'false') {
@@ -134,6 +143,20 @@ export function IssueEditForm({
           </h3>
         </div>
         <div className="space-y-2.5 p-2.5">
+          <label className="block min-w-0">
+            <span className="block text-[11px] font-medium leading-tight text-text2">
+              JIRA ID
+            </span>
+            <input
+              type="text"
+              maxLength={80}
+              value={jiraId}
+              onChange={(e) => setJiraId(e.target.value)}
+              className={rdFieldInputClass}
+              placeholder="e.g. PROJ-123"
+            />
+          </label>
+
           <label className="block min-w-0">
             <span className="block text-[11px] font-medium leading-tight text-text2">
               Change Request Name

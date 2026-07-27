@@ -177,8 +177,9 @@ export function AdminRdFieldsSection() {
         <div>
           <h2 className="text-lg font-semibold">RD fields</h2>
           <p className="mt-1 text-sm text-text2">
-            Fixed fields stay on every RD (Change Request Name, Description, Priority, Current Stage,
-            Capitalization). Manage additional global fields here — they appear on create/edit forms.
+            Fixed fields stay on every RD (JIRA ID, Change Request Name, Description, Priority,
+            Current Stage, Capitalization). Manage additional global fields here — they appear on
+            create/edit forms.
           </p>
         </div>
         {canCreate && (

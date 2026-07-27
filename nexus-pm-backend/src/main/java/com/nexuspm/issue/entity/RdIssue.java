@@ -52,6 +52,10 @@ public class RdIssue extends AuditableEntity {
     @Column(nullable = false)
     private String title;
 
+    /** External JIRA issue key / id (optional). */
+    @Column(name = "jira_id", length = 80)
+    private String jiraId;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

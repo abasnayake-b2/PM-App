@@ -72,6 +72,7 @@ export interface CreateIssuePayload {
   releaseId?: string;
   parentIssueId?: string;
   title: string;
+  jiraId?: string;
   description?: string;
   issueTypeId: string;
   priorityId: string;
@@ -85,6 +86,8 @@ export interface CreateIssuePayload {
 
 export interface UpdateIssuePayload {
   title?: string;
+  jiraId?: string;
+  clearJiraId?: boolean;
   description?: string;
   priorityId?: string;
   assignedToId?: string;

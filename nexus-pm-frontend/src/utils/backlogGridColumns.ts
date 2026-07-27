@@ -14,6 +14,7 @@ export type BacklogCategory =
 
 export type BacklogColumnKey =
   | 'displayKey'
+  | 'jiraId'
   | 'title'
   | 'description'
   | 'status'
@@ -96,6 +97,7 @@ export const CATEGORY_THEME: Record<
 /** Compact view — essentials only, in this order. */
 const COMPACT_COLUMN_KEYS: BacklogColumnKey[] = [
   'displayKey',
+  'jiraId',
   'title',
   'status',
   'project',
@@ -110,6 +112,15 @@ export function buildBacklogColumns(options: {
 }): { columns: BacklogColumn[]; categorySpans: { category: BacklogCategory; span: number }[] } {
   const allColumns: BacklogColumn[] = [
     { key: 'displayKey', category: 'Core', header: 'CR No / ID', minWidth: 'min-w-[9.5rem]', defaultWidthPx: 152, sticky: true, resizable: true },
+    {
+      key: 'jiraId',
+      category: 'Core',
+      header: 'JIRA ID',
+      minWidth: 'min-w-[7.5rem]',
+      defaultWidthPx: 120,
+      sticky: true,
+      resizable: true,
+    },
     {
       key: 'title',
       category: 'Core',

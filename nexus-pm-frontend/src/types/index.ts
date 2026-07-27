@@ -131,6 +131,7 @@ export interface Issue {
   rdNumber?: number;
   childNumber?: number;
   title: string;
+  jiraId?: string;
   description?: string;
   releaseId?: string;
   releaseName?: string;

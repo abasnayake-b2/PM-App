@@ -14,6 +14,7 @@ import {
   Network,
   Settings,
   Shield,
+  Sparkles,
   UserCircle,
   Users,
   X,
@@ -144,6 +145,13 @@ export function AppShell() {
           <NavLink to="/" end className={linkClass}>
             <LayoutDashboard size={18} />
             Dashboard
+          </NavLink>
+          )}
+
+          {can(P.AI_ASSISTANT_VIEW) && (
+          <NavLink to="/assistant" className={linkClass}>
+            <Sparkles size={18} />
+            Assistant
           </NavLink>
           )}
 

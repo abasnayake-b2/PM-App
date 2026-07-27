@@ -6,6 +6,8 @@ import { AdminRdFieldsSection } from '@/components/AdminRdFieldsSection';
 import { ProjectExcelUpload } from '@/components/ProjectExcelUpload';
 import { BacklogExcelUpload } from '@/components/BacklogExcelUpload';
 import { ListPagination } from '@/components/ListPagination';
+import { AiToolsSection } from '@/pages/Admin/AiToolsSection';
+import { AiSettingsSection } from '@/pages/Admin/AiSettingsSection';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import {
@@ -19,7 +21,18 @@ import {
   useNotificationTemplates,
 } from '@/hooks/useAdmin';
 
-type Tab = 'audit' | 'holidays' | 'workflow' | 'settings' | 'templates' | 'reference' | 'access' | 'projects' | 'rd-fields';
+type Tab =
+  | 'audit'
+  | 'holidays'
+  | 'workflow'
+  | 'settings'
+  | 'templates'
+  | 'reference'
+  | 'access'
+  | 'projects'
+  | 'rd-fields'
+  | 'ai-tools'
+  | 'ai-settings';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'audit', label: 'Audit log' },
@@ -30,6 +43,8 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'holidays', label: 'Holidays' },
   { key: 'workflow', label: 'Workflow rules' },
   { key: 'settings', label: 'Settings' },
+  { key: 'ai-tools', label: 'AI Tools' },
+  { key: 'ai-settings', label: 'AI Settings' },
   { key: 'templates', label: 'Email templates' },
 ];
 
@@ -44,6 +59,8 @@ function tabVisible(
     case 'workflow':
     case 'settings':
     case 'templates':
+    case 'ai-tools':
+    case 'ai-settings':
       return can(P.ADMIN_VIEW);
     case 'projects':
       return can(P.IMPORT_CREATE);
@@ -368,6 +385,10 @@ export function AdminPage() {
           ))}
         </div>
       )}
+
+      {tab === 'ai-tools' && can(P.ADMIN_VIEW) && <AiToolsSection />}
+
+      {tab === 'ai-settings' && can(P.ADMIN_VIEW) && <AiSettingsSection />}
 
       {tab === 'templates' && (
         <div className="mt-6 space-y-4">

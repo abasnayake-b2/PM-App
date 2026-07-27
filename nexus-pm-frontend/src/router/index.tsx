@@ -23,6 +23,7 @@ import { NotificationsPage } from '@/pages/Notifications/NotificationsPage';
 import { AdminPage } from '@/pages/Admin/AdminPage';
 import { OrgStructurePage } from '@/pages/Admin/OrgStructurePage';
 import { UserManagementPage } from '@/pages/Admin/UserManagementPage';
+import { AssistantPage } from '@/pages/Assistant/AssistantPage';
 import { AdminRoute } from '@/router/AdminRoute';
 import { PermissionRoute } from '@/router/PermissionRoute';
 import { AppShell } from '@/components/layout/AppShell';
@@ -40,6 +41,9 @@ export function AppRouter() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/account/change-password" element={<ChangePasswordPage />} />
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
+            <Route element={<PermissionRoute permission={P.AI_ASSISTANT_VIEW} />}>
+              <Route path="/assistant" element={<AssistantPage />} />
+            </Route>
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/new" element={<ProjectCreatePage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />

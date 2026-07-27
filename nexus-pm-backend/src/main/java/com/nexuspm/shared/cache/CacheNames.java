@@ -19,6 +19,7 @@ public final class CacheNames {
     public static final String FIELD_DEFS_ACTIVE = "field-defs-active";
     public static final String HOLIDAYS = "holidays";
     public static final String SETTINGS = "settings";
+    public static final String AI_TOOL_CATALOG = "ai-tool-catalog";
 
     public static final String[] ALL = {
             PRIORITIES,
@@ -36,7 +37,8 @@ public final class CacheNames {
             FIELD_DEFS_ALL,
             FIELD_DEFS_ACTIVE,
             HOLIDAYS,
-            SETTINGS
+            SETTINGS,
+            AI_TOOL_CATALOG
     };
 
     private CacheNames() {}

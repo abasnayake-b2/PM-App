@@ -127,7 +127,8 @@ INSERT INTO permission (id, name, code, module, action) VALUES
 ('b1000001-0000-0000-0000-000000000042', 'PMO pages — View',                  'PMO_VIEW',            'PMO',           'VIEW'),
 ('b1000001-0000-0000-0000-000000000043', 'PMO pages — Create',                'PMO_CREATE',          'PMO',           'CREATE'),
 ('b1000001-0000-0000-0000-000000000044', 'PMO pages — Update',                'PMO_UPDATE',          'PMO',           'UPDATE'),
-('b1000001-0000-0000-0000-000000000045', 'PMO pages — Delete',                'PMO_DELETE',          'PMO',           'DELETE');
+('b1000001-0000-0000-0000-000000000045', 'PMO pages — Delete',                'PMO_DELETE',          'PMO',           'DELETE'),
+('b1000001-0000-0000-0000-000000000046', 'AI Assistant — View',               'AI_ASSISTANT_VIEW',   'AI',            'VIEW');
 
 -- Super Admin — all privileges
 INSERT INTO role_permission (role_id, permission_id)
@@ -243,9 +244,33 @@ INSERT INTO notification_template (id, code, subject, body_template) VALUES
 
 INSERT INTO system_settings (id, setting_key, setting_value, updated_by) VALUES
 ('04000001-0000-0000-0000-000000000001', 'app.name',                       'DFN-PlanX', '77777777-7777-7777-7777-777777777701'),
-('04000001-0000-0000-0000-000000000003', 'allocation.bench.threshold_pct', '20',     '77777777-7777-7777-7777-777777777701');
+('04000001-0000-0000-0000-000000000003', 'allocation.bench.threshold_pct', '20',     '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000010', 'ai.enabled',                     'true',  '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000011', 'ai.system_instructions',         '',      '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000012', 'ai.max_tools_per_question',      '4',     '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000013', 'ai.rate_limit_per_hour',         '30',    '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000014', 'ai.model_profile',               'local-ollama', '77777777-7777-7777-7777-777777777701'),
+('04000001-0000-0000-0000-000000000015', 'ai.allowed_roles',               '',      '77777777-7777-7777-7777-777777777701');
 
--- Seeded global RD custom fields (excludes fixed columns: title, description, priority, status, capitalization).
+-- Default Active AI tools (Phase 1 seeded set)
+INSERT INTO ai_tool_catalog (id, tool_key, display_name, description, required_permission, sort_order, updated_by) VALUES
+('05000001-0000-0000-0000-000000000001', 'dashboard.summary', 'Dashboard summary',
+ 'Get high-level dashboard summary metrics for the current user''s scoped projects (counts, status rollups).',
+ 'REPORTS_VIEW', 10, '77777777-7777-7777-7777-777777777701'),
+('05000001-0000-0000-0000-000000000002', 'dashboard.overview', 'Dashboard overview',
+ 'Get detailed dashboard overview including project breakdowns and resource highlights for the current user''s scope.',
+ 'REPORTS_VIEW', 20, '77777777-7777-7777-7777-777777777701'),
+('05000001-0000-0000-0000-000000000003', 'capacity.utilisation', 'Capacity utilisation',
+ 'Get capacity utilisation for engineers over a week horizon. Use for over-allocation and who is busy next N weeks. Optional: weeks (1-52, default 12).',
+ 'ALLOCATIONS_VIEW', 30, '77777777-7777-7777-7777-777777777701'),
+('05000001-0000-0000-0000-000000000004', 'issues.statusCounts', 'Issue status counts',
+ 'Get issue status counts, optionally filtered by project, unreleased-only, priority, or type.',
+ 'ISSUES_VIEW', 40, '77777777-7777-7777-7777-777777777701'),
+('05000001-0000-0000-0000-000000000005', 'issues.crMatrix', 'CR status matrix',
+ 'Get Change Request (CR) status matrix, optionally for one project.',
+ 'ISSUES_VIEW', 50, '77777777-7777-7777-7777-777777777701');
+
+-- Seeded global RD custom fields (excludes fixed columns: jira_id, title, description, priority, status, capitalization).
 -- IDs are stable for fresh installs via seed.sql / bootstrap runner.
 
 INSERT INTO issue_field_definition

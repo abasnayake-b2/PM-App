@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS password_reset_token;
 DROP TABLE IF EXISTS refresh_token;
 DROP TABLE IF EXISTS audit_log;
 DROP TABLE IF EXISTS notification;
+DROP TABLE IF EXISTS ai_tool_catalog;
 DROP TABLE IF EXISTS system_settings;
 DROP TABLE IF EXISTS notification_template;
 DROP TABLE IF EXISTS workflow_rule;
@@ -434,6 +435,7 @@ CREATE TABLE rd_issue (
     rd_number            INT           NOT NULL,
     child_number         INT           NULL,
     title                VARCHAR(255)  NOT NULL,
+    jira_id              VARCHAR(80)   NULL,
     description          TEXT          NULL,
     issue_type_id        CHAR(36)      NOT NULL,
     priority_id          CHAR(36)      NOT NULL,
@@ -605,6 +607,19 @@ CREATE TABLE system_settings (
     created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_ss_employee FOREIGN KEY (updated_by) REFERENCES employee(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE ai_tool_catalog (
+    id                   CHAR(36)     NOT NULL PRIMARY KEY,
+    tool_key             VARCHAR(100) NOT NULL UNIQUE,
+    display_name         VARCHAR(150) NOT NULL,
+    description          TEXT         NULL,
+    required_permission  VARCHAR(80)  NULL,
+    sort_order           INT          NOT NULL DEFAULT 0,
+    updated_by           CHAR(36)     NULL,
+    created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ai_tool_employee FOREIGN KEY (updated_by) REFERENCES employee(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE audit_log (

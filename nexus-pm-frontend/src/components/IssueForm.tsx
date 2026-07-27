@@ -123,6 +123,7 @@ export function IssueForm({
       projectId: projectId || (fd.get('projectId') as string),
       parentIssueId: parentIssue?.id,
       title: (fd.get('title') as string).trim(),
+      jiraId: ((fd.get('jiraId') as string) || '').trim() || undefined,
       description: (fd.get('description') as string).trim() || undefined,
       issueTypeId: fd.get('issueTypeId') as string,
       priorityId: fd.get('priorityId') as string,
@@ -190,6 +191,17 @@ export function IssueForm({
           </select>
         </label>
       )}
+
+      <label className="block min-w-0">
+        <span className={labelText}>JIRA ID</span>
+        <input
+          name="jiraId"
+          type="text"
+          maxLength={80}
+          className={inputClass}
+          placeholder="e.g. PROJ-123"
+        />
+      </label>
 
       <label className="block min-w-0">
         <span className={labelText}>Change Request Name</span>

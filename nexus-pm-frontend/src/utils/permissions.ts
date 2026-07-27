@@ -42,6 +42,7 @@ export const P = {
   PMO_CREATE: 'PMO_CREATE',
   PMO_UPDATE: 'PMO_UPDATE',
   PMO_DELETE: 'PMO_DELETE',
+  AI_ASSISTANT_VIEW: 'AI_ASSISTANT_VIEW',
 } as const;
 
 export type PermissionCode = (typeof P)[keyof typeof P];
