@@ -25,6 +25,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenBlacklistService tokenBlacklistService;
     private final CustomUserDetailsService userDetailsService;
 
+    /**
+     * SSE / async completion re-dispatches the request; JWT must apply there too
+     * or Spring Security sees an anonymous user after the stream is already committed.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {

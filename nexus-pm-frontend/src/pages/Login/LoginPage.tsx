@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { Eye, EyeOff, Globe2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react';
 import { login } from '@/api/auth.api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -233,10 +233,6 @@ export function LoginPage() {
             </form>
 
             <div className="mt-6 grid grid-cols-1 gap-2.5 border-t border-border/80 pt-4 text-xs text-text2">
-              <div className="flex items-start gap-2">
-                <Globe2 size={14} className="mt-0.5 shrink-0 text-accent" />
-                <span>Built for DirectFN delivery teams worldwide</span>
-              </div>
               <div className="flex items-start gap-2">
                 <ShieldCheck size={14} className="mt-0.5 shrink-0 text-accent" />
                 <span>Secure access to backlog & capacity planning</span>

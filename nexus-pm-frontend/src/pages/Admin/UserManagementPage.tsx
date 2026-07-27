@@ -16,7 +16,7 @@ import {
 } from '@/hooks/useUserManagement';
 import type { UserAccount } from '@/api/userManagement.api';
 import type { CreateUserAccountPayload, UpdateUserAccountPayload } from '@/api/userManagement.api';
-import { isAdminRole, isDeliveryManagerRole } from '@/utils/orgRoles';
+import { isAdminRole, isDeliveryManagerRole, hasEmployeeAppRole } from '@/utils/orgRoles';
 
 function isCxoRole(role?: string | null): boolean {
   return role === 'CXO' || role === 'CTO';
@@ -78,12 +78,13 @@ export function UserManagementPage() {
     const afterVp = afterCxo.filter((u) => !has(u, isVpRole));
     const managerUsers = afterVp.filter(
       (u) =>
-        has(u, isManagerGridRole) ||
-        (!!u.managementId &&
-          !has(u, isAdminRole) &&
-          !has(u, isCxoRole) &&
-          !has(u, isVpRole) &&
-          !has(u, isManagerGridRole)),
+        !hasEmployeeAppRole(u.roleCodes, u.roleCode) &&
+        (has(u, isManagerGridRole) ||
+          (!!u.managementId &&
+            !has(u, isAdminRole) &&
+            !has(u, isCxoRole) &&
+            !has(u, isVpRole) &&
+            !has(u, isManagerGridRole))),
     );
     const placed = new Set(
       [...adminUsers, ...cxoUsers, ...vpUsers, ...managerUsers].map((u) => u.id),
@@ -247,7 +248,7 @@ export function UserManagementPage() {
           />
           <UserAccountGrid
             title="Employee"
-            description="Logins linked to the employee roster (not on management)."
+            description="Users with the Employee role (may also have other roles such as PM)."
             users={employeeUsers}
             emptyMessage={
               search

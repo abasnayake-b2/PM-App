@@ -39,6 +39,16 @@ export function isDeliveryManagerRole(role?: string | null): boolean {
   );
 }
 
+/** True when the login includes the Employee app role (may be combined with PM, etc.). */
+export function isEmployeeAppRole(role?: string | null): boolean {
+  return (role ?? '').toUpperCase() === 'EMPLOYEE';
+}
+
+export function hasEmployeeAppRole(roleCodes?: string[] | null, fallbackRole?: string | null): boolean {
+  const codes = roleCodes?.length ? roleCodes : fallbackRole ? [fallbackRole] : [];
+  return codes.some((code) => isEmployeeAppRole(code));
+}
+
 export function isManagerOrAboveRole(role?: string | null): boolean {
   return isAdminRole(role) || isManagerRole(role) || isDeliveryManagerRole(role);
 }

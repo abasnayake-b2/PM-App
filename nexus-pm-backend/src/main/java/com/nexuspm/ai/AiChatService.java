@@ -39,15 +39,16 @@ public class AiChatService {
             for the logged-in user using only the provided tools.
             Rules:
             - Never invent numbers, names, or statuses. If tools do not return data, say so.
-            - Prefer concise answers with clear bullet points or short tables in Markdown.
+            - Answer in plain language for humans. Prefer short Markdown (bullets, bold names).
+            - NEVER paste raw tool JSON, UUIDs lists, or "here is the JSON" dumps into the user-facing answer.
+            - Summarise tool results: for over-allocation questions, list people who are over capacity \
+            (typically allocatedPct above 100, or clearly overloaded). If none are over-allocated, say so clearly.
             - Respect that data is already scoped to the user's organisation permissions.
             - If a needed tool is unavailable, explain the limitation briefly.
             - Do not claim to change data; you are read-only.
-            - When possible, end your final reply with a fenced JSON block matching this schema \
-            (title, summary, metrics[{label,value}], tables[{title,columns,rows}], caveats[], sources[{toolKey,label,href}]):
-            ```json
-            {"title":"...","summary":"...","metrics":[],"tables":[],"caveats":[],"sources":[]}
-            ```
+            - Optionally append ONE fenced ```json block with this schema only \
+            (title, summary, metrics[{label,value}], tables[{title,columns,rows}], caveats[], sources[{toolKey,label,href}]). \
+            Do not put the tool payload itself in that block.
             """;
 
     private final DfnPmProperties properties;
