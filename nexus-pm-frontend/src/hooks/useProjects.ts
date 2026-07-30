@@ -6,6 +6,7 @@ import {
   fetchProjectHealthLog,
   fetchReleases,
   createRelease,
+  deleteRelease,
   createProject,
   updateProject,
   archiveProject,
@@ -68,6 +69,17 @@ export function useCreateRelease(projectId: string) {
       createRelease({ ...payload, projectId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['releases', projectId] });
+    },
+  });
+}
+
+export function useDeleteRelease(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteRelease,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['releases', projectId] });
+      qc.invalidateQueries({ queryKey: ['issues'] });
     },
   });
 }

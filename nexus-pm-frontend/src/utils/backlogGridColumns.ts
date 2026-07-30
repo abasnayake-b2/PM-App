@@ -189,28 +189,6 @@ export function buildBacklogColumns(options: {
     { key: 'cf:prod_date', category: 'Milestones', header: 'Prod Date', minWidth: 'min-w-[6.5rem]', resizable: true },
 
     {
-      key: 'cf:risk_description',
-      category: 'Risk',
-      header: 'Risk Description',
-      minWidth: 'min-w-[12rem]',
-      defaultWidthPx: 240,
-      resizable: true,
-    },
-    { key: 'cf:risk_created_date', category: 'Risk', header: 'Risk Created Date', minWidth: 'min-w-[7.5rem]', resizable: true },
-    { key: 'cf:risk_owner', category: 'Risk', header: 'Risk Owner', minWidth: 'min-w-[7rem]', resizable: true },
-    { key: 'cf:risk_status', category: 'Risk', header: 'Risk Status', minWidth: 'min-w-[6.5rem]', resizable: true },
-    { key: 'cf:risk_impact', category: 'Risk', header: 'Risk Impact', minWidth: 'min-w-[6rem]', resizable: true },
-    { key: 'cf:risk_closed_date', category: 'Risk', header: 'Risk Closed Date', minWidth: 'min-w-[7.5rem]', resizable: true },
-    {
-      key: 'cf:risk_mitigation',
-      category: 'Risk',
-      header: 'Risk Mitigation',
-      minWidth: 'min-w-[12rem]',
-      defaultWidthPx: 240,
-      resizable: true,
-    },
-
-    {
       key: 'cf:notes',
       category: 'Other',
       header: 'Notes',

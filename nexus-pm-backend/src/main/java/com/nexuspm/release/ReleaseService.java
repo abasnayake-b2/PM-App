@@ -1,5 +1,6 @@
 package com.nexuspm.release;
 
+import com.nexuspm.issue.repository.RdIssueRepository;
 import com.nexuspm.project.ProjectService;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.repository.ProjectRepository;
@@ -24,6 +25,7 @@ public class ReleaseService {
     private final ReleaseRepository releaseRepository;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
+    private final RdIssueRepository rdIssueRepository;
     private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
@@ -68,6 +70,21 @@ public class ReleaseService {
 
         auditLogService.log(SecurityUtils.currentUserId(), "CREATE", "RELEASE", release.getId(), release.getName(), null);
         return toResponse(release);
+    }
+
+    @Transactional
+    public void deleteRelease(UUID id) {
+        if (!SecurityUtils.isManagerOrAbove()) {
+            throw new BusinessException("ACCESS_DENIED", "Only managers can delete releases", 403);
+        }
+        Release release = releaseRepository.findWithProjectById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Release not found", 404));
+        projectService.getProject(release.getProject().getId());
+
+        rdIssueRepository.clearReleaseByReleaseId(id);
+        String name = release.getName();
+        releaseRepository.delete(release);
+        auditLogService.log(SecurityUtils.currentUserId(), "DELETE", "RELEASE", id, name, null);
     }
 
     private ReleaseResponse toResponse(Release release) {

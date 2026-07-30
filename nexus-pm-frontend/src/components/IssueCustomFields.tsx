@@ -8,13 +8,17 @@ import {
 
 /** Compact controls for RD panel grids — accent focus, soft fill. */
 export const rdFieldInputClass =
-  'mt-0.5 box-border h-8 w-full min-w-0 rounded-md border border-border bg-bg px-2 py-1 text-xs text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-[color:var(--accent-muted)]';
+  'mt-0.5 box-border h-6 w-full min-w-0 rounded border border-border bg-bg px-1.5 py-0.5 text-[11px] text-text outline-none transition focus:border-accent focus:ring-1 focus:ring-[color:var(--accent-muted)]';
 
 export const rdFieldInputErrorClass =
-  'mt-0.5 box-border h-8 w-full min-w-0 rounded-md border border-danger bg-bg px-2 py-1 text-xs text-text outline-none transition focus:border-danger focus:ring-2 focus:ring-danger/30';
+  'mt-0.5 box-border h-6 w-full min-w-0 rounded border border-danger bg-bg px-1.5 py-0.5 text-[11px] text-text outline-none transition focus:border-danger focus:ring-1 focus:ring-danger/30';
 
 export const rdFieldTextareaClass =
-  'mt-0.5 box-border w-full min-w-0 rounded-md border border-border bg-bg px-2 py-1.5 text-xs text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-[color:var(--accent-muted)]';
+  'mt-0.5 box-border w-full min-w-0 rounded border border-border bg-bg px-1.5 py-1 text-[11px] text-text outline-none transition focus:border-accent focus:ring-1 focus:ring-[color:var(--accent-muted)]';
+
+/** Field label above each input — left-aligned and bold. */
+export const rdFieldLabelClass =
+  'mb-0.5 block truncate px-0.5 py-0.5 text-left text-[10px] font-bold leading-tight text-text';
 
 export const ISSUE_FIELD_SECTION_LABELS: Record<string, string> = {
   GENERAL: 'General',
@@ -56,13 +60,13 @@ export function RdSectionCard({
       }`}
     >
       <div
-        className={`border-b border-border bg-gradient-to-r px-2.5 py-1.5 ${tint}`}
+        className={`border-b border-border bg-gradient-to-r px-2 py-1 ${tint}`}
       >
         <h4 className="text-[10px] font-semibold uppercase tracking-wider text-accent">
           {title}
         </h4>
       </div>
-      <div className="p-2.5">{children}</div>
+      <div className="p-2">{children}</div>
     </section>
   );
 }
@@ -71,6 +75,8 @@ export function groupIssueFieldsBySection(fields: IssueFieldDefinition[]) {
   const groups = new Map<string, IssueFieldDefinition[]>();
   for (const field of fields) {
     const key = field.sectionCode?.trim() || 'OTHER';
+    // Multi-row risks use IssueRisksSection / rd_issue_risk — skip flat RISK defs.
+    if (key === 'RISK') continue;
     const list = groups.get(key) ?? [];
     list.push(field);
     groups.set(key, list);
@@ -111,13 +117,14 @@ export function IssueCustomFieldsEditor({
   if (fields.length === 0) return null;
 
   const groups = groupIssueFieldsBySection(fields);
+  // Dense: ~6–8 fields per row so most sections fit in 1–2 rows on the half-width RD panel.
   const gridClass = compact
-    ? 'grid grid-cols-2 gap-x-1.5 gap-y-2 sm:grid-cols-4'
+    ? 'grid grid-cols-3 gap-x-1 gap-y-1.5 sm:grid-cols-6 lg:grid-cols-7'
     : 'grid gap-3 sm:grid-cols-2';
-  const longSpan = compact ? 'col-span-2 sm:col-span-4' : 'sm:col-span-2';
+  const longSpan = compact ? 'col-span-3 sm:col-span-6 lg:col-span-7' : 'sm:col-span-2';
 
   return (
-    <div className={compact ? 'space-y-2.5' : 'space-y-5'}>
+    <div className={compact ? 'space-y-2' : 'space-y-5'}>
       {groups.map((group) => (
         <RdSectionCard
           key={group.sectionCode}
@@ -131,17 +138,13 @@ export function IssueCustomFieldsEditor({
               const error = fieldErrors[field.fieldKey];
               const inputClass = error ? rdFieldInputErrorClass : rdFieldInputClass;
               const label = (
-                <span
-                  className={`block truncate font-medium leading-tight text-text2 ${
-                    compact ? 'text-[11px]' : 'text-sm'
-                  }`}
-                >
+                <span className={rdFieldLabelClass}>
                   {field.label}
                   {field.required ? <span className="text-danger"> *</span> : null}
                 </span>
               );
               const errorHint = error ? (
-                <span className="mt-0.5 block text-[10px] leading-snug text-danger">{error}</span>
+                <span className="mt-0.5 block text-[9px] leading-snug text-danger">{error}</span>
               ) : null;
 
               if (field.dataType === 'DROPDOWN') {
@@ -319,7 +322,7 @@ export function IssueCustomFieldsView({ fields, values }: IssueCustomFieldsViewP
   const groups = groupIssueFieldsBySection(fields);
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       {groups.map((group) => (
         <RdSectionCard
           key={group.sectionCode}
@@ -327,19 +330,25 @@ export function IssueCustomFieldsView({ fields, values }: IssueCustomFieldsViewP
           sectionCode={group.sectionCode}
           mode="view"
         >
-          <dl className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
+          <dl className="grid grid-cols-3 gap-1 text-[11px] sm:grid-cols-6 lg:grid-cols-7">
             {group.items.map((field) => {
               const raw = (map[field.fieldKey] ?? '').trim();
+              const isLong =
+                field.fieldKey.includes('notes') ||
+                field.fieldKey.includes('description') ||
+                field.fieldKey.includes('mitigation');
               return (
                 <div
                   key={field.id}
-                  className="min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5"
+                  className={`min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 ${
+                    isLong ? 'col-span-3 sm:col-span-6 lg:col-span-7' : ''
+                  }`}
                 >
-                  <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+                  <dt className="mb-0.5 truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                     {field.label}
                   </dt>
                   <dd
-                    className={`mt-0.5 whitespace-pre-wrap break-words text-xs ${
+                    className={`mt-0.5 whitespace-pre-wrap break-words text-[11px] leading-snug ${
                       raw ? 'font-medium text-text' : 'text-text3'
                     }`}
                   >

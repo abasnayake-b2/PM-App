@@ -59,7 +59,7 @@ export function IssueCreateSlideOverPanel({
     <SlideOverPanel
       title="New item"
       subtitle={subtitle}
-      size="third"
+      size="half"
       accent
       onClose={onClose}
     >

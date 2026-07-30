@@ -101,6 +101,10 @@ export async function createRelease(payload: CreateReleasePayload): Promise<Rele
   return data;
 }
 
+export async function deleteRelease(id: string): Promise<void> {
+  await api.delete(`/releases/${id}`);
+}
+
 export async function updateProjectRag(id: string, ragStatus: string, notes?: string): Promise<Project> {
   const { data } = await api.patch<Project>(`/projects/${id}/rag`, { ragStatus, notes });
   return data;

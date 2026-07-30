@@ -452,4 +452,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
     @Modifying
     @Query("UPDATE RdIssue i SET i.reportedBy = NULL WHERE i.reportedBy.id IN :employeeIds")
     void clearReporterByEmployeeIds(@Param("employeeIds") List<UUID> employeeIds);
+
+    @Modifying
+    @Query("UPDATE RdIssue i SET i.release = NULL WHERE i.release.id = :releaseId")
+    int clearReleaseByReleaseId(@Param("releaseId") UUID releaseId);
 }

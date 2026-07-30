@@ -8,8 +8,10 @@ import { fetchActiveIssueFields } from '@/api/issueFields.api';
 import {
   IssueCustomFieldsEditor,
   rdFieldInputClass,
+  rdFieldLabelClass,
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
+import { IssueRisksSection } from '@/components/IssueRisksSection';
 import {
   firstCustomFieldErrorMessage,
   sanitizePercentageCompletionInput,
@@ -144,7 +146,7 @@ export function IssueEditForm({
         </div>
         <div className="space-y-2.5 p-2.5">
           <label className="block min-w-0">
-            <span className="block text-[11px] font-medium leading-tight text-text2">
+            <span className={rdFieldLabelClass}>
               JIRA ID
             </span>
             <input
@@ -158,7 +160,7 @@ export function IssueEditForm({
           </label>
 
           <label className="block min-w-0">
-            <span className="block text-[11px] font-medium leading-tight text-text2">
+            <span className={rdFieldLabelClass}>
               Change Request Name
             </span>
             <input
@@ -172,7 +174,7 @@ export function IssueEditForm({
           </label>
 
           <label className="block min-w-0">
-            <span className="block text-[11px] font-medium leading-tight text-text2">
+            <span className={rdFieldLabelClass}>
               Description
             </span>
             <textarea
@@ -184,9 +186,9 @@ export function IssueEditForm({
             />
           </label>
 
-          <div className="grid grid-cols-2 gap-x-1.5 gap-y-2 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-x-1 gap-y-1.5 sm:grid-cols-6">
             <label className="min-w-0 block">
-              <span className="block text-[11px] font-medium leading-tight text-text2">Priority</span>
+              <span className={rdFieldLabelClass}>Priority</span>
               <select
                 required
                 value={priorityId}
@@ -202,7 +204,7 @@ export function IssueEditForm({
             </label>
 
             <label className="min-w-0 block">
-              <span className="block text-[11px] font-medium leading-tight text-text2">
+              <span className={rdFieldLabelClass}>
                 Current Stage
               </span>
               <select
@@ -220,7 +222,7 @@ export function IssueEditForm({
             </label>
 
             <label className="min-w-0 block">
-              <span className="block text-[11px] font-medium leading-tight text-text2">
+              <span className={rdFieldLabelClass}>
                 Capitalization
               </span>
               <select
@@ -244,6 +246,8 @@ export function IssueEditForm({
         fieldErrors={fieldErrors}
         compact
       />
+
+      <IssueRisksSection issueId={issue.id} mode="edit" />
 
       {errorMessage && (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-2 py-1.5 text-xs text-danger">

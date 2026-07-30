@@ -30,6 +30,7 @@ import {
   IssueCustomFieldsView,
   RdSectionCard,
 } from '@/components/IssueCustomFields';
+import { IssueRisksSection } from '@/components/IssueRisksSection';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { sumAllocationPercent } from '@/utils/allocationUi';
@@ -152,7 +153,7 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
   const subtitle = issue?.title;
 
   return (
-    <SlideOverPanel title={title} subtitle={subtitle} onClose={onClose} size="third" accent>
+    <SlideOverPanel title={title} subtitle={subtitle} onClose={onClose} size="half" accent>
       {isLoading && <p className="text-text2">Loading issue…</p>}
       {error && !isLoading && <p className="text-danger">Issue not found or access denied.</p>}
 
@@ -257,38 +258,38 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
           </RdSectionCard>
 
           <RdSectionCard title="Details" sectionCode="GENERAL" mode="view">
-            <dl className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
-              <div className="col-span-2 min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5 sm:col-span-4">
-                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+            <dl className="grid grid-cols-3 gap-1 text-[11px] sm:grid-cols-6">
+              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-2">
+                <dt className="mb-0.5 truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   JIRA ID
                 </dt>
-                <dd className="mt-0.5 break-words font-mono font-medium text-text">
+                <dd className="mt-0.5 break-words font-mono text-[11px] font-medium leading-snug text-text">
                   {issue.jiraId?.trim() ? issue.jiraId : '—'}
                 </dd>
               </div>
-              <div className="col-span-2 min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5 sm:col-span-4">
-                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-4">
+                <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   Change Request Name
                 </dt>
-                <dd className="mt-0.5 break-words font-medium text-text">{issue.title}</dd>
+                <dd className="mt-0.5 break-words text-[11px] font-medium leading-snug text-text">{issue.title}</dd>
               </div>
-              <div className="min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5">
-                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+              <div className="min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1">
+                <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   Priority
                 </dt>
-                <dd className="mt-0.5 font-medium text-text">{issue.priorityLabel ?? '—'}</dd>
+                <dd className="mt-0.5 font-medium leading-snug text-text">{issue.priorityLabel ?? '—'}</dd>
               </div>
-              <div className="min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5">
-                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+              <div className="min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1">
+                <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   Current Stage
                 </dt>
-                <dd className="mt-0.5 font-medium text-text">{issue.statusName ?? '—'}</dd>
+                <dd className="mt-0.5 font-medium leading-snug text-text">{issue.statusName ?? '—'}</dd>
               </div>
-              <div className="min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5">
-                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+              <div className="min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1">
+                <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   Capitalization
                 </dt>
-                <dd className="mt-0.5 font-medium text-text">
+                <dd className="mt-0.5 font-medium leading-snug text-text">
                   {issue.capitalizable == null
                     ? '—'
                     : issue.capitalizable
@@ -296,24 +297,26 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
                       : 'No'}
                 </dd>
               </div>
-              <div className="min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5">
-                <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+              <div className="min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1">
+                <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   Reporter
                 </dt>
-                <dd className="mt-0.5 font-medium text-text">{issue.reportedByName ?? '—'}</dd>
+                <dd className="mt-0.5 font-medium leading-snug text-text">{issue.reportedByName ?? '—'}</dd>
               </div>
               {issue.utilizationPct != null && issue.utilizationPct > 0 && (
-                <div className="min-w-0 rounded-md border border-border/80 bg-bg px-2 py-1.5">
-                  <dt className="truncate text-[10px] font-medium uppercase tracking-wide text-text2">
+                <div className="min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1">
+                  <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                     Utilization
                   </dt>
-                  <dd className="mt-0.5 font-medium text-text">{issue.utilizationPct}%</dd>
+                  <dd className="mt-0.5 font-medium leading-snug text-text">{issue.utilizationPct}%</dd>
                 </div>
               )}
             </dl>
           </RdSectionCard>
 
           <IssueCustomFieldsView fields={customFieldDefs} values={issue.customFields} />
+
+          <IssueRisksSection issueId={issue.id} mode="view" />
 
           <div
             className={
