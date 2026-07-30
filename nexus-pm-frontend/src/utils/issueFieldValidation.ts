@@ -18,8 +18,6 @@ const FIELD_LABELS: Record<string, string> = {
   uat_start_date: 'UAT Start Date',
   uat_end_date: 'UAT End Date',
   prod_date: 'Prod Date',
-  risk_created_date: 'Risk Created Date',
-  risk_closed_date: 'Risk Closed Date',
 };
 
 /** Ordered date chains: each filled date must be on or after earlier filled dates in the chain. */
@@ -42,7 +40,6 @@ export const DATE_CHAINS: string[][] = [
     'uat_end_date',
     'prod_date',
   ],
-  ['risk_created_date', 'risk_closed_date'],
 ];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

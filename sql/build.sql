@@ -506,6 +506,75 @@ CREATE TABLE issue_field_value (
     CONSTRAINT fk_ifv_def   FOREIGN KEY (field_definition_id) REFERENCES issue_field_definition(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Multiple risks per RD (replaces flat risk_* custom fields on forms)
+CREATE TABLE rd_issue_risk (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    issue_id        CHAR(36)     NOT NULL,
+    risk_number     INT          NOT NULL,
+    description     TEXT         NULL,
+    created_date    DATE         NULL,
+    owner           VARCHAR(120) NULL,
+    status          VARCHAR(40)  NULL,
+    impact          VARCHAR(40)  NULL,
+    closed_date     DATE         NULL,
+    mitigation      TEXT         NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_issue_risk_number (issue_id, risk_number),
+    KEY idx_issue_risk_issue (issue_id, deleted),
+    CONSTRAINT fk_issue_risk_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Multiple risks per project
+CREATE TABLE project_risk (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    project_id      CHAR(36)     NOT NULL,
+    risk_number     INT          NOT NULL,
+    description     TEXT         NULL,
+    created_date    DATE         NULL,
+    owner           VARCHAR(120) NULL,
+    status          VARCHAR(40)  NULL,
+    impact          VARCHAR(40)  NULL,
+    closed_date     DATE         NULL,
+    mitigation      TEXT         NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_project_risk_number (project_id, risk_number),
+    KEY idx_project_risk_project (project_id, deleted),
+    CONSTRAINT fk_project_risk_project FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Multiple risks per release
+CREATE TABLE release_risk (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    release_id      CHAR(36)     NOT NULL,
+    risk_number     INT          NOT NULL,
+    description     TEXT         NULL,
+    created_date    DATE         NULL,
+    owner           VARCHAR(120) NULL,
+    status          VARCHAR(40)  NULL,
+    impact          VARCHAR(40)  NULL,
+    closed_date     DATE         NULL,
+    mitigation      TEXT         NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_release_risk_number (release_id, risk_number),
+    KEY idx_release_risk_release (release_id, deleted),
+    CONSTRAINT fk_release_risk_release FOREIGN KEY (release_id) REFERENCES `release`(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE task (
     id          CHAR(36)     NOT NULL PRIMARY KEY,
     issue_id    CHAR(36)     NOT NULL,

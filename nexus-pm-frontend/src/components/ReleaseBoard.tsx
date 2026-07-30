@@ -1,19 +1,31 @@
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';import type { Allocation, Issue, Release } from '@/types';
+import { Plus, Trash2 } from 'lucide-react';
+import type { Allocation, Issue, Release } from '@/types';
 import { useUpdateIssue } from '@/hooks/useIssues';
+import { useDeleteRelease } from '@/hooks/useProjects';
 import { ReleaseIssueTree } from '@/components/ReleaseIssueTree';
+import { ReleaseRisksSection } from '@/components/ReleaseRisksSection';
 
 interface ReleaseBoardProps {
+  projectId: string;
   releases: Release[];
   issues: Issue[];
   allocations: Allocation[];
-  isManagerOrAbove: boolean;
+  canManage: boolean;
 }
 
-export function ReleaseBoard({ releases, issues, allocations, isManagerOrAbove }: ReleaseBoardProps) {
+export function ReleaseBoard({
+  projectId,
+  releases,
+  issues,
+  allocations,
+  canManage,
+}: ReleaseBoardProps) {
   const updateIssue = useUpdateIssue();
+  const deleteRelease = useDeleteRelease(projectId);
   const [addingToReleaseId, setAddingToReleaseId] = useState<string | null>(null);
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
+  const [removingIssueId, setRemovingIssueId] = useState<string | null>(null);
 
   const backlog = useMemo(() => issues.filter((issue) => !issue.releaseId), [issues]);
 
@@ -50,6 +62,24 @@ export function ReleaseBoard({ releases, issues, allocations, isManagerOrAbove }
     setSelectedIssueIds([]);
   };
 
+  const removeIssue = async (issueId: string) => {
+    setRemovingIssueId(issueId);
+    try {
+      await updateIssue.mutateAsync({ id: issueId, clearRelease: true });
+    } finally {
+      setRemovingIssueId(null);
+    }
+  };
+
+  const handleDeleteRelease = (release: Release, issueCount: number) => {
+    const suffix =
+      issueCount > 0
+        ? ` ${issueCount} RD${issueCount === 1 ? '' : 's'} will return to the backlog.`
+        : '';
+    if (!window.confirm(`Delete release "${release.name}"?${suffix}`)) return;
+    deleteRelease.mutate(release.id);
+  };
+
   return (
     <div className="space-y-6">
       {releases.map((release) => {
@@ -70,22 +100,35 @@ export function ReleaseBoard({ releases, issues, allocations, isManagerOrAbove }
                   )}
                 </p>
               </div>
-              {isManagerOrAbove && !isAdding && backlog.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => openAddIssues(release.id)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium"
-                  style={{ color: 'var(--accent-fg)' }}
-                >
-                  <Plus size={14} />
-                  Add issues
-                </button>
+              {canManage && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {!isAdding && backlog.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openAddIssues(release.id)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium"
+                      style={{ color: 'var(--accent-fg)' }}
+                    >
+                      <Plus size={14} />
+                      Add RDs
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteRelease(release, releaseIssues.length)}
+                    disabled={deleteRelease.isPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-danger hover:bg-bg3 disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />
+                    Delete
+                  </button>
+                </div>
               )}
             </div>
 
             {isAdding && (
               <div className="mt-4 rounded-lg border border-border bg-bg3 p-4">
-                <p className="text-sm font-medium">Select backlog issues to add</p>
+                <p className="text-sm font-medium">Select backlog RDs to add</p>
                 <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                   {backlog.map((issue) => (
                     <li key={issue.id}>
@@ -109,7 +152,7 @@ export function ReleaseBoard({ releases, issues, allocations, isManagerOrAbove }
                     className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium disabled:opacity-50"
                     style={{ color: 'var(--accent-fg)' }}
                   >
-                    {updateIssue.isPending ? 'Adding…' : `Add ${selectedIssueIds.length || ''} issue(s)`}
+                    {updateIssue.isPending ? 'Adding…' : `Add ${selectedIssueIds.length || ''} RD(s)`}
                   </button>
                   <button
                     type="button"
@@ -125,7 +168,17 @@ export function ReleaseBoard({ releases, issues, allocations, isManagerOrAbove }
               </div>
             )}
 
-            <ReleaseIssueTree issues={releaseIssues} allocations={allocations} />
+            <ReleaseIssueTree
+              issues={releaseIssues}
+              allocations={allocations}
+              canRemove={canManage}
+              removingIssueId={removingIssueId}
+              onRemove={removeIssue}
+            />
+
+            <div className="mt-4">
+              <ReleaseRisksSection releaseId={release.id} />
+            </div>
           </section>
         );
       })}

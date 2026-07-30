@@ -15,6 +15,7 @@ import { P } from '@/utils/permissions';
 import { sumAllocationPercent } from '@/utils/allocationUi';
 import { fetchActiveIssueFields } from '@/api/issueFields.api';
 import { IssueCustomFieldsView } from '@/components/IssueCustomFields';
+import { IssueRisksSection } from '@/components/IssueRisksSection';
 import { allowedChildWorkflowCodes, canHaveChildren, childCreateUrl } from '@/utils/issueHierarchy';
 
 export function IssueDetailPage() {
@@ -461,6 +462,8 @@ export function IssueDetailPage() {
           <h2 className="mb-3 font-semibold">Additional fields</h2>
           <IssueDetailCustomFields values={issue.customFields} />
         </section>
+
+        <IssueRisksSection issueId={issue.id} mode="view" />
       </div>
     </div>
   );

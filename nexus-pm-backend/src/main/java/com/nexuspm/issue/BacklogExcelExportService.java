@@ -119,14 +119,6 @@ public class BacklogExcelExportService {
             ColumnDef.field("Milestones", "UAT End Date", "uat_end_date", ValueType.DATE),
             ColumnDef.field("Milestones", "Prod Date", "prod_date", ValueType.DATE),
 
-            ColumnDef.field("Risk", "Risk Description", "risk_description", ValueType.WRAP),
-            ColumnDef.field("Risk", "Risk Created Date", "risk_created_date", ValueType.DATE),
-            ColumnDef.field("Risk", "Risk Owner", "risk_owner", ValueType.TEXT),
-            ColumnDef.field("Risk", "Risk Status", "risk_status", ValueType.TEXT),
-            ColumnDef.field("Risk", "Risk Impact", "risk_impact", ValueType.TEXT),
-            ColumnDef.field("Risk", "Risk Closed Date", "risk_closed_date", ValueType.DATE),
-            ColumnDef.field("Risk", "Risk Mitigation", "risk_mitigation", ValueType.WRAP),
-
             ColumnDef.field("Other", "Notes", "notes", ValueType.WRAP)
     );
 
@@ -403,8 +395,6 @@ public class BacklogExcelExportService {
             } else if (col.core == CoreField.JIRA_ID) {
                 width = 16;
             } else if (col.type == ValueType.WRAP
-                    || "Risk Description".equals(col.header)
-                    || "Risk Mitigation".equals(col.header)
                     || "Notes".equals(col.header)) {
                 width = 32;
             } else if (col.core == CoreField.EM || col.core == CoreField.VP || col.core == CoreField.COUNTRY) {

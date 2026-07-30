@@ -30,4 +30,11 @@ public class ReleaseController {
     public ReleaseResponse createRelease(@Valid @RequestBody CreateReleaseRequest request) {
         return releaseService.createRelease(request);
     }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perm.can('RELEASES_CREATE')")
+    public void deleteRelease(@PathVariable UUID id) {
+        releaseService.deleteRelease(id);
+    }
 }

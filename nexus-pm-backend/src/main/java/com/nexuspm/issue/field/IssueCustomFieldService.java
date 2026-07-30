@@ -43,8 +43,7 @@ public class IssueCustomFieldService {
                     "sit_end_date",
                     "uat_start_date",
                     "uat_end_date",
-                    "prod_date"),
-            List.of("risk_created_date", "risk_closed_date"));
+                    "prod_date"));
 
     private final IssueFieldDefinitionRepository definitionRepository;
     private final IssueFieldValueRepository valueRepository;

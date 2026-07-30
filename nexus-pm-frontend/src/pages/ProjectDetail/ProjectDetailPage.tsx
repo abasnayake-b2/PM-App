@@ -8,6 +8,7 @@ import { ProjectForm } from '@/components/ProjectForm';
 import { ReleaseForm } from '@/components/ReleaseForm';
 import { ProjectBacklogTab } from '@/components/ProjectBacklogTab';
 import { ReleaseBoard } from '@/components/ReleaseBoard';
+import { ProjectRisksSection } from '@/components/ProjectRisksSection';
 import {
   useProject,
   useProjectHealthLog,
@@ -233,26 +234,30 @@ export function ProjectDetailPage() {
       </div>
 
       {tab === 'overview' && editing && canEditProject && (
-        <div className="mt-6 max-w-2xl">
-          <ProjectForm
-            mode="edit"
-            initial={project}
-            clients={clients?.map((c) => ({ id: c.id, label: c.name })) ?? []}
-            rosterEmployees={rosterEmployees}
-            engineeringManagerOptions={engineeringManagerOptions}
-            loading={updateProject.isPending}
-            onCancel={() => setEditing(false)}
-            onSubmit={(payload) => {
-              updateProject.mutate(payload as UpdateProjectPayload, {
-                onSuccess: () => setEditing(false),
-              });
-            }}
-          />
+        <div className="mt-6 space-y-6">
+          <div className="max-w-2xl">
+            <ProjectForm
+              mode="edit"
+              initial={project}
+              clients={clients?.map((c) => ({ id: c.id, label: c.name })) ?? []}
+              rosterEmployees={rosterEmployees}
+              engineeringManagerOptions={engineeringManagerOptions}
+              loading={updateProject.isPending}
+              onCancel={() => setEditing(false)}
+              onSubmit={(payload) => {
+                updateProject.mutate(payload as UpdateProjectPayload, {
+                  onSuccess: () => setEditing(false),
+                });
+              }}
+            />
+          </div>
+          {id && <ProjectRisksSection projectId={id} />}
         </div>
       )}
 
       {tab === 'overview' && !editing && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="mt-6 space-y-6">
+        <div className="grid gap-6 lg:grid-cols-2">
           <section className="card p-6">
             <h2 className="font-semibold">Details</h2>
             <dl className="mt-4 space-y-3 text-sm">
@@ -324,6 +329,8 @@ export function ProjectDetailPage() {
             </div>
           </section>
         </div>
+        {id && <ProjectRisksSection projectId={id} />}
+        </div>
       )}
 
       {tab === 'backlog' && id && (
@@ -371,10 +378,11 @@ export function ProjectDetailPage() {
 
           {!addingRelease && (
             <ReleaseBoard
+              projectId={id!}
               releases={releases ?? []}
               issues={projectIssuesData?.content ?? []}
               allocations={projectAllocations ?? []}
-              isManagerOrAbove={canCreateRelease}
+              canManage={canCreateRelease}
             />
           )}
 

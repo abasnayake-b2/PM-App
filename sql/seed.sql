@@ -318,13 +318,14 @@ VALUES
 ('c1000001-0000-0000-0000-000000000055', 'uat_end_date', 'UAT End Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 560, NULL),
 ('c1000001-0000-0000-0000-000000000056', 'prod_date', 'Prod Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 570, NULL),
 
-('c1000001-0000-0000-0000-000000000060', 'risk_description', 'Risk Description', 'TEXT', 2000, 0, 1, 1, 'RISK', 610, NULL),
-('c1000001-0000-0000-0000-000000000061', 'risk_created_date', 'Risk Created Date', 'DATE', NULL, 0, 1, 1, 'RISK', 620, NULL),
-('c1000001-0000-0000-0000-000000000062', 'risk_owner', 'Risk Owner', 'TEXT', 120, 0, 1, 1, 'RISK', 630, NULL),
-('c1000001-0000-0000-0000-000000000063', 'risk_status', 'Risk Status', 'DROPDOWN', NULL, 0, 1, 1, 'RISK', 640, '["Open","Closed","Hold","Rejected"]'),
-('c1000001-0000-0000-0000-000000000064', 'risk_impact', 'Risk Impact', 'DROPDOWN', NULL, 0, 1, 1, 'RISK', 650, '["Low","Mid","High"]'),
-('c1000001-0000-0000-0000-000000000065', 'risk_closed_date', 'Risk Closed Date', 'DATE', NULL, 0, 1, 1, 'RISK', 660, NULL),
-('c1000001-0000-0000-0000-000000000066', 'risk_mitigation', 'Risk Mitigation', 'TEXT', 2000, 0, 1, 1, 'RISK', 670, NULL),
+-- Flat RISK custom fields deactivated; multi-row risks live in rd_issue_risk.
+('c1000001-0000-0000-0000-000000000060', 'risk_description', 'Risk Description', 'TEXT', 2000, 0, 0, 1, 'RISK', 610, NULL),
+('c1000001-0000-0000-0000-000000000061', 'risk_created_date', 'Risk Created Date', 'DATE', NULL, 0, 0, 1, 'RISK', 620, NULL),
+('c1000001-0000-0000-0000-000000000062', 'risk_owner', 'Risk Owner', 'TEXT', 120, 0, 0, 1, 'RISK', 630, NULL),
+('c1000001-0000-0000-0000-000000000063', 'risk_status', 'Risk Status', 'DROPDOWN', NULL, 0, 0, 1, 'RISK', 640, '["Open","Closed","Hold","Rejected"]'),
+('c1000001-0000-0000-0000-000000000064', 'risk_impact', 'Risk Impact', 'DROPDOWN', NULL, 0, 0, 1, 'RISK', 650, '["Low","Mid","High"]'),
+('c1000001-0000-0000-0000-000000000065', 'risk_closed_date', 'Risk Closed Date', 'DATE', NULL, 0, 0, 1, 'RISK', 660, NULL),
+('c1000001-0000-0000-0000-000000000066', 'risk_mitigation', 'Risk Mitigation', 'TEXT', 2000, 0, 0, 1, 'RISK', 670, NULL),
 
 ('c1000001-0000-0000-0000-000000000070', 'notes', 'Notes', 'TEXT', 4000, 0, 1, 1, 'OTHER', 710, NULL);
 
