@@ -31,6 +31,10 @@ public class Project extends AuditableEntity {
     @Column(length = 120)
     private String product;
 
+    /** Optional Jira Cloud project key used for backlog sync (e.g. TEST). */
+    @Column(name = "jira_project_key", length = 50)
+    private String jiraProjectKey;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lead_employee_id")
     private Employee leadEmployee;

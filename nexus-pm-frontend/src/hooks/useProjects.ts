@@ -14,9 +14,11 @@ import {
   restoreProject,
   updateProjectRag,
   importProjects,
+  syncProjectFromJira,
   type CreateProjectPayload,
   type CreateReleasePayload,
   type UpdateProjectPayload,
+  type JiraSyncResult,
 } from '@/api/projects.api';
 
 export function useProjects(
@@ -181,4 +183,16 @@ export function useImportProjects() {
   });
 }
 
-export type { CreateProjectPayload, CreateReleasePayload, UpdateProjectPayload };
+export function useSyncProjectJira(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncProjectFromJira(projectId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['issues'] });
+      qc.invalidateQueries({ queryKey: ['issue-status-counts'] });
+      qc.invalidateQueries({ queryKey: ['project', projectId] });
+    },
+  });
+}
+
+export type { CreateProjectPayload, CreateReleasePayload, UpdateProjectPayload, JiraSyncResult };

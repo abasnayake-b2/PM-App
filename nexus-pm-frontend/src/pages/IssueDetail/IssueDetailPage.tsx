@@ -12,7 +12,6 @@ import { fetchRosterAllocationResources } from '@/api/resources.api';
 import { fetchIssueTypes } from '@/api/lookup.api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
-import { sumAllocationPercent } from '@/utils/allocationUi';
 import { fetchActiveIssueFields } from '@/api/issueFields.api';
 import { IssueCustomFieldsView } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
@@ -72,12 +71,6 @@ export function IssueDetailPage() {
       })) ?? [],
     [rosterResources],
   );
-
-  const totalAllocated = useMemo(
-    () => sumAllocationPercent(issueAllocations ?? []),
-    [issueAllocations],
-  );
-  const allocationCount = issueAllocations?.length ?? 0;
 
   if (id === 'new') {
     return <Navigate to="/issues/new" replace />;
@@ -238,10 +231,6 @@ export function IssueDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Resource allocation</h2>
-                <p className="mt-1 text-sm text-text2">
-                  {allocationCount} resource{allocationCount !== 1 ? 's' : ''} · {totalAllocated}% on this
-                  issue · rolls up to project utilisation
-                </p>
               </div>
               {canManageAllocations && !addingAllocation && !editingAllocationId && (
                 <button
@@ -315,17 +304,6 @@ export function IssueDetailPage() {
               <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
                 Could not load allocations. Check that the database schema is up to date (allocation.issue_id).
               </p>
-            )}
-
-            {totalAllocated > 0 && (
-              <div className="mt-4 space-y-2">
-                <AllocationBar percentage={totalAllocated} showLabel overAllocated={totalAllocated > 100} />
-                {totalAllocated > 100 && (
-                  <p className="text-xs text-warning">
-                    Issue utilisation exceeds 100% because multiple resources are allocated in parallel.
-                  </p>
-                )}
-              </div>
             )}
 
             {allocationsLoading && <p className="mt-4 text-sm text-text2">Loading allocations…</p>}

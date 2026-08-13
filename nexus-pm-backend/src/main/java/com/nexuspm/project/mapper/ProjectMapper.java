@@ -19,6 +19,7 @@ public class ProjectMapper {
                 .id(project.getId())
                 .name(project.getName())
                 .product(project.getProduct())
+                .jiraProjectKey(project.getJiraProjectKey())
                 .status(project.getStatus())
                 .ragStatus(project.getRagStatus())
                 .startDate(project.getStartDate())

@@ -15,6 +15,7 @@ public class ProjectResponse {
     private UUID id;
     private String name;
     private String product;
+    private String jiraProjectKey;
     private String status;
     private String ragStatus;
     private Integer progressPct;

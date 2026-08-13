@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
+import { Plus, RefreshCw, Search } from 'lucide-react';
 import { BacklogExcelUpload } from '@/components/BacklogExcelUpload';
 import { IssueTrackerTable } from '@/components/IssueTrackerTable';
 import { IssueSlideOverPanel } from '@/components/IssueSlideOverPanel';
@@ -11,11 +11,13 @@ import { MultiStatusFilter } from '@/components/MultiStatusFilter';
 import { fetchPriorities, fetchIssueTypes, fetchIssueStatuses } from '@/api/lookup.api';
 import { fetchIssueStatusCounts } from '@/api/issues.api';
 import { useIssues } from '@/hooks/useIssues';
+import { useSyncProjectJira } from '@/hooks/useProjects';
 import { filterIssuesBySearch } from '@/utils/issueUi';
 
 interface ProjectBacklogTabProps {
   projectId: string;
   projectLabel?: string;
+  jiraProjectKey?: string | null;
   canImportBacklog: boolean;
   canCreateIssue: boolean;
 }
@@ -26,6 +28,7 @@ interface ProjectBacklogTabProps {
 export function ProjectBacklogTab({
   projectId,
   projectLabel,
+  jiraProjectKey,
   canImportBacklog,
   canCreateIssue,
 }: ProjectBacklogTabProps) {
@@ -37,6 +40,10 @@ export function ProjectBacklogTab({
   const [pageSize, setPageSize] = useState(100);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const syncJira = useSyncProjectJira(projectId);
+  const hasJiraKey = Boolean(jiraProjectKey?.trim());
 
   const { data: priorities } = useQuery({ queryKey: ['priorities'], queryFn: fetchPriorities });
   const { data: issueTypes } = useQuery({ queryKey: ['issue-types'], queryFn: fetchIssueTypes });
@@ -78,6 +85,27 @@ export function ProjectBacklogTab({
     sort: ['rdNumber,asc', 'childNumber,asc'],
   });
 
+  const handleSyncJira = () => {
+    setSyncError(null);
+    if (!hasJiraKey) {
+      setSyncError('Set a Jira project key on this project (Edit project) before syncing.');
+      return;
+    }
+    syncJira.mutate(undefined, {
+      onSuccess: () => {
+        void refetch();
+      },
+      onError: (err: unknown) => {
+        const msg =
+          (err as { response?: { data?: { detail?: string; message?: string } } })?.response?.data
+            ?.detail ??
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Jira sync failed';
+        setSyncError(msg);
+      },
+    });
+  };
+
   const countsByStatusId = statusCounts?.countsByStatusId ?? {};
 
   const issues = useMemo(() => {
@@ -88,6 +116,7 @@ export function ProjectBacklogTab({
   const initialLoad = isLoading && !data;
   const showEmpty = !initialLoad && !error && issues.length === 0;
   const showTable = !initialLoad && !error && issues.length > 0;
+  const syncResult = syncJira.data;
 
   return (
     <div className="mt-6 space-y-4">
@@ -101,6 +130,22 @@ export function ProjectBacklogTab({
           {isFetching && data ? ' …' : ''}
         </p>
         <div className="flex flex-wrap items-center gap-2">
+          {canCreateIssue && (
+            <button
+              type="button"
+              onClick={handleSyncJira}
+              disabled={syncJira.isPending}
+              title={
+                hasJiraKey
+                  ? `Sync Change Requests from Jira project ${jiraProjectKey}`
+                  : 'Set a Jira project key on this project first'
+              }
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-bg3 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={syncJira.isPending ? 'animate-spin' : undefined} />
+              {syncJira.isPending ? 'Syncing…' : 'Sync from Jira'}
+            </button>
+          )}
           {(statusCounts?.total ?? 0) > 0 && canImportBacklog && (
             <BacklogExcelUpload
               variant="project"
@@ -123,6 +168,28 @@ export function ProjectBacklogTab({
           )}
         </div>
       </div>
+
+      {(syncError || (syncResult && syncJira.isSuccess)) && (
+        <div className="max-w-xl text-sm">
+          {syncError && <p className="whitespace-pre-wrap text-danger">{syncError}</p>}
+          {syncResult && syncJira.isSuccess && !syncError && (
+            <div className="text-text2">
+              <p>
+                Jira sync: {syncResult.fetched} fetched, {syncResult.created} created,{' '}
+                {syncResult.updated} updated
+                {syncResult.skipped > 0 ? `, ${syncResult.skipped} skipped` : ''}.
+              </p>
+              {syncResult.errors.length > 0 && (
+                <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-danger">
+                  {syncResult.errors.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <RdStatusSummary
         statuses={statuses ?? []}

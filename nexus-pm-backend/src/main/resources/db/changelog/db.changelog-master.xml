@@ -23,5 +23,6 @@
     <include file="db/changelog/changes/016-team-management-profile-picture.xml"/>
     <include file="db/changelog/changes/017-em-capacity-plan.xml"/>
     <include file="db/changelog/changes/018-pmo-permissions.xml"/>
+    <include file="db/changelog/changes/019-project-jira-key.xml"/>
 
 </databaseChangeLog>

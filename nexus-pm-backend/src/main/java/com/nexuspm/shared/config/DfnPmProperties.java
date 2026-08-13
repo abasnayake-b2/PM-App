@@ -22,6 +22,7 @@ public class DfnPmProperties {
     private Storage storage = new Storage();
     private Cache cache = new Cache();
     private Ai ai = new Ai();
+    private Jira jira = new Jira();
 
     @Getter
     @Setter
@@ -132,5 +133,36 @@ public class DfnPmProperties {
         private String apiKey = "";
         private String baseUrl = "";
         private String model = "";
+    }
+
+    /**
+     * Jira Cloud REST integration (email + API token basic auth).
+     * Secrets stay in env / YAML — never store the API token in the database.
+     */
+    @Getter
+    @Setter
+    public static class Jira {
+        private boolean enabled = false;
+        /** e.g. https://your-domain.atlassian.net */
+        private String baseUrl = "";
+        private String email = "";
+        private String apiToken = "";
+        private int connectTimeoutMs = 15_000;
+        private int readTimeoutMs = 60_000;
+        /**
+         * Comma-separated Jira issue type names synced into PM as RD items (CHANGE type).
+         * Default matches DirectFN Jira work types: Change, New Feature, etc.
+         */
+        private String crIssueTypeNames = "Change,Change Request,CR,New Feature,Feature,Features";
+
+        public List<String> resolvedCrIssueTypeNames() {
+            if (crIssueTypeNames == null || crIssueTypeNames.isBlank()) {
+                return List.of("Change", "Change Request", "CR", "New Feature", "Feature", "Features");
+            }
+            return java.util.Arrays.stream(crIssueTypeNames.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
     }
 }

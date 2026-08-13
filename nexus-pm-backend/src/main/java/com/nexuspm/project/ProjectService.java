@@ -153,6 +153,7 @@ public class ProjectService {
         project.setClient(client);
         project.setName(request.getName());
         project.setProduct(trimOrNull(request.getProduct()));
+        project.setJiraProjectKey(normalizeJiraProjectKey(request.getJiraProjectKey()));
         project.setLeadEmployee(lead);
         applyStakeholdersOnCreate(project, request.getArchitectEmployeeId(),
                 request.getEngineeringManagerManagementId());
@@ -192,6 +193,7 @@ public class ProjectService {
         Project project = loadAccessibleProjectForEdit(id);
         project.setName(request.getName());
         project.setProduct(trimOrNull(request.getProduct()));
+        project.setJiraProjectKey(normalizeJiraProjectKey(request.getJiraProjectKey()));
         if (request.getLeadEmployeeId() != null) {
             Employee lead = employeeRepository.findById(request.getLeadEmployeeId())
                     .orElseThrow(() -> new BusinessException("NOT_FOUND", "Lead employee not found", 404));
@@ -474,5 +476,10 @@ public class ProjectService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String normalizeJiraProjectKey(String value) {
+        String trimmed = trimOrNull(value);
+        return trimmed == null ? null : trimmed.toUpperCase();
     }
 }

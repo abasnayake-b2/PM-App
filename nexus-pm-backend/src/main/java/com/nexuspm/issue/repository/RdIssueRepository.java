@@ -16,6 +16,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
 
     Optional<RdIssue> findByProjectIdAndTitleIgnoreCaseAndDeletedFalse(UUID projectId, String title);
 
+    Optional<RdIssue> findByProjectIdAndJiraIdIgnoreCaseAndDeletedFalse(UUID projectId, String jiraId);
+
     long countByDisplayKeyIsNull();
 
     @Query("""

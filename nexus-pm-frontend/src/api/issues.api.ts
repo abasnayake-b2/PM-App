@@ -67,6 +67,36 @@ export async function fetchIssueChildren(parentId: string): Promise<Issue[]> {
   return data;
 }
 
+export interface JiraWorklogEntry {
+  id: string;
+  authorDisplayName: string;
+  authorAccountId?: string;
+  timeSpent?: string;
+  timeSpentSeconds?: number;
+  started?: string;
+  created?: string;
+  updated?: string;
+  comment?: string;
+}
+
+export interface JiraWorklogResponse {
+  jiraIssueKey: string;
+  total: number;
+  totalTimeSpentSeconds: number;
+  originalEstimate?: string;
+  remainingEstimate?: string;
+  timeSpent?: string;
+  originalEstimateSeconds?: number;
+  remainingEstimateSeconds?: number;
+  timeSpentSeconds?: number;
+  worklogs: JiraWorklogEntry[];
+}
+
+export async function fetchIssueJiraWorklogs(issueId: string): Promise<JiraWorklogResponse> {
+  const { data } = await api.get<JiraWorklogResponse>(`/issues/${issueId}/jira/worklogs`);
+  return data;
+}
+
 export interface CreateIssuePayload {
   projectId: string;
   releaseId?: string;

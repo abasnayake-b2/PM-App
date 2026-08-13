@@ -337,6 +337,7 @@ export function ProjectDetailPage() {
         <ProjectBacklogTab
           projectId={id}
           projectLabel={project.product ?? project.name}
+          jiraProjectKey={project.jiraProjectKey}
           canImportBacklog={canImportBacklog}
           canCreateIssue={canCreateIssue}
         />

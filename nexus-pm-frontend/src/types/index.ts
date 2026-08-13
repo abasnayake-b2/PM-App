@@ -74,6 +74,7 @@ export interface Project {
   id: string;
   name: string;
   product?: string;
+  jiraProjectKey?: string;
   code?: string;
   description?: string;
   status: string;

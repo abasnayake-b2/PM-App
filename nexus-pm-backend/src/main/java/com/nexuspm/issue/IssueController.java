@@ -1,6 +1,8 @@
 package com.nexuspm.issue;
 
 import com.nexuspm.issue.dto.*;
+import com.nexuspm.jira.JiraWorklogService;
+import com.nexuspm.jira.dto.JiraWorklogResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,7 @@ public class IssueController {
 
     private final IssueService issueService;
     private final IssueImportService issueImportService;
+    private final JiraWorklogService jiraWorklogService;
 
     @PostMapping("/import")
     @ResponseStatus(HttpStatus.OK)
@@ -107,6 +110,12 @@ public class IssueController {
     @PreAuthorize("@perm.can('ISSUES_VIEW')")
     public java.util.List<String> allowedChildTypes(@PathVariable UUID id) {
         return issueService.allowedChildWorkflowCodes(id);
+    }
+
+    @GetMapping("/{id}/jira/worklogs")
+    @PreAuthorize("@perm.can('ISSUES_VIEW')")
+    public JiraWorklogResponse getJiraWorklogs(@PathVariable UUID id) {
+        return jiraWorklogService.getWorklogsForIssue(id);
     }
 
     @PostMapping

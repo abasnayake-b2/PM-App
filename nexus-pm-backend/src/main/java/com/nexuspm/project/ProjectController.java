@@ -2,6 +2,8 @@ package com.nexuspm.project;
 
 import com.nexuspm.issue.IssueImportService;
 import com.nexuspm.issue.dto.IssueImportResult;
+import com.nexuspm.jira.JiraSyncService;
+import com.nexuspm.jira.dto.JiraSyncResult;
 import com.nexuspm.project.dto.*;
 import com.nexuspm.project.entity.ProjectAccess;
 import jakarta.validation.Valid;
@@ -25,6 +27,7 @@ public class ProjectController {
     private final ProjectService projectService;
     private final ProjectImportService projectImportService;
     private final IssueImportService issueImportService;
+    private final JiraSyncService jiraSyncService;
 
     @GetMapping
     @PreAuthorize("@perm.can('PROJECTS_VIEW')")
@@ -62,6 +65,13 @@ public class ProjectController {
     @PreAuthorize("@perm.superAdmin()")
     public IssueImportResult importProjectBacklog(@PathVariable UUID id, @RequestParam("file") MultipartFile file) {
         return issueImportService.importBacklogExcel(file, id);
+    }
+
+    @PostMapping("/{id}/jira/sync")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("@perm.can('ISSUES_CREATE')")
+    public JiraSyncResult syncProjectFromJira(@PathVariable UUID id) {
+        return jiraSyncService.syncProject(id);
     }
 
     @GetMapping("/{id}")

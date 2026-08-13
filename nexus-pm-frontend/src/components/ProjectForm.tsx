@@ -57,6 +57,7 @@ export function ProjectForm({
         clientId,
         name: (fd.get('name') as string).trim(),
         product: (fd.get('product') as string).trim() || undefined,
+        jiraProjectKey: (fd.get('jiraProjectKey') as string).trim() || undefined,
         leadEmployeeId: fd.get('leadEmployeeId') as string,
         architectEmployeeId: readOptionalId(fd, 'architectEmployeeId') ?? undefined,
         engineeringManagerManagementId:
@@ -74,6 +75,7 @@ export function ProjectForm({
     const payload: UpdateProjectPayload = {
       name: (fd.get('name') as string).trim(),
       product: (fd.get('product') as string).trim() || null,
+      jiraProjectKey: (fd.get('jiraProjectKey') as string).trim() || null,
       leadEmployeeId: (fd.get('leadEmployeeId') as string) || undefined,
       architectEmployeeId: readOptionalId(fd, 'architectEmployeeId'),
       engineeringManagerManagementId: readOptionalId(fd, 'engineeringManagerManagementId'),
@@ -109,6 +111,20 @@ export function ProjectForm({
           placeholder="e.g. GBL"
           className={inputClass}
         />
+      </label>
+
+      <label className="block text-sm">
+        <span className="text-text2">Jira project key</span>
+        <input
+          name="jiraProjectKey"
+          type="text"
+          defaultValue={initial?.jiraProjectKey ?? ''}
+          placeholder="e.g. TEST"
+          className={inputClass}
+        />
+        <span className="mt-1 block text-xs text-text2">
+          Used by Backlog → Sync from Jira to pull Change Requests into this project.
+        </span>
       </label>
 
       {mode === 'create' && (

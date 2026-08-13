@@ -20,6 +20,7 @@ export interface CreateProjectPayload {
   clientId: string;
   name: string;
   product?: string;
+  jiraProjectKey?: string;
   leadEmployeeId: string;
   architectEmployeeId?: string;
   engineeringManagerManagementId?: string;
@@ -32,6 +33,7 @@ export interface CreateProjectPayload {
 export interface UpdateProjectPayload {
   name: string;
   product?: string | null;
+  jiraProjectKey?: string | null;
   leadEmployeeId?: string;
   architectEmployeeId?: string | null;
   engineeringManagerManagementId?: string | null;
@@ -126,5 +128,20 @@ export async function importProjects(file: File): Promise<ProjectImportResult> {
   const { data } = await api.post<ProjectImportResult>('/projects/import', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return data;
+}
+
+export interface JiraSyncResult {
+  fetched: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  syncedByName?: string;
+  syncedAt?: string;
+}
+
+export async function syncProjectFromJira(projectId: string): Promise<JiraSyncResult> {
+  const { data } = await api.post<JiraSyncResult>(`/projects/${projectId}/jira/sync`);
   return data;
 }

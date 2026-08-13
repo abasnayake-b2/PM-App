@@ -100,6 +100,14 @@ dfnpm:
         base-url: ${AI_OPENAI_BASE_URL:https://api.openai.com/v1}
         model: ${AI_OPENAI_MODEL:gpt-4o-mini}
         api-key: ${OPENAI_API_KEY:}
+  jira:
+    enabled: ${JIRA_ENABLED:false}
+    base-url: ${JIRA_BASE_URL:}
+    email: ${JIRA_EMAIL:}
+    api-token: ${JIRA_API_TOKEN:}
+    connect-timeout-ms: ${JIRA_CONNECT_TIMEOUT_MS:15000}
+    read-timeout-ms: ${JIRA_READ_TIMEOUT_MS:60000}
+    cr-issue-type-names: "${JIRA_CR_ISSUE_TYPES:Change,Change Request,CR,New Feature,Feature,Features}"
 
 management:
   endpoints:
@@ -132,6 +140,7 @@ logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
     com.nexuspm: ${LOG_LEVEL_APP:INFO}
+    com.nexuspm.jira: ${LOG_LEVEL_JIRA:INFO}
     com.nexuspm.shared.logging.RequestLoggingFilter: ${LOG_LEVEL_HTTP:INFO}
     com.nexuspm.shared.audit.AuditLogService: ${LOG_LEVEL_AUDIT:INFO}
     org.springframework.web: ${LOG_LEVEL_WEB:INFO}

@@ -357,6 +357,7 @@ CREATE TABLE project (
     client_id                           CHAR(36)     NOT NULL,
     name                                VARCHAR(200) NOT NULL,
     product                             VARCHAR(120) NULL,
+    jira_project_key                    VARCHAR(50)  NULL,
     lead_employee_id                    CHAR(36)     NULL,
     architect_employee_id               CHAR(36)     NULL,
     engineering_manager_management_id   CHAR(36)     NULL,

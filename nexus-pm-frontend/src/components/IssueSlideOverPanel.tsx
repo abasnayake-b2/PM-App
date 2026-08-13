@@ -31,6 +31,7 @@ import {
   RdSectionCard,
 } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
+import { IssueJiraWorklogPanel } from '@/components/IssueJiraWorklogPanel';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { sumAllocationPercent } from '@/utils/allocationUi';
@@ -55,12 +56,14 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
   const [addingAllocation, setAddingAllocation] = useState(false);
   const [editingAllocationId, setEditingAllocationId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
+  const [panelTab, setPanelTab] = useState<'details' | 'worklog'>('details');
 
   useEffect(() => {
     setEditing(false);
     setAddingAllocation(false);
     setEditingAllocationId(null);
     setSaveError(null);
+    setPanelTab('details');
   }, [issueId]);
 
   const { data: issue, isLoading, error } = useIssue(issueId);
@@ -249,6 +252,35 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
               }}
               onSave={handleSave}
             />
+          ) : (
+            <>
+          <div className="flex gap-1 border-b border-border pb-0">
+            <button
+              type="button"
+              onClick={() => setPanelTab('details')}
+              className={`rounded-t-md px-3 py-1.5 text-xs font-medium ${
+                panelTab === 'details'
+                  ? 'border border-b-0 border-border bg-bg2 text-accent'
+                  : 'text-text2 hover:text-text'
+              }`}
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanelTab('worklog')}
+              className={`rounded-t-md px-3 py-1.5 text-xs font-medium ${
+                panelTab === 'worklog'
+                  ? 'border border-b-0 border-border bg-bg2 text-accent'
+                  : 'text-text2 hover:text-text'
+              }`}
+            >
+              Work log
+            </button>
+          </div>
+
+          {panelTab === 'worklog' ? (
+            <IssueJiraWorklogPanel issueId={issue.id} jiraId={issue.jiraId} />
           ) : (
             <>
           <RdSectionCard title="Description" sectionCode="OTHER" mode="view">
@@ -531,6 +563,8 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
             )}
           </section>
           </div>
+            </>
+          )}
             </>
           )}
         </div>

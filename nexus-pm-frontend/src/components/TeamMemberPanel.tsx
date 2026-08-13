@@ -55,7 +55,7 @@ export function TeamMemberPanel({
     if (!formOpen) setDirty(false);
   }, [formOpen, setDirty]);
 
-  const { allocations, totalPercentage, availablePercentage } = capacityPeriodView(
+  const { allocations } = capacityPeriodView(
     row,
     rangeFrom,
     rangeTo,
@@ -149,21 +149,8 @@ export function TeamMemberPanel({
           onInputCapture={unsaved.markDirtyFromEvent}
           onChangeCapture={unsaved.markDirtyFromEvent}
         >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-border bg-bg3 p-4 text-center">
-              <p className="text-xs font-medium uppercase tracking-wide text-text2">Allocated</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums">{totalPercentage}%</p>
-              <p className="mt-1 text-[11px] text-text3">Avg over selected dates</p>
-            </div>
-            <div className="rounded-xl border border-border bg-bg3 p-4 text-center">
-              <p className="text-xs font-medium uppercase tracking-wide text-text2">Available</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-accent">{availablePercentage}%</p>
-              <p className="mt-1 text-[11px] text-text3">Remaining capacity</p>
-            </div>
-          </div>
-
           {canEdit && allocating && !editingAllocation && (
-            <div className="mt-6">
+            <div>
               <ResourceIssueAllocateForm
                 row={row}
                 loading={createAllocation.isPending}

@@ -20,6 +20,8 @@ public class CreateProjectRequest {
 
     private String product;
 
+    private String jiraProjectKey;
+
     @NotNull
     private UUID leadEmployeeId;
 
