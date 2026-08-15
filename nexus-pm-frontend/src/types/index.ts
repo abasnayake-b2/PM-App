@@ -201,6 +201,8 @@ export interface Capacity {
   vpName?: string;
   engineeringManagerName?: string;
   benchStatus?: string;
+  /** ACTIVE or INACTIVE — inactive keep historical allocations but cannot be newly allocated. */
+  status?: string;
   /** Average daily allocation % over the selected From–To range. */
   totalPercentage: number;
   /** Available capacity % for the same range (max 0, 100 − allocated). */

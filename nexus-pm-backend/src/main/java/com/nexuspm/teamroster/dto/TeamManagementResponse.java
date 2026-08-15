@@ -20,6 +20,7 @@ public class TeamManagementResponse {
     /** Relative API path when a picture is stored, e.g. /team-roster/management/{id}/photo */
     private String profilePictureUrl;
     private String status;
+    private String employmentType;
     private Instant createdAt;
     private Instant updatedAt;
     private UUID createdBy;

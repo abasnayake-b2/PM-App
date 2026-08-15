@@ -12,6 +12,7 @@ export interface TeamManagement {
   /** Relative API path when set, e.g. /team-roster/management/{id}/photo */
   profilePictureUrl?: string | null;
   status: string;
+  employmentType?: string | null;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -42,6 +43,7 @@ export interface TeamRosterMember {
   /** Relative API path when set, e.g. /team-roster/members/{id}/photo */
   profilePictureUrl?: string | null;
   status: string;
+  employmentType?: string | null;
   skillIds?: string[];
   skillNames?: string[];
   totalYearsOfExperience?: number | null;
@@ -80,6 +82,7 @@ export interface TeamManagementPayload {
   supervisorName?: string;
   supervisorId?: string;
   status?: string;
+  employmentType?: string;
 }
 
 export interface TeamRosterMemberPayload {
@@ -100,6 +103,7 @@ export interface TeamRosterMemberPayload {
   email?: string;
   phone?: string;
   status?: string;
+  employmentType?: string;
   skillIds?: string[];
   totalYearsOfExperience?: number | null;
   experienceInDfn?: number | null;

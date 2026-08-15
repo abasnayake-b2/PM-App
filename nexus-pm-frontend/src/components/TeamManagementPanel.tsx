@@ -56,6 +56,7 @@ export function TeamManagementPanel({ member, canEdit, onClose, onEdit }: TeamMa
             <DetailRow label="First name" value={member.firstName} />
             <DetailRow label="Last name" value={member.lastName} />
             <DetailRow label="Supervisor" value={member.supervisorFullName ?? member.supervisorName} />
+            <DetailRow label="Employment type" value={member.employmentType} />
             <DetailRow label="Status" value={member.status} />
             <DetailRow label="Created by" value={member.createdByName} />
             <DetailRow label="Updated by" value={member.updatedByName} />

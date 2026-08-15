@@ -510,18 +510,26 @@ export function AllocationTimeline({
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
             onScroll={() => syncScroll('left')}
           >
-            {rowLayouts.map(({ row, height }) => (
+            {rowLayouts.map(({ row, height }) => {
+              const inactive = (row.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE';
+              return (
               <button
                 key={row.employeeId}
                 type="button"
                 onClick={() => onRowSelect?.(row)}
-                className="flex w-full items-center gap-2 border-b border-border bg-bg px-3 text-left hover:bg-bg2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+                className={`flex w-full items-center gap-2 border-b border-border px-3 text-left hover:bg-bg2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
+                  inactive ? 'bg-bg2/50 text-text3 grayscale' : 'bg-bg'
+                }`}
                 style={{ height }}
               >
                 <ResourceAvatar name={row.employeeName} size="sm" />
-                <span className="truncate text-sm font-medium leading-none">{row.employeeName}</span>
+                <span className="truncate text-sm font-medium leading-none">
+                  {row.employeeName}
+                  {inactive ? ' (Inactive)' : ''}
+                </span>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -554,30 +562,39 @@ export function AllocationTimeline({
               )}
             </div>
 
-            {rowLayouts.map(({ row, items, height }) => (
-              <div key={row.employeeId} className="border-b border-border bg-bg" style={{ height }}>
+            {rowLayouts.map(({ row, items, height }) => {
+              const inactive = (row.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE';
+              return (
+              <div
+                key={row.employeeId}
+                className={`border-b border-border ${inactive ? 'bg-bg2/50 opacity-70 grayscale' : 'bg-bg'}`}
+                style={{ height }}
+              >
                 <AllocationBars
                   items={items}
                   colCount={colCount}
                   columnTemplate={columnTemplate}
                   showDates={showDates}
                   getSpan={getSpan}
-                  canEdit={canEdit}
+                  canEdit={canEdit && !inactive}
                   granularity={granularity}
                   days={days}
                   weeks={weeks}
                   months={months}
                   rangeTo={to}
                   datesSaving={datesSaving}
-                  onAllocationDoubleClick={(allocation) => onAllocationEdit?.(row, allocation)}
+                  onAllocationDoubleClick={
+                    inactive ? undefined : (allocation) => onAllocationEdit?.(row, allocation)
+                  }
                   onAllocationDatesChange={
-                    onAllocationDatesChange
+                    !inactive && onAllocationDatesChange
                       ? (allocation, next) => onAllocationDatesChange(row, allocation, next)
                       : undefined
                   }
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

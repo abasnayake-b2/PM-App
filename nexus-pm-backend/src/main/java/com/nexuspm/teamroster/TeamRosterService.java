@@ -488,11 +488,14 @@ public class TeamRosterService {
     public void deleteManagement(UUID id) {
         TeamManagement entity = managementRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
-        String picture = entity.getProfilePicture();
+        if ("INACTIVE".equalsIgnoreCase(entity.getStatus())) {
+            return;
+        }
+        entity.setStatus("INACTIVE");
+        managementRepository.save(entity);
 
-        // Login users are linked via employee.team_management_id — unlink + deactivate so delete can proceed.
+        // Soft-deactivate linked login account when present (same pattern as User management).
         employeeRepository.findByTeamManagementId(id).ifPresent(employee -> {
-            employee.setTeamManagement(null);
             employee.setStatus("INACTIVE");
             employeeRepository.save(employee);
             userAuthRepository.findByEmployeeId(employee.getId()).ifPresent(auth -> {
@@ -500,13 +503,6 @@ public class TeamRosterService {
                 userAuthRepository.save(auth);
             });
         });
-
-        // Roster engineers may still point at this person as their EM.
-        employeeRepository.clearEngineeringManagerManagement(id);
-        detachManagementReferences(id);
-        entityManager.flush();
-        managementRepository.deleteById(id);
-        profilePictureStorageService.deleteIfPresent(picture);
     }
 
     @Transactional
@@ -581,13 +577,15 @@ public class TeamRosterService {
         Employee entity = employeeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
         ensureRosterEmployee(entity);
-        if (userAuthRepository.existsByEmployeeId(id)) {
-            throw new BusinessException("VALIDATION", "Cannot delete a login user from the employee roster", 400);
+        if ("INACTIVE".equalsIgnoreCase(entity.getStatus())) {
+            return;
         }
-        String picture = entity.getProfilePicture();
-        employeeCleanupService.detachEmployeesForDeletion(List.of(id));
-        employeeRepository.delete(entity);
-        profilePictureStorageService.deleteIfPresent(picture);
+        entity.setStatus("INACTIVE");
+        employeeRepository.save(entity);
+        userAuthRepository.findByEmployeeId(id).ifPresent(auth -> {
+            auth.setActive(false);
+            userAuthRepository.save(auth);
+        });
     }
 
     @Transactional
@@ -1091,6 +1089,7 @@ public class TeamRosterService {
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             entity.setStatus(request.getStatus().trim().toUpperCase());
         }
+        entity.setEmploymentType(trimOrNull(request.getEmploymentType()));
     }
 
     private void applyMemberRequest(Employee entity, TeamRosterMemberRequest request) {
@@ -1098,6 +1097,7 @@ public class TeamRosterService {
         entity.setProduct(trimOrNull(request.getProduct()));
         entity.setEmail(trimOrNull(request.getEmail()));
         entity.setPhone(trimOrNull(request.getPhone()));
+        entity.setEmploymentType(trimOrNull(request.getEmploymentType()));
         entity.setTotalYearsOfExperience(request.getTotalYearsOfExperience());
         entity.setExperienceInDfn(request.getExperienceInDfn());
         applySkills(entity, request.getSkillIds());
@@ -1162,6 +1162,7 @@ public class TeamRosterService {
                 .profilePictureUrl(ProfilePictureStorageService.managementPhotoUrl(
                         m.getId(), m.getProfilePicture(), m.getUpdatedAt()))
                 .status(m.getStatus())
+                .employmentType(m.getEmploymentType())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
                 .createdBy(m.getCreatedBy())
@@ -1203,6 +1204,7 @@ public class TeamRosterService {
                 .profilePictureUrl(ProfilePictureStorageService.memberPhotoUrl(
                         employee.getId(), employee.getProfilePicture(), employee.getUpdatedAt()))
                 .status(employee.getStatus())
+                .employmentType(employee.getEmploymentType())
                 .skillIds(skills.stream().map(Skill::getId).toList())
                 .skillNames(skills.stream().map(Skill::getName).toList())
                 .totalYearsOfExperience(employee.getTotalYearsOfExperience())

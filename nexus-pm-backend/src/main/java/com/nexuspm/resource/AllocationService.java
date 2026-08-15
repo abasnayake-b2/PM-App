@@ -120,16 +120,36 @@ public class AllocationService {
                 ? allocationRepository.findActive(null, null, null, snapshotAsOf)
                 : allocationRepository.findActiveForProjects(scopedProjectIds, null, null, snapshotAsOf);
 
+        // Keep inactive employees visible when they still have allocations in range (read-only / gray in UI).
+        Set<UUID> activeIds = rosterEmployees.stream().map(Employee::getId).collect(Collectors.toSet());
+        Set<UUID> allocatedIds = new HashSet<>();
+        inRange.forEach(a -> allocatedIds.add(a.getEmployee().getId()));
+        activeAtAsOf.forEach(a -> allocatedIds.add(a.getEmployee().getId()));
+        List<UUID> inactiveAllocatedIds = allocatedIds.stream()
+                .filter(id -> !activeIds.contains(id))
+                .toList();
+        if (!inactiveAllocatedIds.isEmpty()) {
+            List<Employee> inactiveAllocated = employeeRepository.findRosterByIds(inactiveAllocatedIds).stream()
+                    .filter(employee -> !"ACTIVE".equalsIgnoreCase(employee.getStatus()))
+                    .filter(employee -> matchesRosterFilters(
+                            employee, nameFilter, teamFilter, designationFilter, engineeringManagerFilter))
+                    .toList();
+            if (!inactiveAllocated.isEmpty()) {
+                List<Employee> merged = new ArrayList<>(rosterEmployees);
+                merged.addAll(inactiveAllocated);
+                rosterEmployees = merged;
+            }
+        }
+
         if (scopedProjectIds != null) {
             UUID viewerId = SecurityUtils.currentUserId();
             Map<UUID, Employee> teamById = new LinkedHashMap<>();
             managerTeamService.resolveTeam(viewerId).forEach(member -> teamById.put(member.getId(), member));
 
-            Set<UUID> allocatedEmployeeIds = new HashSet<>();
-            inRange.forEach(a -> allocatedEmployeeIds.add(a.getEmployee().getId()));
-            activeAtAsOf.forEach(a -> allocatedEmployeeIds.add(a.getEmployee().getId()));
+            Set<UUID> allocatedEmployeeIds = new HashSet<>(allocatedIds);
             rosterEmployees.stream()
-                    .filter(employee -> allocatedEmployeeIds.contains(employee.getId()))
+                    .filter(employee -> allocatedEmployeeIds.contains(employee.getId())
+                            || "ACTIVE".equalsIgnoreCase(employee.getStatus()))
                     .forEach(employee -> teamById.putIfAbsent(employee.getId(), employee));
 
             rosterEmployees = teamById.values().stream()
@@ -176,6 +196,7 @@ public class AllocationService {
                             .vpName(vpName)
                             .engineeringManagerName(EmployeeRosterRefs.engineeringManagerName(employee))
                             .benchStatus(employee.getBenchStatus())
+                            .status(employee.getStatus())
                             .totalPercentage(periodAllocated)
                             .availablePercentage(Math.max(0, 100 - periodAllocated))
                             .overAllocated(periodAllocated > 100)
@@ -245,10 +266,12 @@ public class AllocationService {
     public List<RosterAllocationResourceResponse> listRosterAllocationResources() {
         if (SecurityUtils.isAdmin() || SecurityUtils.hasOrgWideVisibility()) {
             return employeeRepository.searchRosterMembers(null).stream()
+                    .filter(employee -> "ACTIVE".equalsIgnoreCase(employee.getStatus()))
                     .map(this::toRosterAllocationResource)
                     .toList();
         }
         return managerTeamService.resolveTeam(SecurityUtils.currentUserId()).stream()
+                .filter(employee -> "ACTIVE".equalsIgnoreCase(employee.getStatus()))
                 .map(this::toRosterAllocationResource)
                 .toList();
     }
@@ -312,6 +335,9 @@ public class AllocationService {
 
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
+        if (!"ACTIVE".equalsIgnoreCase(employee.getStatus())) {
+            throw new BusinessException("VALIDATION", "Cannot allocate an inactive employee", 400);
+        }
         if (userAuthRepository.existsByEmployeeId(employee.getId())) {
             throw new BusinessException("VALIDATION", "Allocations must target roster employees, not login users", 400);
         }
@@ -359,6 +385,11 @@ public class AllocationService {
         Allocation allocation = allocationRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Allocation not found", 404));
         projectService.getProject(allocation.getIssue().getProject().getId());
+
+        Employee employee = allocation.getEmployee();
+        if (employee == null || !"ACTIVE".equalsIgnoreCase(employee.getStatus())) {
+            throw new BusinessException("VALIDATION", "Cannot change allocations for an inactive employee", 400);
+        }
 
         if (request.getToDate().isBefore(request.getFromDate())) {
             throw new BusinessException("VALIDATION", "End date must be on or after start date", 400);

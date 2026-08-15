@@ -97,6 +97,7 @@ export function hasAdminNavAccess(
     P.USERS_VIEW,
     P.ADMIN_VIEW,
     P.REFERENCE_VIEW,
+    P.AI_ASSISTANT_VIEW,
   ]);
 }
 

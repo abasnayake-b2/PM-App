@@ -17,6 +17,7 @@ import {
 } from '@/hooks/useTeamRoster';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
+import { EMPLOYMENT_TYPE_OPTIONS } from '@/utils/employmentType';
 import type { TeamManagement } from '@/api/teamRoster.api';
 
 const inputClass =
@@ -130,6 +131,7 @@ function ManagementForm({
       supervisorName: (fd.get('supervisorName') as string).trim() || undefined,
       supervisorId: (fd.get('supervisorId') as string) || undefined,
       status: (fd.get('status') as string) || 'ACTIVE',
+      employmentType: (fd.get('employmentType') as string)?.trim() || undefined,
     });
   };
 
@@ -246,13 +248,30 @@ function ManagementForm({
             ))}
         </select>
       </label>
-      <label className="block text-sm">
-        <span className="text-text2">Status</span>
-        <select name="status" defaultValue={initial?.status ?? 'ACTIVE'} className={inputClass}>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="INACTIVE">INACTIVE</option>
-        </select>
-      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="text-text2">Employment type</span>
+          <select
+            name="employmentType"
+            defaultValue={initial?.employmentType ?? ''}
+            className={inputClass}
+          >
+            <option value="">Select employment type…</option>
+            {EMPLOYMENT_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="text-text2">Status</span>
+          <select name="status" defaultValue={initial?.status ?? 'ACTIVE'} className={inputClass}>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+        </label>
+      </div>
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
@@ -359,6 +378,7 @@ export function ManagementPage() {
                   <th className="px-4 py-2">First name</th>
                   <th className="px-4 py-2">Last name</th>
                   <th className="px-4 py-2">Supervisor</th>
+                  <th className="px-4 py-2">Employment</th>
                   <th className="px-4 py-2">Status</th>
                   {canManageHierarchy && <th className="px-4 py-2">Actions</th>}
                 </tr>
@@ -383,6 +403,7 @@ export function ManagementPage() {
                     <td className={`${cellClass} text-text2`}>
                       {row.supervisorFullName ?? row.supervisorName ?? '—'}
                     </td>
+                    <td className={`${cellClass} text-text2`}>{row.employmentType ?? '—'}</td>
                     <td className={cellClass}>{row.status}</td>
                     {canManageHierarchy && (
                       <td className={cellClass}>
@@ -405,12 +426,15 @@ export function ManagementPage() {
                               <ArrowDownLeft size={16} />
                             </button>
                           )}
+                          {row.status === 'ACTIVE' && (
                           <button
                             type="button"
                             onClick={() => {
                               if (
                                 window.confirm(
-                                  `Delete ${row.fullName}?\n\nProjects where they are VP or Engineering Manager will have those assignments cleared.\nIf they have a login, it will be deactivated.`,
+                                  `Deactivate ${row.fullName}? They will be marked inactive${
+                                    row.email ? ' and any linked login will be disabled' : ''
+                                  }.`,
                                 )
                               ) {
                                 deleteRow.mutate(row.id, {
@@ -421,17 +445,18 @@ export function ManagementPage() {
                                     const message = isAxiosError(err)
                                       ? (err.response?.data as { detail?: string })?.detail ||
                                         err.message
-                                      : 'Failed to delete management record.';
+                                      : 'Failed to deactivate management record.';
                                     window.alert(message);
                                   },
                                 });
                               }
                             }}
                             className="rounded p-1 text-danger hover:bg-danger/10"
-                            title="Delete"
+                            title="Deactivate"
                           >
                             <Trash2 size={16} />
                           </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -439,7 +464,7 @@ export function ManagementPage() {
                 ))}
                 {(rows?.length ?? 0) === 0 && (
                   <tr>
-                    <td colSpan={canManageHierarchy ? 8 : 7} className="px-4 py-8 text-center text-text2">
+                    <td colSpan={canManageHierarchy ? 9 : 8} className="px-4 py-8 text-center text-text2">
                       No management records. Upload a Management Excel file or add manually.
                     </td>
                   </tr>

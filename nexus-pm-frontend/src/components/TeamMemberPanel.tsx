@@ -50,6 +50,8 @@ export function TeamMemberPanel({
   const formOpen = allocating || editingAllocation != null;
   const unsaved = useUnsavedCloseGuard(formOpen);
   const { setDirty, confirmOpen, keepEditing, requestClose: guardClose } = unsaved;
+  const inactive = (row.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE';
+  const canMutateAllocations = canEdit && !inactive;
 
   useEffect(() => {
     if (!formOpen) setDirty(false);
@@ -66,14 +68,14 @@ export function TeamMemberPanel({
   }, [row.employeeId]);
 
   useEffect(() => {
-    if (!initialEditingAllocationId || !canEdit) {
+    if (!initialEditingAllocationId || !canMutateAllocations) {
       setEditingAllocation(null);
       return;
     }
     const allocation = allocations.find((item) => item.id === initialEditingAllocationId) ?? null;
     setEditingAllocation(allocation);
     if (allocation) setAllocating(false);
-  }, [initialEditingAllocationId, allocations, canEdit, row.employeeId]);
+  }, [initialEditingAllocationId, allocations, canMutateAllocations, row.employeeId]);
 
   const openIssues = issues.filter((i) => isOpenIssueStatus(i.statusName));
 
@@ -145,11 +147,17 @@ export function TeamMemberPanel({
 
         <div
           ref={unsaved.contentRef}
-          className="flex-1 overflow-y-auto p-5"
+          className={`flex-1 overflow-y-auto p-5 ${inactive ? 'opacity-80' : ''}`}
           onInputCapture={unsaved.markDirtyFromEvent}
           onChangeCapture={unsaved.markDirtyFromEvent}
         >
-          {canEdit && allocating && !editingAllocation && (
+          {inactive && (
+            <p className="mb-4 rounded-lg border border-border bg-bg3 px-3 py-2 text-sm text-text2">
+              This employee is inactive. Existing allocations are retained; new allocations are not allowed.
+            </p>
+          )}
+
+          {canMutateAllocations && allocating && !editingAllocation && (
             <div>
               <ResourceIssueAllocateForm
                 row={row}
@@ -173,7 +181,7 @@ export function TeamMemberPanel({
 
           <section className="mt-6">
             <h3 className="text-sm font-semibold">Issue allocations</h3>
-            {canEdit && editingAllocation && (
+            {canMutateAllocations && editingAllocation && (
               <div className="mt-3">
                 <AllocationForm
                   title="Edit allocation"
@@ -217,7 +225,7 @@ export function TeamMemberPanel({
                         </Link>
                         <div className="flex shrink-0 items-center gap-1.5">
                           <span className="text-text2">{allocation.percentage}%</span>
-                          {canEdit && (
+                          {canMutateAllocations && (
                             <>
                               <button
                                 type="button"
@@ -306,7 +314,7 @@ export function TeamMemberPanel({
                   Employee roster
                 </Link>
               ))}
-            {canEdit && (
+            {canMutateAllocations && (
               <button
                 type="button"
                 onClick={() => {

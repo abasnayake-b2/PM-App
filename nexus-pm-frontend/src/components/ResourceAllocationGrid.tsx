@@ -35,17 +35,26 @@ export function ResourceAllocationGrid({ rows, rangeFrom, rangeTo, onSelect }: R
                 rangeFrom,
                 rangeTo,
               );
+              const inactive = (row.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE';
               return (
-                <tr key={row.employeeId} className="border-t border-border hover:bg-bg2/50">
+                <tr
+                  key={row.employeeId}
+                  className={`border-t border-border hover:bg-bg2/50 ${
+                    inactive ? 'bg-bg2/40 text-text3' : ''
+                  }`}
+                >
                   <td className={`${cellClass} text-center text-xs tabular-nums text-text2`}>{index + 1}</td>
                   <td className={cellClass}>
                     <button
                       type="button"
                       onClick={() => onSelect?.(row)}
-                      className="max-w-[220px] truncate font-medium text-accent hover:underline"
+                      className={`max-w-[220px] truncate font-medium hover:underline ${
+                        inactive ? 'text-text3' : 'text-accent'
+                      }`}
                       title={row.employeeName}
                     >
                       {row.employeeName}
+                      {inactive ? ' (Inactive)' : ''}
                     </button>
                   </td>
                   <td className={`${cellClass} text-text2`}>{row.designationName ?? '—'}</td>
@@ -54,18 +63,30 @@ export function ResourceAllocationGrid({ rows, rangeFrom, rangeTo, onSelect }: R
                   <td className={`${cellClass} text-text2`}>{row.engineeringManagerName ?? '—'}</td>
                   <td
                     className={`${cellClass} text-right font-semibold tabular-nums ${
-                      overAllocated ? 'text-danger' : totalPercentage >= 90 ? 'text-warning' : 'text-text'
+                      inactive
+                        ? 'text-text3'
+                        : overAllocated
+                          ? 'text-danger'
+                          : totalPercentage >= 90
+                            ? 'text-warning'
+                            : 'text-text'
                     }`}
                   >
                     {totalPercentage}%
                   </td>
-                  <td className={`${cellClass} text-right font-semibold tabular-nums text-accent`}>
+                  <td
+                    className={`${cellClass} text-right font-semibold tabular-nums ${
+                      inactive ? 'text-text3' : 'text-accent'
+                    }`}
+                  >
                     {availablePercentage}%
                   </td>
                   <td className={`${cellClass} text-text2`}>
-                    {row.benchStatus === 'BENCH' && totalPercentage === 0
-                      ? 'On bench'
-                      : availabilityLabel(totalPercentage)}
+                    {inactive
+                      ? 'Inactive'
+                      : row.benchStatus === 'BENCH' && totalPercentage === 0
+                        ? 'On bench'
+                        : availabilityLabel(totalPercentage)}
                   </td>
                 </tr>
               );

@@ -200,13 +200,24 @@ export function DashboardPage() {
         <>
           {capacityDurationControl}
 
-          <div className="grid min-h-[22rem] gap-4 xl:grid-cols-[minmax(14rem,0.75fr)_minmax(16rem,1fr)_minmax(20rem,1.5fr)] xl:items-stretch">
+          {showCapacityUtilisation && (
+            <CapacityUtilisationSection
+              data={capacityQuery.data}
+              isLoading={capacityQuery.isLoading}
+              error={!!capacityQuery.error}
+              showTeamBars={false}
+              showHeatmap={false}
+              weeksLabel={capacityRangeLabel}
+            />
+          )}
+
+          <div className="grid min-h-[22rem] gap-4 xl:grid-cols-2 xl:items-stretch">
             <section className="card flex h-full min-h-0 flex-col overflow-hidden p-0">
               <div className="shrink-0 border-b border-border px-5 py-4">
                 <h2 className="font-semibold">Organisation overview</h2>
                 <p className="mt-1 text-sm text-text2">Workforce and project totals</p>
               </div>
-              <dl className="flex min-h-0 flex-1 flex-col justify-center gap-3 px-5 py-5">
+              <dl className="flex min-h-0 flex-1 flex-col justify-start gap-3 px-5 py-5">
                 <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
                   <dt className="text-sm text-text2"># Engineers</dt>
                   <dd className="text-xl tabular-nums">
@@ -370,18 +381,6 @@ export function DashboardPage() {
                 </table>
               </div>
             </section>
-
-            {showCapacityUtilisation ? (
-              <GroupBarsChart
-                title="Utilisation by team"
-                subtitle={`Average allocation % over the next ${capacityRangeLabel} — click a bar for allocated vs free`}
-                rows={capacityQuery.data?.byTeam ?? []}
-              />
-            ) : (
-              <section className="card flex h-full items-center justify-center p-5 text-sm text-text2">
-                Utilisation by team unavailable
-              </section>
-            )}
           </div>
 
           {showCapacityUtilisation && (
@@ -393,18 +392,39 @@ export function DashboardPage() {
               weeksLabel={capacityRangeLabel}
             />
           )}
+
+          {showCapacityUtilisation ? (
+            <GroupBarsChart
+              title="Utilisation by team"
+              subtitle={`Average allocation % over the next ${capacityRangeLabel} — click a bar for allocated vs free`}
+              rows={capacityQuery.data?.byTeam ?? []}
+            />
+          ) : null}
         </>
       )}
 
       {!showOrgOverview && showCapacityUtilisation && (
         <div className="space-y-3">
           {capacityDurationControl}
+          <CapacityUtilisationSection
+            data={capacityQuery.data}
+            isLoading={capacityQuery.isLoading}
+            error={!!capacityQuery.error}
+            showTeamBars={false}
+            showHeatmap={false}
+            weeksLabel={capacityRangeLabel}
+          />
           <EmUtilisationWithHeatmap
             utilRows={capacityQuery.data?.byEngineeringManager ?? []}
             emBreakdown={data?.emBreakdown}
             heatmap={capacityQuery.data?.heatmap}
             onOpenBreakdown={setBreakdownPanel}
             weeksLabel={capacityRangeLabel}
+          />
+          <GroupBarsChart
+            title="Utilisation by team"
+            subtitle={`Average allocation % over the next ${capacityRangeLabel} — click a bar for allocated vs free`}
+            rows={capacityQuery.data?.byTeam ?? []}
           />
         </div>
       )}
@@ -420,17 +440,6 @@ export function DashboardPage() {
             </Link>
           </p>
         </div>
-      )}
-
-      {showCapacityUtilisation && (
-        <CapacityUtilisationSection
-          data={capacityQuery.data}
-          isLoading={capacityQuery.isLoading}
-          error={!!capacityQuery.error}
-          showTeamBars={!showOrgOverview}
-          showHeatmap={false}
-          weeksLabel={capacityRangeLabel}
-        />
       )}
         </>
       )}

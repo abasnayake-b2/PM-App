@@ -16,4 +16,5 @@ public class TeamManagementRequest {
     private String supervisorName;
     private UUID supervisorId;
     private String status;
+    private String employmentType;
 }

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -113,8 +114,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             SELECT e FROM Employee e
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
-            WHERE e.status = 'ACTIVE'
-              AND e.manager.id = :managerId
+            WHERE e.manager.id = :managerId
             ORDER BY e.lastName, e.firstName
             """)
     List<Employee> findDirectReports(UUID managerId);
@@ -124,8 +124,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
             LEFT JOIN FETCH e.engineeringManagerManagement em
-            WHERE e.status = 'ACTIVE'
-              AND em.id = :managementId
+            WHERE em.id = :managementId
             ORDER BY e.lastName, e.firstName
             """)
     List<Employee> findByEngineeringManagerManagementId(UUID managementId);
@@ -164,8 +163,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH vp.supervisor vp2
             LEFT JOIN FETCH e.teamManagement
             LEFT JOIN FETCH e.department
-            WHERE e.status = 'ACTIVE'
-              AND e.teamManagement IS NULL
+            WHERE e.teamManagement IS NULL
               AND (:search IS NULL OR :search = '' OR
                    LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(e.firstName, '')) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -192,6 +190,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                    OR LOWER(COALESCE(e.email, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(e.phone, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(e.status, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(e.employmentType, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR CAST(e.totalYearsOfExperience AS string) LIKE CONCAT('%', :search, '%')
                    OR CAST(e.experienceInDfn AS string) LIKE CONCAT('%', :search, '%')
                    OR EXISTS (
@@ -201,6 +200,21 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             ORDER BY e.firstName, e.lastName
             """)
     List<Employee> searchRosterMembers(String search);
+
+    @Query("""
+            SELECT e FROM Employee e
+            LEFT JOIN FETCH e.designation d
+            LEFT JOIN FETCH d.stream
+            LEFT JOIN FETCH e.stream
+            LEFT JOIN FETCH e.workType
+            LEFT JOIN FETCH e.country
+            LEFT JOIN FETCH e.engineeringManagerManagement em
+            LEFT JOIN FETCH em.supervisor
+            WHERE e.teamManagement IS NULL
+              AND e.id IN :ids
+            ORDER BY e.firstName, e.lastName
+            """)
+    List<Employee> findRosterByIds(@Param("ids") Collection<UUID> ids);
 
     @Query("""
             SELECT e FROM Employee e

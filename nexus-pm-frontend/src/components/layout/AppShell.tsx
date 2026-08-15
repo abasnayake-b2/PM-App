@@ -30,7 +30,7 @@ import { logout } from '@/api/auth.api';
 
 const PROJECT_MANAGEMENT_PATHS = ['/projects', '/issues', '/resources'];
 const ORGANIZATION_PATHS = ['/organization'];
-const ADMIN_PATHS = ['/team', '/time', '/admin', '/organisation'];
+const ADMIN_PATHS = ['/team', '/time', '/admin', '/organisation', '/assistant'];
 
 function pathInGroup(pathname: string, prefixes: string[]) {
   return prefixes.some(
@@ -148,13 +148,6 @@ export function AppShell() {
           </NavLink>
           )}
 
-          {can(P.AI_ASSISTANT_VIEW) && (
-          <NavLink to="/assistant" className={linkClass}>
-            <Sparkles size={18} />
-            Assistant
-          </NavLink>
-          )}
-
           {showPlanningNav && (
           <NavCollapsibleGroup
             title="Planning"
@@ -235,6 +228,12 @@ export function AppShell() {
             <NavLink to="/admin" className={linkClass}>
               <Settings size={18} />
               Admin
+            </NavLink>
+            )}
+            {can(P.AI_ASSISTANT_VIEW) && (
+            <NavLink to="/assistant" className={linkClass}>
+              <Sparkles size={18} />
+              Assistant
             </NavLink>
             )}
           </NavCollapsibleGroup>

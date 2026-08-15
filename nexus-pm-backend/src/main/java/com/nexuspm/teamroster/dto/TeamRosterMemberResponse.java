@@ -32,6 +32,7 @@ public class TeamRosterMemberResponse {
     /** Relative API path when a picture is stored, e.g. /team-roster/members/{id}/photo */
     private String profilePictureUrl;
     private String status;
+    private String employmentType;
     private List<UUID> skillIds;
     private List<String> skillNames;
     private BigDecimal totalYearsOfExperience;

@@ -33,6 +33,10 @@ public class TeamManagement extends AuditableEntity {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    /** e.g. Permanent, Contract, Intern, Consultant */
+    @Column(name = "employment_type", length = 40)
+    private String employmentType;
+
     /** Filename under the configured Pic/ directory (e.g. mgmt-{uuid}.jpg). */
     @Column(name = "profile_picture", length = 255)
     private String profilePicture;

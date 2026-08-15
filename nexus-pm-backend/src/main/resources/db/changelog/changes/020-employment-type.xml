@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="020-employee-employment-type" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="employee"/>
+            <not>
+                <columnExists tableName="employee" columnName="employment_type"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="employee">
+            <column name="employment_type" type="varchar(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="020-team-management-employment-type" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_management"/>
+            <not>
+                <columnExists tableName="team_management" columnName="employment_type"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="team_management">
+            <column name="employment_type" type="varchar(40)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

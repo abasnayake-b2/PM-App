@@ -19,6 +19,8 @@ public class CapacityResponse {
     private String vpName;
     private String engineeringManagerName;
     private String benchStatus;
+    /** Employee roster status: ACTIVE or INACTIVE. */
+    private String status;
     /** Average daily allocation % over the requested from–to range. */
     private int totalPercentage;
     /** max(0, 100 − totalPercentage) for the same date range. */

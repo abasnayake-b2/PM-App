@@ -168,6 +168,7 @@ export function TeamEmployeesPage() {
   const canPromote = can(P.TEAM_CREATE);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [statusTab, setStatusTab] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
   const [dialog, setDialog] = useState<'create' | 'edit' | 'promote' | null>(null);
   const [editing, setEditing] = useState<TeamRosterMember | null>(null);
   const [selected, setSelected] = useState<TeamRosterMember | null>(null);
@@ -184,6 +185,17 @@ export function TeamEmployeesPage() {
     const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
+
+  const { activeRows, inactiveRows, visibleRows } = useMemo(() => {
+    const list = rows ?? [];
+    const active = list.filter((row) => (row.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE');
+    const inactive = list.filter((row) => (row.status ?? '').toUpperCase() === 'INACTIVE');
+    return {
+      activeRows: active,
+      inactiveRows: inactive,
+      visibleRows: statusTab === 'INACTIVE' ? inactive : active,
+    };
+  }, [rows, statusTab]);
 
   const closeDialog = () => {
     setDialog(null);
@@ -225,7 +237,7 @@ export function TeamEmployeesPage() {
             </div>
           </label>
         </div>
-        {canEdit && (
+        {canEdit && statusTab === 'ACTIVE' && (
           <button
             type="button"
             onClick={() => setDialog('create')}
@@ -235,6 +247,31 @@ export function TeamEmployeesPage() {
             Add employee
           </button>
         )}
+      </div>
+
+      <div className="border-b border-border">
+        <nav className="-mb-px flex gap-6">
+          {(
+            [
+              { key: 'ACTIVE' as const, label: 'Active', count: activeRows.length },
+              { key: 'INACTIVE' as const, label: 'Inactive', count: inactiveRows.length },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setStatusTab(tab.key)}
+              className={`border-b-2 pb-3 text-sm font-medium transition ${
+                statusTab === tab.key
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text2 hover:text-text'
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1.5 tabular-nums text-text2">({tab.count})</span>
+            </button>
+          ))}
+        </nav>
       </div>
 
       {isLoading && <p className="text-text2">Loading employees…</p>}
@@ -260,11 +297,13 @@ export function TeamEmployeesPage() {
                   <th className="px-4 py-2">DFN</th>
                   <th className="px-4 py-2">Email</th>
                   <th className="px-4 py-2">Tel</th>
+                  <th className="px-4 py-2">Employment</th>
+                  <th className="px-4 py-2">Status</th>
                   {canEdit && <th className="px-4 py-2">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {rows?.map((row, index) => (
+                {visibleRows.map((row, index) => (
                   <tr key={row.id} className="border-t border-border hover:bg-bg2/50">
                     <td className={`${cellClass} text-center text-xs tabular-nums text-text2`}>{index + 1}</td>
                     <td className={cellClass}>
@@ -301,6 +340,8 @@ export function TeamEmployeesPage() {
                     </td>
                     <td className={`${cellClass} text-text2`}>{row.email ?? '—'}</td>
                     <td className={`${cellClass} text-text2`}>{row.phone ?? '—'}</td>
+                    <td className={`${cellClass} text-text2`}>{row.employmentType ?? '—'}</td>
+                    <td className={cellClass}>{row.status ?? '—'}</td>
                     {canEdit && (
                       <td className={cellClass}>
                         <div className="flex gap-2">
@@ -312,7 +353,7 @@ export function TeamEmployeesPage() {
                           >
                             <Pencil size={16} />
                           </button>
-                          {canPromote && !row.managementId && (
+                          {statusTab === 'ACTIVE' && canPromote && !row.managementId && (
                             <button
                               type="button"
                               onClick={() => openPromote(row)}
@@ -322,10 +363,15 @@ export function TeamEmployeesPage() {
                               <ArrowUpRight size={16} />
                             </button>
                           )}
+                          {statusTab === 'ACTIVE' && (
                           <button
                             type="button"
                             onClick={() => {
-                              if (window.confirm(`Delete ${row.fullName}?`)) {
+                              if (
+                                window.confirm(
+                                  `Deactivate ${row.fullName}? They will be marked inactive and any linked login will be disabled.`,
+                                )
+                              ) {
                                 deleteRow.mutate(row.id, {
                                   onSuccess: () => {
                                     if (selected?.id === row.id) setSelected(null);
@@ -334,19 +380,22 @@ export function TeamEmployeesPage() {
                               }
                             }}
                             className="rounded p-1 text-danger hover:bg-danger/10"
-                            title="Delete"
+                            title="Deactivate"
                           >
                             <Trash2 size={16} />
                           </button>
+                          )}
                         </div>
                       </td>
                     )}
                   </tr>
                 ))}
-                {(rows?.length ?? 0) === 0 && (
+                {visibleRows.length === 0 && (
                   <tr>
-                    <td colSpan={canEdit ? 15 : 14} className="px-4 py-8 text-center text-text2">
-                      No employees. Upload a Team Excel file or add manually.
+                    <td colSpan={canEdit ? 17 : 16} className="px-4 py-8 text-center text-text2">
+                      {statusTab === 'INACTIVE'
+                        ? 'No inactive employees.'
+                        : 'No active employees. Upload a Team Excel file or add manually.'}
                     </td>
                   </tr>
                 )}
@@ -354,7 +403,8 @@ export function TeamEmployeesPage() {
             </table>
           </div>
           <p className="border-t border-border px-4 py-2 text-xs text-text2">
-            {rows?.length ?? 0} employee{(rows?.length ?? 0) !== 1 ? 's' : ''}
+            {visibleRows.length} {statusTab === 'INACTIVE' ? 'inactive' : 'active'} employee
+            {visibleRows.length !== 1 ? 's' : ''}
             {search ? ` matching "${search}"` : ''}
           </p>
         </div>

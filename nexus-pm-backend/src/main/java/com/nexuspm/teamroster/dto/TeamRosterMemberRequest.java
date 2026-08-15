@@ -28,6 +28,7 @@ public class TeamRosterMemberRequest {
     private String email;
     private String phone;
     private String status;
+    private String employmentType;
     private List<UUID> skillIds = new ArrayList<>();
     private BigDecimal totalYearsOfExperience;
     private BigDecimal experienceInDfn;

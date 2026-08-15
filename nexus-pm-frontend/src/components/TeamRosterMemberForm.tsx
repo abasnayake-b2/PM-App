@@ -16,6 +16,7 @@ import {
   useDeleteTeamRosterMemberPhoto,
   useUploadTeamRosterMemberPhoto,
 } from '@/hooks/useTeamRoster';
+import { EMPLOYMENT_TYPE_OPTIONS } from '@/utils/employmentType';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -292,6 +293,7 @@ export function TeamRosterMemberForm({
       email: str('email'),
       phone: str('phone'),
       status: (fd.get('status') as string) || 'ACTIVE',
+      employmentType: str('employmentType'),
       skillIds,
       totalYearsOfExperience,
       experienceInDfn,
@@ -519,13 +521,30 @@ export function TeamRosterMemberForm({
           <input name="phone" defaultValue={initial?.phone ?? ''} className={inputClass} />
         </label>
       </div>
-      <label className="block text-sm">
-        <span className="text-text2">Status</span>
-        <select name="status" defaultValue={initial?.status ?? 'ACTIVE'} className={inputClass}>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="INACTIVE">INACTIVE</option>
-        </select>
-      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="text-text2">Employment type</span>
+          <select
+            name="employmentType"
+            defaultValue={initial?.employmentType ?? ''}
+            className={selectClass}
+          >
+            <option value="">Select employment type…</option>
+            {EMPLOYMENT_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="text-text2">Status</span>
+          <select name="status" defaultValue={initial?.status ?? 'ACTIVE'} className={inputClass}>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+        </label>
+      </div>
       <div className="flex gap-3 pt-2">
         <button
           type="submit"

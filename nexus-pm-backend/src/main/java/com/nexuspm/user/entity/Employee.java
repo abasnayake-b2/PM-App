@@ -89,6 +89,10 @@ public class Employee extends AuditableEntity {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    /** e.g. Permanent, Contract, Intern, Consultant */
+    @Column(name = "employment_type", length = 40)
+    private String employmentType;
+
     @Column(name = "bench_status", length = 20)
     private String benchStatus = "ASSIGNED";
 
