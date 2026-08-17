@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react';
 import { login } from '@/api/auth.api';
+import { ensureAccessToken } from '@/api/axios';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUIStore } from '@/store/useUIStore';
 import { authUserFromToken } from '@/utils/permissions';
@@ -24,15 +25,29 @@ const STATS = [
   { value: '500+', label: 'Professionals' },
 ] as const;
 
+function postLoginPath(
+  passwordChangeDue: boolean | undefined,
+  fromPathname: string | undefined,
+) {
+  if (passwordChangeDue) return '/account/change-password';
+  if (fromPathname && fromPathname !== '/login') return fromPathname;
+  return '/';
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPathname = (location.state as { from?: { pathname?: string } } | null)?.from
+    ?.pathname;
   const setSession = useAuthStore((s) => s.setSession);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [email, setEmail] = useState(remembered?.email ?? '');
   const [password, setPassword] = useState(remembered?.password ?? '');
   const [rememberMe, setRememberMe] = useState(!!remembered);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(() => !useAuthStore.getState().accessToken);
 
   // Login is always dark (no theme / glass picker). Restore app preference on leave.
   useEffect(() => {
@@ -46,6 +61,29 @@ export function LoginPage() {
     };
   }, []);
 
+  // If a refresh cookie still exists, restore the session instead of showing login.
+  useEffect(() => {
+    if (accessToken) {
+      setRestoring(false);
+      navigate(postLoginPath(false, fromPathname), { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+    void ensureAccessToken().then((token) => {
+      if (cancelled) return;
+      if (token) {
+        navigate(postLoginPath(false, fromPathname), { replace: true });
+      } else {
+        setRestoring(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, fromPathname, navigate]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -58,7 +96,7 @@ export function LoginPage() {
         clearRememberedLogin();
       }
       setSession(data.accessToken, authUserFromToken(data));
-      navigate(data.passwordChangeDue ? '/account/change-password' : '/');
+      navigate(postLoginPath(data.passwordChangeDue, fromPathname));
     } catch (err) {
       if (isAxiosError(err)) {
         const data = err.response?.data as
@@ -78,6 +116,14 @@ export function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (restoring) {
+    return (
+      <div className="login-shell flex min-h-screen items-center justify-center bg-[#07122f] text-sm text-white/70">
+        Restoring session…
+      </div>
+    );
+  }
 
   return (
     <div className="login-shell relative flex min-h-screen">

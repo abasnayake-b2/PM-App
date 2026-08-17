@@ -160,6 +160,7 @@ public class ProjectService {
         project.setStatus("ACTIVE");
         project.setRagStatus("GREEN");
         project.setProgressPct(0);
+        validateProjectDates(request.getStartDate(), request.getEndDate());
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
         projectRepository.save(project);
@@ -204,6 +205,9 @@ public class ProjectService {
         if (request.getStatus() != null) {
             project.setStatus(request.getStatus());
         }
+        LocalDate nextStart = request.getStartDate() != null ? request.getStartDate() : project.getStartDate();
+        LocalDate nextEnd = request.getEndDate() != null ? request.getEndDate() : project.getEndDate();
+        validateProjectDates(nextStart, nextEnd);
         if (request.getStartDate() != null) {
             project.setStartDate(request.getStartDate());
         }
@@ -468,6 +472,12 @@ public class ProjectService {
         log.setNotes(notes);
         log.setChangedBy(changedBy);
         projectHealthLogRepository.save(log);
+    }
+
+    private static void validateProjectDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw new BusinessException("INVALID_DATES", "End date must be on or after the start date", 400);
+        }
     }
 
     private static String trimOrNull(String value) {

@@ -8,10 +8,13 @@ import { fetchActiveIssueFields } from '@/api/issueFields.api';
 import {
   IssueCustomFieldsEditor,
   rdFieldInputClass,
+  rdFieldInputErrorClass,
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
 import {
   firstCustomFieldErrorMessage,
+  firstFieldErrorKey,
+  scrollToIssueField,
   validateIssueCustomFields,
 } from '@/utils/issueFieldValidation';
 
@@ -46,9 +49,29 @@ interface IssueFormProps {
 const pageInputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
 
+const pageInputErrorClass =
+  'mt-1 w-full rounded-lg border border-danger bg-bg3 px-3 py-2 text-sm outline-none focus:border-danger';
+
+const CORE_FIELD_ORDER = ['projectId', 'title', 'issueTypeId', 'priorityId'] as const;
+
 function parseOptionalBoolean(value: FormDataEntryValue | null): boolean | undefined {
   if (value == null || value === '') return undefined;
   return value === 'true';
+}
+
+function fieldHint(message: string | undefined, compact: boolean) {
+  if (!message) return null;
+  return (
+    <span
+      className={
+        compact
+          ? 'mt-0.5 block text-[9px] leading-snug text-danger'
+          : 'mt-1 block text-xs text-danger'
+      }
+    >
+      {message}
+    </span>
+  );
 }
 
 export function IssueForm({
@@ -85,6 +108,8 @@ export function IssueForm({
 
   const [projectId, setProjectId] = useState(parentIssue?.projectId ?? initialProjectId ?? '');
   const [issueTypeId, setIssueTypeId] = useState(defaultTypeId);
+  const [priorityId, setPriorityId] = useState('');
+  const [title, setTitle] = useState('');
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [localError, setLocalError] = useState<string | null>(null);
@@ -108,25 +133,63 @@ export function IssueForm({
     }
   }, [availableIssueTypes, issueTypeId]);
 
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setLocalError(null);
+  };
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const errors = validateIssueCustomFields(customFields);
+    const fd = new FormData(e.currentTarget);
+    const resolvedProjectId = projectId || ((fd.get('projectId') as string) ?? '');
+    const trimmedTitle = title.trim() || ((fd.get('title') as string) ?? '').trim();
+    const resolvedTypeId = issueTypeId || ((fd.get('issueTypeId') as string) ?? '');
+    const resolvedPriorityId = priorityId || ((fd.get('priorityId') as string) ?? '');
+
+    const errors: Record<string, string> = {};
+    if (!lockProject && !parentIssue && !resolvedProjectId) {
+      errors.projectId = 'Project is required';
+    }
+    if (!trimmedTitle) {
+      errors.title = 'Change Request Name is required';
+    }
+    if (!resolvedTypeId) {
+      errors.issueTypeId = 'Type is required';
+    }
+    if (!resolvedPriorityId) {
+      errors.priorityId = 'Priority is required';
+    }
+
+    const customErrors = validateIssueCustomFields(customFields, customFieldDefs);
+    Object.assign(errors, customErrors);
+
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       setLocalError(firstCustomFieldErrorMessage(errors));
+      const firstKey = firstFieldErrorKey(errors, [
+        ...CORE_FIELD_ORDER,
+        ...customFieldDefs.map((f) => f.fieldKey),
+      ]);
+      if (firstKey) {
+        requestAnimationFrame(() => scrollToIssueField(firstKey));
+      }
       return;
     }
     setLocalError(null);
 
-    const fd = new FormData(e.currentTarget);
     const payload: CreateIssuePayload = {
-      projectId: projectId || (fd.get('projectId') as string),
+      projectId: resolvedProjectId,
       parentIssueId: parentIssue?.id,
-      title: (fd.get('title') as string).trim(),
+      title: trimmedTitle,
       jiraId: ((fd.get('jiraId') as string) || '').trim() || undefined,
       description: (fd.get('description') as string).trim() || undefined,
-      issueTypeId: fd.get('issueTypeId') as string,
-      priorityId: fd.get('priorityId') as string,
+      issueTypeId: resolvedTypeId,
+      priorityId: resolvedPriorityId,
       capitalizable: parseOptionalBoolean(fd.get('capitalizable')),
       customFields,
     };
@@ -138,6 +201,7 @@ export function IssueForm({
 
   const compact = variant === 'panel';
   const inputClass = compact ? rdFieldInputClass : pageInputClass;
+  const inputErrorClass = compact ? rdFieldInputErrorClass : pageInputErrorClass;
   const textareaClass = compact ? rdFieldTextareaClass : pageInputClass;
   const labelText = compact
     ? 'block text-[11px] leading-tight text-text2'
@@ -171,14 +235,20 @@ export function IssueForm({
           <p className="mt-0.5 font-medium">{lockedProjectLabel}</p>
         </div>
       ) : (
-        <label className="block min-w-0">
-          <span className={labelText}>Project</span>
+        <label className="block min-w-0" data-issue-field="projectId">
+          <span className={labelText}>
+            Project <span className="text-danger">*</span>
+          </span>
           <select
             name="projectId"
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
+            onChange={(e) => {
+              setProjectId(e.target.value);
+              clearFieldError('projectId');
+            }}
             required
-            className={inputClass}
+            className={fieldErrors.projectId ? inputErrorClass : inputClass}
+            aria-invalid={!!fieldErrors.projectId}
           >
             <option value="" disabled>
               Select project…
@@ -189,6 +259,7 @@ export function IssueForm({
               </option>
             ))}
           </select>
+          {fieldHint(fieldErrors.projectId, compact)}
         </label>
       )}
 
@@ -203,9 +274,24 @@ export function IssueForm({
         />
       </label>
 
-      <label className="block min-w-0">
-        <span className={labelText}>Change Request Name</span>
-        <input name="title" type="text" required maxLength={255} className={inputClass} />
+      <label className="block min-w-0" data-issue-field="title">
+        <span className={labelText}>
+          Change Request Name <span className="text-danger">*</span>
+        </span>
+        <input
+          name="title"
+          type="text"
+          required
+          maxLength={255}
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            clearFieldError('title');
+          }}
+          className={fieldErrors.title ? inputErrorClass : inputClass}
+          aria-invalid={!!fieldErrors.title}
+        />
+        {fieldHint(fieldErrors.title, compact)}
       </label>
 
       <label className="block min-w-0">
@@ -219,8 +305,10 @@ export function IssueForm({
       </label>
 
       <div className={compact ? 'grid grid-cols-2 gap-x-1.5 gap-y-2 sm:grid-cols-4' : 'grid gap-4 sm:grid-cols-2'}>
-        <label className="min-w-0 block">
-          <span className={labelText}>Type</span>
+        <label className="min-w-0 block" data-issue-field="issueTypeId">
+          <span className={labelText}>
+            Type <span className="text-danger">*</span>
+          </span>
           <div className="relative">
             {selectedIssueType && (
               <span
@@ -239,8 +327,14 @@ export function IssueForm({
               name="issueTypeId"
               required
               value={issueTypeId}
-              onChange={(e) => setIssueTypeId(e.target.value)}
-              className={`${inputClass} ${selectedIssueType ? (compact ? 'pl-7' : 'pl-9') : ''}`}
+              onChange={(e) => {
+                setIssueTypeId(e.target.value);
+                clearFieldError('issueTypeId');
+              }}
+              className={`${fieldErrors.issueTypeId ? inputErrorClass : inputClass} ${
+                selectedIssueType ? (compact ? 'pl-7' : 'pl-9') : ''
+              }`}
+              aria-invalid={!!fieldErrors.issueTypeId}
             >
               <option value="" disabled>
                 Select type…
@@ -252,10 +346,23 @@ export function IssueForm({
               ))}
             </select>
           </div>
+          {fieldHint(fieldErrors.issueTypeId, compact)}
         </label>
-        <label className="min-w-0 block">
-          <span className={labelText}>Priority</span>
-          <select name="priorityId" required className={inputClass} defaultValue="">
+        <label className="min-w-0 block" data-issue-field="priorityId">
+          <span className={labelText}>
+            Priority <span className="text-danger">*</span>
+          </span>
+          <select
+            name="priorityId"
+            required
+            className={fieldErrors.priorityId ? inputErrorClass : inputClass}
+            value={priorityId}
+            onChange={(e) => {
+              setPriorityId(e.target.value);
+              clearFieldError('priorityId');
+            }}
+            aria-invalid={!!fieldErrors.priorityId}
+          >
             <option value="" disabled>
               Select priority…
             </option>
@@ -265,6 +372,7 @@ export function IssueForm({
               </option>
             ))}
           </select>
+          {fieldHint(fieldErrors.priorityId, compact)}
         </label>
         <label className="min-w-0 block">
           <span className={labelText}>Capitalization</span>
@@ -281,13 +389,7 @@ export function IssueForm({
         values={customFields}
         onChange={(key, value) => {
           setCustomFields((prev) => ({ ...prev, [key]: value }));
-          setFieldErrors((prev) => {
-            if (!prev[key]) return prev;
-            const next = { ...prev };
-            delete next[key];
-            return next;
-          });
-          setLocalError(null);
+          clearFieldError(key);
         }}
         fieldErrors={fieldErrors}
         compact={compact}
@@ -302,7 +404,7 @@ export function IssueForm({
       <div className={`flex gap-2 ${compact ? 'pt-0.5' : 'pt-2'}`}>
         <button
           type="submit"
-          disabled={loading || !projectId}
+          disabled={loading}
           className={`font-medium disabled:opacity-50 ${
             compact
               ? 'rounded-md bg-accent px-3 py-1.5 text-xs'

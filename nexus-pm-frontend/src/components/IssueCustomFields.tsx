@@ -149,7 +149,11 @@ export function IssueCustomFieldsEditor({
 
               if (field.dataType === 'DROPDOWN') {
                 return (
-                  <label key={field.id} className="min-w-0 block">
+                  <label
+                    key={field.id}
+                    className="min-w-0 block"
+                    data-issue-field={field.fieldKey}
+                  >
                     {label}
                     <select
                       required={field.required}
@@ -173,7 +177,11 @@ export function IssueCustomFieldsEditor({
               if (field.dataType === 'DATE') {
                 const bounds = getDateFieldBounds(field.fieldKey, values);
                 return (
-                  <label key={field.id} className="min-w-0 block">
+                  <label
+                    key={field.id}
+                    className="min-w-0 block"
+                    data-issue-field={field.fieldKey}
+                  >
                     {label}
                     <input
                       type="date"
@@ -202,7 +210,11 @@ export function IssueCustomFieldsEditor({
 
               if (field.dataType === 'YEAR') {
                 return (
-                  <label key={field.id} className="min-w-0 block">
+                  <label
+                    key={field.id}
+                    className="min-w-0 block"
+                    data-issue-field={field.fieldKey}
+                  >
                     {label}
                     <input
                       type="number"
@@ -224,7 +236,11 @@ export function IssueCustomFieldsEditor({
               if (field.dataType === 'NUMBER' || isPercentageCompletionField(field.fieldKey)) {
                 const isPct = isPercentageCompletionField(field.fieldKey);
                 return (
-                  <label key={field.id} className="min-w-0 block">
+                  <label
+                    key={field.id}
+                    className="min-w-0 block"
+                    data-issue-field={field.fieldKey}
+                  >
                     {label}
                     <input
                       type="number"
@@ -269,7 +285,11 @@ export function IssueCustomFieldsEditor({
 
               if (isLongTextField(field)) {
                 return (
-                  <label key={field.id} className={`min-w-0 block ${longSpan}`}>
+                  <label
+                    key={field.id}
+                    className={`min-w-0 block ${longSpan}`}
+                    data-issue-field={field.fieldKey}
+                  >
                     {label}
                     <textarea
                       rows={compact ? 2 : 3}
@@ -286,7 +306,11 @@ export function IssueCustomFieldsEditor({
               }
 
               return (
-                <label key={field.id} className="min-w-0 block">
+                <label
+                  key={field.id}
+                  className="min-w-0 block"
+                  data-issue-field={field.fieldKey}
+                >
                   {label}
                   <input
                     type="text"

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import type { Project } from '@/types';
 import type { CreateProjectPayload, UpdateProjectPayload } from '@/hooks/useProjects';
 import { ClientHierarchySelect, type ClientHierarchyValue } from '@/components/ClientHierarchySelect';
@@ -6,6 +6,8 @@ import { ClientHierarchySelect, type ClientHierarchyValue } from '@/components/C
 export interface ProjectFormOption {
   id: string;
   label: string;
+  /** EM supervisor display name (used for derived VP field). */
+  supervisorName?: string;
 }
 
 interface ProjectFormProps {
@@ -46,10 +48,51 @@ export function ProjectForm({
       clientId: initial?.clientId ?? '',
     },
   );
+  const [engineeringManagerManagementId, setEngineeringManagerManagementId] = useState(
+    initial?.engineeringManagerManagementId ?? '',
+  );
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '');
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '');
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  const selectedEm = useMemo(
+    () =>
+      engineeringManagerOptions.find((option) => option.id === engineeringManagerManagementId) ??
+      null,
+    [engineeringManagerOptions, engineeringManagerManagementId],
+  );
+
+  const vpDisplayName = useMemo(() => {
+    if (selectedEm?.supervisorName) return selectedEm.supervisorName;
+    // Keep showing stored VP while EM options load, or when EM unchanged but supervisor missing on option.
+    if (
+      mode === 'edit' &&
+      initial?.vpName &&
+      engineeringManagerManagementId === (initial.engineeringManagerManagementId ?? '')
+    ) {
+      return initial.vpName;
+    }
+    if (!engineeringManagerManagementId) {
+      return mode === 'edit' ? '—' : 'Set after EM is chosen (follows EM’s supervisor)';
+    }
+    return 'No supervisor set for this EM';
+  }, [
+    selectedEm,
+    mode,
+    engineeringManagerManagementId,
+    initial?.vpName,
+    initial?.engineeringManagerManagementId,
+  ]);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+
+    if (startDate && endDate && endDate < startDate) {
+      setDateError('End date must be on or after the start date.');
+      return;
+    }
+    setDateError(null);
 
     if (mode === 'create') {
       const clientId = hierarchy.clientId || (fd.get('clientId') as string);
@@ -60,10 +103,9 @@ export function ProjectForm({
         jiraProjectKey: (fd.get('jiraProjectKey') as string).trim() || undefined,
         leadEmployeeId: fd.get('leadEmployeeId') as string,
         architectEmployeeId: readOptionalId(fd, 'architectEmployeeId') ?? undefined,
-        engineeringManagerManagementId:
-          readOptionalId(fd, 'engineeringManagerManagementId') ?? undefined,
-        startDate: (fd.get('startDate') as string) || undefined,
-        endDate: (fd.get('endDate') as string) || undefined,
+        engineeringManagerManagementId: engineeringManagerManagementId || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
         budgetCurrency: (fd.get('budgetCurrency') as string) || undefined,
       };
       const budget = fd.get('budgetAmount') as string;
@@ -78,60 +120,57 @@ export function ProjectForm({
       jiraProjectKey: (fd.get('jiraProjectKey') as string).trim() || null,
       leadEmployeeId: (fd.get('leadEmployeeId') as string) || undefined,
       architectEmployeeId: readOptionalId(fd, 'architectEmployeeId'),
-      engineeringManagerManagementId: readOptionalId(fd, 'engineeringManagerManagementId'),
+      engineeringManagerManagementId: engineeringManagerManagementId || null,
+      startDate: startDate || null,
+      endDate: endDate || null,
       status: (fd.get('status') as string) || undefined,
-      startDate: (fd.get('startDate') as string) || undefined,
-      endDate: (fd.get('endDate') as string) || undefined,
       budgetCurrency: (fd.get('budgetCurrency') as string) || undefined,
     };
     const budget = fd.get('budgetAmount') as string;
-    if (budget !== '') payload.budgetAmount = parseFloat(budget);
+    if (budget) payload.budgetAmount = parseFloat(budget);
+    else if (budget === '') payload.budgetAmount = null;
     onSubmit(payload);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-bg2 p-6">
       <label className="block text-sm">
         <span className="text-text2">Project name</span>
         <input
           name="name"
-          type="text"
           required
-          defaultValue={initial?.name}
+          defaultValue={initial?.name ?? ''}
           className={inputClass}
+          placeholder="e.g. Trading Platform Redesign"
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="text-text2">Product</span>
-        <input
-          name="product"
-          type="text"
-          defaultValue={initial?.product ?? ''}
-          placeholder="e.g. GBL"
-          className={inputClass}
-        />
-      </label>
-
-      <label className="block text-sm">
-        <span className="text-text2">Jira project key</span>
-        <input
-          name="jiraProjectKey"
-          type="text"
-          defaultValue={initial?.jiraProjectKey ?? ''}
-          placeholder="e.g. TEST"
-          className={inputClass}
-        />
-        <span className="mt-1 block text-xs text-text2">
-          Used by Backlog → Sync from Jira to pull Change Requests into this project.
-        </span>
-      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="text-text2">Product</span>
+          <input
+            name="product"
+            defaultValue={initial?.product ?? ''}
+            className={inputClass}
+            placeholder="e.g. GBL"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="text-text2">Jira project key</span>
+          <input
+            name="jiraProjectKey"
+            defaultValue={initial?.jiraProjectKey ?? ''}
+            className={inputClass}
+            placeholder="e.g. TEST"
+          />
+        </label>
+      </div>
 
       {mode === 'create' && (
-        clients && clients.length > 0 ? (
+        clients ? (
           <label className="block text-sm">
             <span className="text-text2">Client</span>
-            <select name="clientId" required className={inputClass} defaultValue={hierarchy.clientId}>
+            <select name="clientId" required className={inputClass} defaultValue="">
               <option value="" disabled>
                 Select client…
               </option>
@@ -157,7 +196,8 @@ export function ProjectForm({
           <select
             name="engineeringManagerManagementId"
             className={inputClass}
-            defaultValue={initial?.engineeringManagerManagementId ?? ''}
+            value={engineeringManagerManagementId}
+            onChange={(e) => setEngineeringManagerManagementId(e.target.value)}
           >
             <option value="">{mode === 'edit' ? 'None' : 'Select engineering manager…'}</option>
             {engineeringManagerOptions.map((option) => (
@@ -174,11 +214,7 @@ export function ProjectForm({
             type="text"
             readOnly
             disabled
-            value={
-              mode === 'edit'
-                ? (initial?.vpName ?? '—')
-                : 'Set after EM is chosen (follows EM’s supervisor)'
-            }
+            value={vpDisplayName}
             className={`${inputClass} opacity-80`}
             title="Derived from the engineering manager’s supervisor. Change the EM’s supervisor in Org Structure to move projects."
           />
@@ -245,7 +281,17 @@ export function ProjectForm({
           <input
             name="startDate"
             type="date"
-            defaultValue={initial?.startDate ?? ''}
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(e) => {
+              const next = e.target.value;
+              setStartDate(next);
+              if (endDate && next && endDate < next) {
+                setDateError('End date must be on or after the start date.');
+              } else {
+                setDateError(null);
+              }
+            }}
             className={inputClass}
           />
         </label>
@@ -254,11 +300,22 @@ export function ProjectForm({
           <input
             name="endDate"
             type="date"
-            defaultValue={initial?.endDate ?? ''}
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => {
+              const next = e.target.value;
+              setEndDate(next);
+              if (startDate && next && next < startDate) {
+                setDateError('End date must be on or after the start date.');
+              } else {
+                setDateError(null);
+              }
+            }}
             className={inputClass}
           />
         </label>
       </div>
+      {dateError && <p className="text-xs text-danger">{dateError}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
@@ -291,7 +348,7 @@ export function ProjectForm({
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !!dateError}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
           style={{ color: 'var(--accent-fg)' }}
         >

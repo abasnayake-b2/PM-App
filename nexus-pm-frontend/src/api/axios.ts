@@ -27,6 +27,35 @@ function isAuthAnonymousUrl(url?: string) {
   );
 }
 
+/**
+ * Exchange the HttpOnly refreshToken cookie for a new access token.
+ * Concurrent callers share one in-flight request.
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  refreshPromise ??= api
+    .post('/auth/refresh')
+    .then((res) => {
+      const token = res.data.accessToken as string;
+      useAuthStore.getState().setSession(token, authUserFromToken(res.data));
+      return token;
+    })
+    .catch(() => {
+      useAuthStore.getState().clearSession();
+      return null;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+  return refreshPromise;
+}
+
+/** Return the in-memory access token, or restore it from the refresh cookie. */
+export async function ensureAccessToken(): Promise<string | null> {
+  const existing = useAuthStore.getState().accessToken;
+  if (existing) return existing;
+  return refreshAccessToken();
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -42,28 +71,14 @@ api.interceptors.response.use(
     }
 
     original._retry = true;
-    refreshPromise ??= api
-      .post('/auth/refresh')
-      .then((res) => {
-        const token = res.data.accessToken as string;
-        useAuthStore.getState().setSession(token, authUserFromToken(res.data));
-        return token;
-      })
-      .catch(() => {
-        useAuthStore.getState().clearSession();
-        if (!window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
-        }
-        return null;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
-
-    const newToken = await refreshPromise;
+    const newToken = await refreshAccessToken();
     if (newToken) {
       original.headers.Authorization = `Bearer ${newToken}`;
       return api(original);
+    }
+
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   },

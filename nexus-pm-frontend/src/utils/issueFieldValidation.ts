@@ -106,11 +106,35 @@ export function sanitizePercentageCompletionInput(raw: string): string {
   return String(n);
 }
 
-/** Returns per-field error messages. Empty object means valid. */
-export function validateIssueCustomFields(
+export interface IssueFieldRequiredDef {
+  fieldKey: string;
+  label: string;
+  required: boolean;
+}
+
+/** Required custom fields that are empty. */
+export function validateRequiredCustomFields(
+  fields: IssueFieldRequiredDef[],
   values: Record<string, string>,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
+  for (const field of fields) {
+    if (!field.required) continue;
+    if (!(values[field.fieldKey] ?? '').trim()) {
+      errors[field.fieldKey] = `${field.label} is required`;
+    }
+  }
+  return errors;
+}
+
+/** Returns per-field error messages. Empty object means valid. */
+export function validateIssueCustomFields(
+  values: Record<string, string>,
+  fieldDefs?: IssueFieldRequiredDef[],
+): Record<string, string> {
+  const errors: Record<string, string> = fieldDefs
+    ? validateRequiredCustomFields(fieldDefs, values)
+    : {};
 
   const pctRaw = (values.percentage_completion ?? '').trim();
   if (pctRaw) {
@@ -153,4 +177,26 @@ export function firstCustomFieldErrorMessage(
 ): string | null {
   const first = Object.values(errors)[0];
   return first ?? null;
+}
+
+/** First error key in preferred order, then remaining keys. */
+export function firstFieldErrorKey(
+  errors: Record<string, string>,
+  preferredOrder: string[] = [],
+): string | null {
+  for (const key of preferredOrder) {
+    if (errors[key]) return key;
+  }
+  return Object.keys(errors)[0] ?? null;
+}
+
+/** Scroll the labeled field (or its control) into view inside slide-overs / long forms. */
+export function scrollToIssueField(fieldKey: string) {
+  const el = document.querySelector<HTMLElement>(`[data-issue-field="${fieldKey}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const focusable = el.matches('input, select, textarea')
+    ? el
+    : el.querySelector<HTMLElement>('input, select, textarea');
+  focusable?.focus({ preventScroll: true });
 }

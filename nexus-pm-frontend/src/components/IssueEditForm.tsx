@@ -8,13 +8,16 @@ import { fetchActiveIssueFields } from '@/api/issueFields.api';
 import {
   IssueCustomFieldsEditor,
   rdFieldInputClass,
+  rdFieldInputErrorClass,
   rdFieldLabelClass,
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
 import {
   firstCustomFieldErrorMessage,
+  firstFieldErrorKey,
   sanitizePercentageCompletionInput,
+  scrollToIssueField,
   validateIssueCustomFields,
 } from '@/utils/issueFieldValidation';
 
@@ -101,14 +104,32 @@ export function IssueEditForm({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) return;
+    const errors: Record<string, string> = {};
+    if (!trimmedTitle) {
+      errors.title = 'Change Request Name is required';
+    }
+    if (!priorityId) {
+      errors.priorityId = 'Priority is required';
+    }
+    if (!statusId) {
+      errors.statusId = 'Current Stage is required';
+    }
 
     const normalizedFields = normalizeCustomFields(customFields);
     setCustomFields(normalizedFields);
-    const errors = validateIssueCustomFields(normalizedFields);
+    Object.assign(errors, validateIssueCustomFields(normalizedFields, customFieldDefs));
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       setLocalError(firstCustomFieldErrorMessage(errors));
+      const firstKey = firstFieldErrorKey(errors, [
+        'title',
+        'priorityId',
+        'statusId',
+        ...customFieldDefs.map((f) => f.fieldKey),
+      ]);
+      if (firstKey) {
+        requestAnimationFrame(() => scrollToIssueField(firstKey));
+      }
       return;
     }
     setLocalError(null);
@@ -159,18 +180,33 @@ export function IssueEditForm({
             />
           </label>
 
-          <label className="block min-w-0">
+          <label className="block min-w-0" data-issue-field="title">
             <span className={rdFieldLabelClass}>
-              Change Request Name
+              Change Request Name <span className="text-danger">*</span>
             </span>
             <input
               type="text"
               required
               maxLength={255}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={rdFieldInputClass}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setFieldErrors((prev) => {
+                  if (!prev.title) return prev;
+                  const next = { ...prev };
+                  delete next.title;
+                  return next;
+                });
+                setLocalError(null);
+              }}
+              className={fieldErrors.title ? rdFieldInputErrorClass : rdFieldInputClass}
+              aria-invalid={!!fieldErrors.title}
             />
+            {fieldErrors.title ? (
+              <span className="mt-0.5 block text-[9px] leading-snug text-danger">
+                {fieldErrors.title}
+              </span>
+            ) : null}
           </label>
 
           <label className="block min-w-0">
@@ -187,13 +223,25 @@ export function IssueEditForm({
           </label>
 
           <div className="grid grid-cols-3 gap-x-1 gap-y-1.5 sm:grid-cols-6">
-            <label className="min-w-0 block">
-              <span className={rdFieldLabelClass}>Priority</span>
+            <label className="min-w-0 block" data-issue-field="priorityId">
+              <span className={rdFieldLabelClass}>
+                Priority <span className="text-danger">*</span>
+              </span>
               <select
                 required
                 value={priorityId}
-                onChange={(e) => setPriorityId(e.target.value)}
-                className={rdFieldInputClass}
+                onChange={(e) => {
+                  setPriorityId(e.target.value);
+                  setFieldErrors((prev) => {
+                    if (!prev.priorityId) return prev;
+                    const next = { ...prev };
+                    delete next.priorityId;
+                    return next;
+                  });
+                  setLocalError(null);
+                }}
+                className={fieldErrors.priorityId ? rdFieldInputErrorClass : rdFieldInputClass}
+                aria-invalid={!!fieldErrors.priorityId}
               >
                 {priorities.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -201,17 +249,32 @@ export function IssueEditForm({
                   </option>
                 ))}
               </select>
+              {fieldErrors.priorityId ? (
+                <span className="mt-0.5 block text-[9px] leading-snug text-danger">
+                  {fieldErrors.priorityId}
+                </span>
+              ) : null}
             </label>
 
-            <label className="min-w-0 block">
+            <label className="min-w-0 block" data-issue-field="statusId">
               <span className={rdFieldLabelClass}>
-                Current Stage
+                Current Stage <span className="text-danger">*</span>
               </span>
               <select
                 required
                 value={statusId}
-                onChange={(e) => setStatusId(e.target.value)}
-                className={rdFieldInputClass}
+                onChange={(e) => {
+                  setStatusId(e.target.value);
+                  setFieldErrors((prev) => {
+                    if (!prev.statusId) return prev;
+                    const next = { ...prev };
+                    delete next.statusId;
+                    return next;
+                  });
+                  setLocalError(null);
+                }}
+                className={fieldErrors.statusId ? rdFieldInputErrorClass : rdFieldInputClass}
+                aria-invalid={!!fieldErrors.statusId}
               >
                 {statuses.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -219,6 +282,11 @@ export function IssueEditForm({
                   </option>
                 ))}
               </select>
+              {fieldErrors.statusId ? (
+                <span className="mt-0.5 block text-[9px] leading-snug text-danger">
+                  {fieldErrors.statusId}
+                </span>
+              ) : null}
             </label>
 
             <label className="min-w-0 block">

@@ -1,6 +1,4 @@
-import { useAuthStore } from '@/store/useAuthStore';
-import { authUserFromToken } from '@/utils/permissions';
-import api from '@/api/axios';
+import api, { ensureAccessToken, refreshAccessToken } from '@/api/axios';
 
 export type AiStatus = {
   enabled: boolean;
@@ -25,21 +23,6 @@ export type AiSseHandlers = {
   onError?: (message: string) => void;
   onDone?: (ok: boolean, content?: string, structured?: AiStructuredAnswer) => void;
 };
-
-async function ensureAccessToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (token) return token;
-
-  try {
-    const res = await api.post('/auth/refresh');
-    token = res.data.accessToken as string;
-    useAuthStore.getState().setSession(token, authUserFromToken(res.data));
-    return token;
-  } catch {
-    useAuthStore.getState().clearSession();
-    return null;
-  }
-}
 
 export async function fetchAiStatus(): Promise<AiStatus> {
   const { data } = await api.get<AiStatus>('/ai/status');
@@ -75,16 +58,13 @@ export async function streamAiChat(
   });
 
   if (response.status === 401 && !retried) {
-    try {
-      const refresh = await api.post('/auth/refresh');
-      const newToken = refresh.data.accessToken as string;
-      useAuthStore.getState().setSession(newToken, authUserFromToken(refresh.data));
+    const newToken = await refreshAccessToken();
+    if (newToken) {
       return streamAiChat(message, handlers, signal, true);
-    } catch {
-      handlers.onError?.('Session expired. Please sign in again.');
-      handlers.onDone?.(false);
-      return;
     }
+    handlers.onError?.('Session expired. Please sign in again.');
+    handlers.onDone?.(false);
+    return;
   }
 
   if (response.status === 403) {

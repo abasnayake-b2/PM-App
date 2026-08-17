@@ -112,6 +112,7 @@ export function toManagementOption(member: TeamManagement): ProjectFormOption {
   return {
     id: member.id,
     label: member.fullName,
+    supervisorName: member.supervisorFullName ?? member.supervisorName ?? undefined,
   };
 }
 
