@@ -18,6 +18,18 @@ export default defineConfig({
         // Keep AI chat SSE open longer than the default proxy timeout
         timeout: 0,
         proxyTimeout: 0,
+        configure: (proxy) => {
+          // If the API ever returns an absolute redirect to :8080, keep it on the Vite origin.
+          proxy.on('proxyRes', (proxyRes) => {
+            const location = proxyRes.headers['location'];
+            if (typeof location === 'string' && /:\/\/localhost:8080\b/i.test(location)) {
+              proxyRes.headers['location'] = location.replace(
+                /^https?:\/\/localhost:8080/i,
+                '',
+              );
+            }
+          });
+        },
       },
     },
   },

@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import type { IssueFieldDefinition } from '@/api/issueFields.api';
 import {
   getDateFieldBounds,
+  isNonNegativeNumberField,
   isPercentageCompletionField,
+  sanitizeNonNegativeNumberInput,
   sanitizePercentageCompletionInput,
 } from '@/utils/issueFieldValidation';
 
@@ -235,6 +237,7 @@ export function IssueCustomFieldsEditor({
 
               if (field.dataType === 'NUMBER' || isPercentageCompletionField(field.fieldKey)) {
                 const isPct = isPercentageCompletionField(field.fieldKey);
+                const nonNegative = isPct || isNonNegativeNumberField(field.fieldKey);
                 return (
                   <label
                     key={field.id}
@@ -246,14 +249,16 @@ export function IssueCustomFieldsEditor({
                       type="number"
                       inputMode="numeric"
                       step={1}
-                      min={isPct ? 0 : undefined}
+                      min={nonNegative ? 0 : undefined}
                       max={isPct ? 100 : undefined}
                       required={field.required}
                       value={value}
                       onChange={(e) => {
                         const next = isPct
                           ? sanitizePercentageCompletionInput(e.target.value)
-                          : e.target.value;
+                          : nonNegative
+                            ? sanitizeNonNegativeNumberInput(e.target.value)
+                            : e.target.value;
                         onChange(field.fieldKey, next);
                       }}
                       onBlur={
@@ -262,13 +267,22 @@ export function IssueCustomFieldsEditor({
                               if (value === '') return;
                               onChange(field.fieldKey, sanitizePercentageCompletionInput(value));
                             }
-                          : undefined
+                          : nonNegative
+                            ? () => {
+                                if (value === '') return;
+                                onChange(field.fieldKey, sanitizeNonNegativeNumberInput(value));
+                              }
+                            : undefined
                       }
                       onKeyDown={
-                        isPct
+                        nonNegative
                           ? (e) => {
                               // Block e/E/+/- which number inputs otherwise allow
-                              if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                              if (['e', 'E', '+', '-'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                              // Percentage is integers only
+                              if (isPct && e.key === '.') {
                                 e.preventDefault();
                               }
                             }

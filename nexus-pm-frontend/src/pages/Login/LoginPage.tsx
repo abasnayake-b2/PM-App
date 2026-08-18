@@ -37,8 +37,9 @@ function postLoginPath(
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const fromPathname = (location.state as { from?: { pathname?: string } } | null)?.from
-    ?.pathname;
+  const fromState = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  const fromQuery = new URLSearchParams(location.search).get('next') ?? undefined;
+  const fromPathname = fromState || fromQuery;
   const setSession = useAuthStore((s) => s.setSession);
   const accessToken = useAuthStore((s) => s.accessToken);
   const [email, setEmail] = useState(remembered?.email ?? '');

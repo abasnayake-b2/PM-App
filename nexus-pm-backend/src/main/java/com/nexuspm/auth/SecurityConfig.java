@@ -1,21 +1,19 @@
 package com.nexuspm.auth;
 
-import com.nexuspm.auth.JwtAuthenticationFilter;
-import com.nexuspm.auth.RateLimitFilter;
 import com.nexuspm.shared.config.DfnPmProperties;
 import com.nexuspm.shared.logging.RequestLoggingFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -23,6 +21,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Configuration
@@ -40,6 +39,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> {
@@ -61,7 +63,16 @@ public class SecurityConfig {
                     }
                     auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
                     auth.anyRequest().authenticated();
-                });
+                })
+                // Expired/missing JWT leaves the request anonymous. Default Spring behavior is
+                // often 403 here; clients must see 401 so they can refresh or log out.
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeSecurityProblem(response, HttpServletResponse.SC_UNAUTHORIZED,
+                                        "UNAUTHORIZED", "Authentication required"))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeSecurityProblem(response, HttpServletResponse.SC_FORBIDDEN,
+                                        "ACCESS_DENIED", "You do not have permission to perform this action")));
 
         rateLimitFilter.ifAvailable(filter ->
                 http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class));
@@ -72,9 +83,13 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+    private static void writeSecurityProblem(
+            HttpServletResponse response, int status, String title, String detail) throws java.io.IOException {
+        response.setStatus(status);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        String body = "{\"title\":\"" + title + "\",\"detail\":\"" + detail + "\",\"status\":" + status + "}";
+        response.getWriter().write(body);
     }
 
     @Bean

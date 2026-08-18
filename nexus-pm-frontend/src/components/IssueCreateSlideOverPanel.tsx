@@ -73,7 +73,7 @@ export function IssueCreateSlideOverPanel({
           projects={projects}
           priorities={priorities ?? []}
           issueTypes={issueTypes ?? []}
-          initialProjectId={projectId || projects[0]?.id}
+          initialProjectId={projectId}
           lockProject={lockProject}
           variant="panel"
           loading={createIssue.isPending}

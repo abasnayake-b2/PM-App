@@ -2,15 +2,24 @@
 
 const FIELD_LABELS: Record<string, string> = {
   percentage_completion: 'Percentage Completion',
+  ba_ballpark_effort: 'BA Ballpark Effort',
+  bp_effort: 'BP Effort',
+  md_planned: 'Man-days Planned',
+  md_additional: 'Man-days Additional',
+  md_total: 'Man-days Total',
+  md_actually_utilized: 'Man-days Actually Utilized',
+  md_remaining: 'Man-days Remaining',
   requirement_initiated_date: 'Requirement Initiated Date',
   brd_requested_date: 'BRD Requested Date',
   brd_received_date: 'BRD Received Date',
-  rd_start_date: 'RD Start Date',
-  rd_delivery_eta: 'RD Delivery ETA',
-  rd_sign_off_date: 'RD Sign Off Date',
   bp_effort_eta: 'BP Effort ETA',
   bp_effort_accepted_date: 'BP Effort Accepted Date',
   total_effort_eta: 'Total Effort ETA',
+  rd_start_date: 'RD Start Date',
+  rd_delivery_eta: 'RD Delivery ETA',
+  rd_sign_off_date: 'RD Sign Off Date',
+  quotation_shared_date: 'Quotation Shared Date',
+  quotation_approved_date: 'Quotation Approved Date',
   dev_start_date: 'Dev Start Date',
   dev_end_date: 'Dev End Date',
   sit_start_date: 'SIT Start Date',
@@ -20,18 +29,23 @@ const FIELD_LABELS: Record<string, string> = {
   prod_date: 'Prod Date',
 };
 
-/** Ordered date chains: each filled date must be on or after earlier filled dates in the chain. */
+/**
+ * Single delivery timeline: each filled date must be on or after earlier filled dates.
+ * Empty fields are skipped so partial timelines still validate.
+ */
 export const DATE_CHAINS: string[][] = [
   [
     'requirement_initiated_date',
     'brd_requested_date',
     'brd_received_date',
+    'bp_effort_eta',
+    'bp_effort_accepted_date',
+    'total_effort_eta',
     'rd_start_date',
     'rd_delivery_eta',
     'rd_sign_off_date',
-  ],
-  ['bp_effort_eta', 'bp_effort_accepted_date', 'total_effort_eta'],
-  [
+    'quotation_shared_date',
+    'quotation_approved_date',
     'dev_start_date',
     'dev_end_date',
     'sit_start_date',
@@ -91,6 +105,41 @@ export function isPercentageCompletionField(fieldKey: string): boolean {
   return fieldKey === 'percentage_completion';
 }
 
+/** Effort / man-days fields that must be ≥ 0. */
+const NON_NEGATIVE_NUMBER_FIELDS = new Set([
+  'ba_ballpark_effort',
+  'bp_effort',
+  'md_planned',
+  'md_additional',
+  'md_total',
+  'md_actually_utilized',
+  'md_remaining',
+]);
+
+export function isNonNegativeNumberField(fieldKey: string): boolean {
+  return NON_NEGATIVE_NUMBER_FIELDS.has(fieldKey);
+}
+
+/**
+ * Keep only a non-negative number (optional decimals). Empty string allowed.
+ * Strips minus / scientific notation so negatives cannot be entered.
+ */
+export function sanitizeNonNegativeNumberInput(raw: string): string {
+  if (raw == null || raw === '') return '';
+  let next = String(raw).replace(/[eE+\-]/g, '');
+  // Allow a single decimal point
+  const firstDot = next.indexOf('.');
+  if (firstDot !== -1) {
+    next =
+      next.slice(0, firstDot + 1) + next.slice(firstDot + 1).replace(/\./g, '');
+  }
+  next = next.replace(/[^\d.]/g, '');
+  if (next === '' || next === '.') return next === '.' ? '0.' : '';
+  const n = Number(next);
+  if (!Number.isFinite(n) || n < 0) return '0';
+  return next;
+}
+
 /**
  * Restrict Percentage Completion input to digits and clamp to 0–100 while typing.
  * Empty string is allowed (cleared field).
@@ -145,6 +194,19 @@ export function validateIssueCustomFields(
       if (!Number.isFinite(n) || n < 0 || n > 100) {
         errors.percentage_completion = 'Must be a number between 0 and 100';
       }
+    }
+  }
+
+  for (const key of NON_NEGATIVE_NUMBER_FIELDS) {
+    const raw = (values[key] ?? '').trim();
+    if (!raw) continue;
+    if (!/^\d+(\.\d+)?$/.test(raw)) {
+      errors[key] = `${fieldLabel(key)} must be zero or greater`;
+      continue;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) {
+      errors[key] = `${fieldLabel(key)} must be zero or greater`;
     }
   }
 
