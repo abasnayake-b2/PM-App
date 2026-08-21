@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import {
@@ -16,11 +16,15 @@ import {
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import {
+  IssueCustomFieldsEditor,
+  IssueCustomFieldsView,
   RdSectionCard,
   rdFieldInputClass,
   rdFieldLabelClass,
   rdFieldTextareaClass,
+  riskSectionFields,
 } from '@/components/IssueCustomFields';
+import type { IssueFieldDefinition } from '@/api/issueFields.api';
 
 function apiErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
@@ -118,16 +122,21 @@ function RiskForm({
   onCancel: () => void;
   onSubmit: () => void;
 }) {
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const save = (e?: MouseEvent | KeyboardEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     onSubmit();
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
+    <div
       className="mt-2 space-y-1.5 rounded border border-accent/30 bg-bg p-2"
-      noValidate
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return;
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'TEXTAREA') return;
+        save(e);
+      }}
     >
       <h5 className="text-[10px] font-semibold uppercase tracking-wide text-accent">{title}</h5>
       <div className="grid grid-cols-2 gap-x-1 gap-y-1.5 sm:grid-cols-6 lg:grid-cols-7">
@@ -225,8 +234,9 @@ function RiskForm({
       )}
       <div className="flex gap-1.5">
         <button
-          type="submit"
+          type="button"
           disabled={loading}
+          onClick={save}
           className="rounded bg-accent px-2.5 py-1 text-[11px] font-medium disabled:opacity-50"
           style={{ color: 'var(--accent-fg)' }}
         >
@@ -241,17 +251,25 @@ function RiskForm({
           Cancel
         </button>
       </div>
-    </form>
+    </div>
   );
 }
 
 export function IssueRisksSection({
   issueId,
   mode = 'view',
+  customFields,
+  customFieldValues,
+  onCustomFieldChange,
+  customFieldErrors,
 }: {
   issueId: string;
   /** 'edit' forces manage controls; 'view' still allows manage when user has ISSUES_UPDATE. */
   mode?: 'view' | 'edit';
+  customFields?: IssueFieldDefinition[];
+  customFieldValues?: Record<string, string> | null;
+  onCustomFieldChange?: (fieldKey: string, value: string) => void;
+  customFieldErrors?: Record<string, string>;
 }) {
   const { can } = usePermissions();
   const canManage = can(P.ISSUES_UPDATE);
@@ -259,6 +277,7 @@ export function IssueRisksSection({
   const createRisk = useCreateIssueRisk(issueId);
   const updateRisk = useUpdateIssueRisk(issueId);
   const deleteRisk = useDeleteIssueRisk(issueId);
+  const riskFields = riskSectionFields(customFields ?? []);
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -296,6 +315,29 @@ export function IssueRisksSection({
 
   return (
     <RdSectionCard title="Risk" sectionCode="RISK" mode={mode === 'edit' ? 'edit' : 'view'}>
+      {riskFields.length > 0 && mode === 'edit' && onCustomFieldChange ? (
+        <div className="mb-2">
+          <IssueCustomFieldsEditor
+            fields={riskFields}
+            values={customFieldValues ?? {}}
+            onChange={onCustomFieldChange}
+            fieldErrors={customFieldErrors}
+            compact
+            includeRisk
+            wrapSections={false}
+          />
+        </div>
+      ) : null}
+      {riskFields.length > 0 && mode !== 'edit' ? (
+        <div className="mb-2">
+          <IssueCustomFieldsView
+            fields={riskFields}
+            values={customFieldValues}
+            includeRisk
+            wrapSections={false}
+          />
+        </div>
+      ) : null}
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
         <p className="text-[10px] text-text2">
           {risks.length} risk{risks.length !== 1 ? 's' : ''}

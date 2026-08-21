@@ -31,6 +31,8 @@ import {
   RdSectionCard,
 } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
+import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
+import { IssueNotesSection } from '@/components/IssueNotesSection';
 import { IssueJiraWorklogPanel } from '@/components/IssueJiraWorklogPanel';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
@@ -291,7 +293,7 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
 
           <RdSectionCard title="Details" sectionCode="GENERAL" mode="view">
             <dl className="grid grid-cols-3 gap-1 text-[11px] sm:grid-cols-6">
-              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-2">
+              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-3">
                 <dt className="mb-0.5 truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   JIRA ID
                 </dt>
@@ -299,7 +301,15 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
                   {issue.jiraId?.trim() ? issue.jiraId : '—'}
                 </dd>
               </div>
-              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-4">
+              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-3">
+                <dt className="mb-0.5 truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
+                  BMS ID
+                </dt>
+                <dd className="mt-0.5 break-words font-mono text-[11px] font-medium leading-snug text-text">
+                  {issue.bmsId?.trim() ? issue.bmsId : '—'}
+                </dd>
+              </div>
+              <div className="col-span-3 min-w-0 rounded border border-border/80 bg-bg px-1.5 py-1 sm:col-span-6">
                 <dt className="truncate px-0.5 py-0.5 text-left text-[9px] font-bold uppercase tracking-wide text-text">
                   Change Request Name
                 </dt>
@@ -348,7 +358,16 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
 
           <IssueCustomFieldsView fields={customFieldDefs} values={issue.customFields} />
 
-          <IssueRisksSection issueId={issue.id} mode="view" />
+          <IssueNotesSection issueId={issue.id} mode="view" />
+
+          <IssueQuarterlyCompletionSection issueId={issue.id} mode="view" />
+
+          <IssueRisksSection
+            issueId={issue.id}
+            mode="view"
+            customFields={customFieldDefs}
+            customFieldValues={issue.customFields}
+          />
 
           <div
             className={

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="022-rd-quarterly-completion" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="rd_issue_quarterly_completion"/>
+            </not>
+        </preConditions>
+        <comment>Multiple quarterly completion rows per RD (year, quarter, percentage).</comment>
+        <sql>
+            CREATE TABLE rd_issue_quarterly_completion (
+                id              CHAR(36)      NOT NULL PRIMARY KEY,
+                issue_id        CHAR(36)      NOT NULL,
+                year            INT           NOT NULL,
+                quarter         INT           NOT NULL,
+                percentage      DECIMAL(5,2)  NOT NULL,
+                deleted         TINYINT(1)    NOT NULL DEFAULT 0,
+                version         BIGINT        NOT NULL DEFAULT 0,
+                created_by      CHAR(36)      NULL,
+                updated_by      CHAR(36)      NULL,
+                created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_issue_qc_issue (issue_id, deleted),
+                KEY idx_issue_qc_year_quarter (issue_id, year, quarter),
+                CONSTRAINT fk_issue_qc_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

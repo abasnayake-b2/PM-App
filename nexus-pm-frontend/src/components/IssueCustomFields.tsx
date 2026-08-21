@@ -39,6 +39,7 @@ const SECTION_TINT: Record<string, string> = {
   FINANCIALS: 'from-emerald-500/10 to-transparent',
   MAN_DAYS: 'from-amber-500/10 to-transparent',
   MILESTONES: 'from-indigo-500/10 to-transparent',
+  QUARTERLY_COMPLETION: 'from-cyan-500/10 to-transparent',
   RISK: 'from-rose-500/10 to-transparent',
   OTHER: 'from-[color:var(--bg3)] to-transparent',
 };
@@ -73,12 +74,27 @@ export function RdSectionCard({
   );
 }
 
-export function groupIssueFieldsBySection(fields: IssueFieldDefinition[]) {
+export function isRiskSectionField(field: IssueFieldDefinition) {
+  return (field.sectionCode?.trim() || '') === 'RISK';
+}
+
+export function riskSectionFields(fields: IssueFieldDefinition[]) {
+  return fields.filter(isRiskSectionField);
+}
+
+export function groupIssueFieldsBySection(
+  fields: IssueFieldDefinition[],
+  options?: { includeRisk?: boolean },
+) {
+  const includeRisk = options?.includeRisk ?? false;
   const groups = new Map<string, IssueFieldDefinition[]>();
   for (const field of fields) {
     const key = field.sectionCode?.trim() || 'OTHER';
-    // Multi-row risks use IssueRisksSection / rd_issue_risk — skip flat RISK defs.
-    if (key === 'RISK') continue;
+    // Multi-row risks use IssueRisksSection / rd_issue_risk — skip flat RISK defs
+    // unless the caller is rendering them inside that section.
+    if (!includeRisk && key === 'RISK') continue;
+    // Multi-row notes use IssueNotesSection / rd_issue_note.
+    if (field.fieldKey === 'notes') continue;
     const list = groups.get(key) ?? [];
     list.push(field);
     groups.set(key, list);
@@ -107,6 +123,10 @@ interface IssueCustomFieldsEditorProps {
   compact?: boolean;
   /** Per-field validation messages keyed by fieldKey. */
   fieldErrors?: Record<string, string>;
+  /** Include RISK-section fields (normally rendered inside IssueRisksSection). */
+  includeRisk?: boolean;
+  /** When false, render field grids without section cards. */
+  wrapSections?: boolean;
 }
 
 export function IssueCustomFieldsEditor({
@@ -115,10 +135,12 @@ export function IssueCustomFieldsEditor({
   onChange,
   compact = true,
   fieldErrors = {},
+  includeRisk = false,
+  wrapSections = true,
 }: IssueCustomFieldsEditorProps) {
   if (fields.length === 0) return null;
 
-  const groups = groupIssueFieldsBySection(fields);
+  const groups = groupIssueFieldsBySection(fields, { includeRisk });
   // Dense: ~6–8 fields per row so most sections fit in 1–2 rows on the half-width RD panel.
   const gridClass = compact
     ? 'grid grid-cols-3 gap-x-1 gap-y-1.5 sm:grid-cols-6 lg:grid-cols-7'
@@ -127,13 +149,8 @@ export function IssueCustomFieldsEditor({
 
   return (
     <div className={compact ? 'space-y-2' : 'space-y-5'}>
-      {groups.map((group) => (
-        <RdSectionCard
-          key={group.sectionCode}
-          title={group.label}
-          sectionCode={group.sectionCode}
-          mode="edit"
-        >
+      {groups.map((group) => {
+        const grid = (
           <div className={gridClass}>
             {group.items.map((field) => {
               const value = values[field.fieldKey] ?? '';
@@ -340,8 +357,21 @@ export function IssueCustomFieldsEditor({
               );
             })}
           </div>
-        </RdSectionCard>
-      ))}
+        );
+        if (!wrapSections) {
+          return <div key={group.sectionCode}>{grid}</div>;
+        }
+        return (
+          <RdSectionCard
+            key={group.sectionCode}
+            title={group.label}
+            sectionCode={group.sectionCode}
+            mode="edit"
+          >
+            {grid}
+          </RdSectionCard>
+        );
+      })}
     </div>
   );
 }
@@ -349,25 +379,29 @@ export function IssueCustomFieldsEditor({
 interface IssueCustomFieldsViewProps {
   fields: IssueFieldDefinition[];
   values?: Record<string, string> | null;
+  includeRisk?: boolean;
+  wrapSections?: boolean;
 }
 
-export function IssueCustomFieldsView({ fields, values }: IssueCustomFieldsViewProps) {
+export function IssueCustomFieldsView({
+  fields,
+  values,
+  includeRisk = false,
+  wrapSections = true,
+}: IssueCustomFieldsViewProps) {
   if (!fields.length) {
-    return <p className="text-xs text-text2">No additional fields configured.</p>;
+    return wrapSections ? (
+      <p className="text-xs text-text2">No additional fields configured.</p>
+    ) : null;
   }
 
   const map = values ?? {};
-  const groups = groupIssueFieldsBySection(fields);
+  const groups = groupIssueFieldsBySection(fields, { includeRisk });
 
   return (
     <div className="space-y-2">
-      {groups.map((group) => (
-        <RdSectionCard
-          key={group.sectionCode}
-          title={group.label}
-          sectionCode={group.sectionCode}
-          mode="view"
-        >
+      {groups.map((group) => {
+        const grid = (
           <dl className="grid grid-cols-3 gap-1 text-[11px] sm:grid-cols-6 lg:grid-cols-7">
             {group.items.map((field) => {
               const raw = (map[field.fieldKey] ?? '').trim();
@@ -396,8 +430,21 @@ export function IssueCustomFieldsView({ fields, values }: IssueCustomFieldsViewP
               );
             })}
           </dl>
-        </RdSectionCard>
-      ))}
+        );
+        if (!wrapSections) {
+          return <div key={group.sectionCode}>{grid}</div>;
+        }
+        return (
+          <RdSectionCard
+            key={group.sectionCode}
+            title={group.label}
+            sectionCode={group.sectionCode}
+            mode="view"
+          >
+            {grid}
+          </RdSectionCard>
+        );
+      })}
     </div>
   );
 }

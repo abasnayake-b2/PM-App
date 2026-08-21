@@ -25,5 +25,11 @@
     <include file="db/changelog/changes/018-pmo-permissions.xml"/>
     <include file="db/changelog/changes/019-project-jira-key.xml"/>
     <include file="db/changelog/changes/020-employment-type.xml"/>
+    <include file="db/changelog/changes/021-rd-additional-fields.xml"/>
+    <include file="db/changelog/changes/022-rd-quarterly-completion.xml"/>
+    <include file="db/changelog/changes/023-rd-milestone-audit-dates.xml"/>
+    <include file="db/changelog/changes/024-rename-quotation-approved-date-label.xml"/>
+    <include file="db/changelog/changes/025-rd-issue-notes.xml"/>
+    <include file="db/changelog/changes/026-rd-issue-bms-id.xml"/>
 
 </databaseChangeLog>

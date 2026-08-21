@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="023-rd-milestone-audit-dates" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="issue_field_definition"/>
+        </preConditions>
+        <comment>Project milestones: Release Audit Date and Last Action date.</comment>
+        <sql>
+            INSERT IGNORE INTO issue_field_definition
+            (id, field_key, label, data_type, max_length, required, active, system_field, section_code, display_order, options_json)
+            VALUES
+            ('c1000001-0000-0000-0000-000000000073', 'release_audit_date', 'Release Audit Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 620, NULL),
+            ('c1000001-0000-0000-0000-000000000074', 'last_action_date', 'Last Action date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 630, NULL);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

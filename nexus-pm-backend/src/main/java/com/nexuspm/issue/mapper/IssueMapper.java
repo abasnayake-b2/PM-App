@@ -19,6 +19,7 @@ public class IssueMapper {
                 .childNumber(issue.getChildNumber())
                 .title(issue.getTitle())
                 .jiraId(issue.getJiraId())
+                .bmsId(issue.getBmsId())
                 .description(issue.getDescription())
                 .releaseId(release != null ? release.getId() : null)
                 .releaseName(release != null ? release.getName() : null)

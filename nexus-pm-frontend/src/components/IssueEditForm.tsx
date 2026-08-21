@@ -13,6 +13,8 @@ import {
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
+import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
+import { IssueNotesSection } from '@/components/IssueNotesSection';
 import {
   firstCustomFieldErrorMessage,
   firstFieldErrorKey,
@@ -55,6 +57,7 @@ export function IssueEditForm({
 
   const [title, setTitle] = useState(issue.title);
   const [jiraId, setJiraId] = useState(issue.jiraId ?? '');
+  const [bmsId, setBmsId] = useState(issue.bmsId ?? '');
   const [description, setDescription] = useState(issue.description ?? '');
   const [priorityId, setPriorityId] = useState(issue.priorityId);
   const [statusId, setStatusId] = useState(issue.statusId);
@@ -70,6 +73,7 @@ export function IssueEditForm({
   useEffect(() => {
     setTitle(issue.title);
     setJiraId(issue.jiraId ?? '');
+    setBmsId(issue.bmsId ?? '');
     setDescription(issue.description ?? '');
     setPriorityId(issue.priorityId);
     setStatusId(issue.statusId);
@@ -148,6 +152,13 @@ export function IssueEditForm({
       payload.clearJiraId = true;
     }
 
+    const trimmedBms = bmsId.trim();
+    if (trimmedBms) {
+      payload.bmsId = trimmedBms;
+    } else if (issue.bmsId) {
+      payload.clearBmsId = true;
+    }
+
     if (capitalizable === 'true') {
       payload.capitalizable = true;
     } else if (capitalizable === 'false') {
@@ -166,19 +177,33 @@ export function IssueEditForm({
           </h3>
         </div>
         <div className="space-y-2.5 p-2.5">
-          <label className="block min-w-0">
-            <span className={rdFieldLabelClass}>
-              JIRA ID
-            </span>
-            <input
-              type="text"
-              maxLength={80}
-              value={jiraId}
-              onChange={(e) => setJiraId(e.target.value)}
-              className={rdFieldInputClass}
-              placeholder="e.g. PROJ-123"
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-x-1 gap-y-1.5">
+            <label className="block min-w-0">
+              <span className={rdFieldLabelClass}>
+                JIRA ID
+              </span>
+              <input
+                type="text"
+                maxLength={80}
+                value={jiraId}
+                onChange={(e) => setJiraId(e.target.value)}
+                className={rdFieldInputClass}
+                placeholder="e.g. PROJ-123"
+              />
+            </label>
+            <label className="block min-w-0">
+              <span className={rdFieldLabelClass}>
+                BMS ID
+              </span>
+              <input
+                type="text"
+                maxLength={80}
+                value={bmsId}
+                onChange={(e) => setBmsId(e.target.value)}
+                className={rdFieldInputClass}
+              />
+            </label>
+          </div>
 
           <label className="block min-w-0" data-issue-field="title">
             <span className={rdFieldLabelClass}>
@@ -315,7 +340,18 @@ export function IssueEditForm({
         compact
       />
 
-      <IssueRisksSection issueId={issue.id} mode="edit" />
+      <IssueNotesSection issueId={issue.id} mode="edit" />
+
+      <IssueQuarterlyCompletionSection issueId={issue.id} mode="edit" />
+
+      <IssueRisksSection
+        issueId={issue.id}
+        mode="edit"
+        customFields={customFieldDefs}
+        customFieldValues={customFields}
+        onCustomFieldChange={handleCustomChange}
+        customFieldErrors={fieldErrors}
+      />
 
       {errorMessage && (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-2 py-1.5 text-xs text-danger">

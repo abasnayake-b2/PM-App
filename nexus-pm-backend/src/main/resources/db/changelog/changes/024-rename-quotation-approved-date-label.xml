@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="024-rename-quotation-approved-date-label" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="issue_field_definition"/>
+        </preConditions>
+        <comment>Rename Quotation Approved Date label to Quotation Accepted Date.</comment>
+        <sql>
+            UPDATE issue_field_definition
+            SET label = 'Quotation Accepted Date'
+            WHERE field_key = 'quotation_approved_date';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

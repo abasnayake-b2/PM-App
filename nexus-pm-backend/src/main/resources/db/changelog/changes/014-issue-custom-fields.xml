@@ -79,7 +79,7 @@
       ('c1000001-0000-0000-0000-000000000031', 'quote_done', 'Quote Done?', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 320, '["Yes","No"]'),
       ('c1000001-0000-0000-0000-000000000032', 'quotation', 'Quotation', 'NUMBER', NULL, 0, 1, 1, 'FINANCIALS', 330, NULL),
       ('c1000001-0000-0000-0000-000000000033', 'quotation_shared_date', 'Quotation Shared Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 340, NULL),
-      ('c1000001-0000-0000-0000-000000000034', 'quotation_approved_date', 'Quotation Approved Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 350, NULL),
+      ('c1000001-0000-0000-0000-000000000034', 'quotation_approved_date', 'Quotation Accepted Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 350, NULL),
       ('c1000001-0000-0000-0000-000000000035', 'deal_desk_approval_status', 'Deal Desk Approval Status', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 360, '["Approved","Not Approved","Reject"]'),
       ('c1000001-0000-0000-0000-000000000036', 'payment_status', 'Payment Status', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 370, '["Open","Completed"]'),
       ('c1000001-0000-0000-0000-000000000040', 'md_planned', 'Man-days Planned', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 410, NULL),

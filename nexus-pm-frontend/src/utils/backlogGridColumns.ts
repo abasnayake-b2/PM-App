@@ -15,6 +15,7 @@ export type BacklogCategory =
 export type BacklogColumnKey =
   | 'displayKey'
   | 'jiraId'
+  | 'bmsId'
   | 'title'
   | 'description'
   | 'status'
@@ -98,6 +99,7 @@ export const CATEGORY_THEME: Record<
 const COMPACT_COLUMN_KEYS: BacklogColumnKey[] = [
   'displayKey',
   'jiraId',
+  'bmsId',
   'title',
   'status',
   'project',
@@ -119,6 +121,14 @@ export function buildBacklogColumns(options: {
       minWidth: 'min-w-[7.5rem]',
       defaultWidthPx: 120,
       sticky: true,
+      resizable: true,
+    },
+    {
+      key: 'bmsId',
+      category: 'Core',
+      header: 'BMS ID',
+      minWidth: 'min-w-[7.5rem]',
+      defaultWidthPx: 120,
       resizable: true,
     },
     {
@@ -153,6 +163,7 @@ export function buildBacklogColumns(options: {
     { key: 'cf:delivery_quarter', category: 'General', header: 'Delivery Quarter', minWidth: 'min-w-[6rem]', resizable: true },
     { key: 'cf:delivery_year', category: 'General', header: 'Delivery Year', minWidth: 'min-w-[5.5rem]', resizable: true },
     { key: 'cf:percentage_completion', category: 'General', header: 'Percentage Completion', minWidth: 'min-w-[6.5rem]', resizable: true },
+    { key: 'cf:rag_status', category: 'General', header: 'RAG Status', minWidth: 'min-w-[6rem]', resizable: true },
 
     { key: 'cf:requirement_initiated_date', category: 'Dates', header: 'Requirement Initiated Date', minWidth: 'min-w-[8rem]', resizable: true },
     { key: 'cf:brd_requested_date', category: 'Dates', header: 'BRD Requested Date', minWidth: 'min-w-[8rem]', resizable: true },
@@ -165,12 +176,15 @@ export function buildBacklogColumns(options: {
     { key: 'cf:rd_start_date', category: 'Dates', header: 'RD Start Date', minWidth: 'min-w-[7.5rem]', resizable: true },
     { key: 'cf:rd_delivery_eta', category: 'Dates', header: 'RD Delivery ETA', minWidth: 'min-w-[7.5rem]', resizable: true },
     { key: 'cf:rd_sign_off_date', category: 'Dates', header: 'RD Sign Off Date', minWidth: 'min-w-[7.5rem]', resizable: true },
+    { key: 'cf:highlevel_rd_delivery_eta', category: 'Dates', header: 'Highlevel RD Delivery ETA', minWidth: 'min-w-[9rem]', resizable: true },
+    { key: 'cf:pending_highlevel_rd_signoff', category: 'Dates', header: 'Pending Highlevel RD Signoff', minWidth: 'min-w-[9.5rem]', resizable: true },
+    { key: 'cf:requirement_audit_date', category: 'Dates', header: 'Requirement Audit Date', minWidth: 'min-w-[8.5rem]', resizable: true },
 
     { key: 'cf:costing_done', category: 'Financials', header: 'Costing Done?', minWidth: 'min-w-[6.5rem]', resizable: true },
     { key: 'cf:quote_done', category: 'Financials', header: 'Quote Done?', minWidth: 'min-w-[6rem]', resizable: true },
     { key: 'cf:quotation', category: 'Financials', header: 'Quotation', minWidth: 'min-w-[6rem]', resizable: true },
     { key: 'cf:quotation_shared_date', category: 'Financials', header: 'Quotation Shared Date', minWidth: 'min-w-[8rem]', resizable: true },
-    { key: 'cf:quotation_approved_date', category: 'Financials', header: 'Quotation Approved Date', minWidth: 'min-w-[8.5rem]', resizable: true },
+    { key: 'cf:quotation_approved_date', category: 'Financials', header: 'Quotation Accepted Date', minWidth: 'min-w-[8.5rem]', resizable: true },
     { key: 'cf:deal_desk_approval_status', category: 'Financials', header: 'Deal Desk Approval Status', minWidth: 'min-w-[9rem]', resizable: true },
     { key: 'cf:payment_status', category: 'Financials', header: 'Payment Status', minWidth: 'min-w-[7rem]', resizable: true },
 
@@ -179,6 +193,10 @@ export function buildBacklogColumns(options: {
     { key: 'cf:md_total', category: 'Man-days', header: 'Man-days Total', minWidth: 'min-w-[6.5rem]', resizable: true },
     { key: 'cf:md_actually_utilized', category: 'Man-days', header: 'Man-days Actually Utilized', minWidth: 'min-w-[8.5rem]', resizable: true },
     { key: 'cf:md_remaining', category: 'Man-days', header: 'Man-days Remaining', minWidth: 'min-w-[7.5rem]', resizable: true },
+    { key: 'cf:over_utilization_pct', category: 'Man-days', header: 'Over Utilization %', minWidth: 'min-w-[7.5rem]', resizable: true },
+    { key: 'cf:completion_based_on_actual_effort', category: 'Man-days', header: 'Completion based on Actual Effort', minWidth: 'min-w-[10rem]', resizable: true },
+    { key: 'cf:latest_client_acknowledged_percentage', category: 'Man-days', header: 'Latest client acknowledged percentage', minWidth: 'min-w-[11rem]', resizable: true },
+    { key: 'cf:completion_70_pct_based_on_actual_effort', category: 'Man-days', header: '70% of Completion based on Actual effort', minWidth: 'min-w-[12rem]', resizable: true },
 
     { key: 'cf:dev_start_date', category: 'Milestones', header: 'Dev Start Date', minWidth: 'min-w-[7.5rem]', resizable: true },
     { key: 'cf:dev_end_date', category: 'Milestones', header: 'Dev End Date', minWidth: 'min-w-[7rem]', resizable: true },
@@ -187,6 +205,14 @@ export function buildBacklogColumns(options: {
     { key: 'cf:uat_start_date', category: 'Milestones', header: 'UAT Start Date', minWidth: 'min-w-[7.5rem]', resizable: true },
     { key: 'cf:uat_end_date', category: 'Milestones', header: 'UAT End Date', minWidth: 'min-w-[7rem]', resizable: true },
     { key: 'cf:prod_date', category: 'Milestones', header: 'Prod Date', minWidth: 'min-w-[6.5rem]', resizable: true },
+    { key: 'cf:next_uat_release', category: 'Milestones', header: 'Next UAT Release', minWidth: 'min-w-[8rem]', resizable: true },
+    { key: 'cf:release_count', category: 'Milestones', header: 'Release Count', minWidth: 'min-w-[6.5rem]', resizable: true },
+    { key: 'cf:uat_defect_count', category: 'Milestones', header: 'UAT Defect Count', minWidth: 'min-w-[7.5rem]', resizable: true },
+    { key: 'cf:next_production_release', category: 'Milestones', header: 'Next Production Release', minWidth: 'min-w-[9rem]', resizable: true },
+    { key: 'cf:release_audit_date', category: 'Milestones', header: 'Release Audit Date', minWidth: 'min-w-[8rem]', resizable: true },
+    { key: 'cf:last_action_date', category: 'Milestones', header: 'Last Action date', minWidth: 'min-w-[7.5rem]', resizable: true },
+
+    { key: 'cf:risk_count', category: 'Risk', header: 'Risk Count', minWidth: 'min-w-[6rem]', resizable: true },
 
     {
       key: 'cf:notes',

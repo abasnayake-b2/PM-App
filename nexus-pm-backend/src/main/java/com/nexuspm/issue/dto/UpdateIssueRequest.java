@@ -16,6 +16,11 @@ public class UpdateIssueRequest {
     private String jiraId;
 
     private Boolean clearJiraId;
+
+    @Size(max = 80)
+    private String bmsId;
+
+    private Boolean clearBmsId;
     private String description;
     private UUID priorityId;
     private UUID assignedToId;

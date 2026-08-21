@@ -53,7 +53,7 @@ public class BacklogExcelExportService {
 
     private enum CoreField {
         PROJECT, EM, COUNTRY, VP,
-        DISPLAY_KEY, JIRA_ID, TITLE, DESCRIPTION, STATUS, PRIORITY, CAPITALIZABLE, ASSIGNEE
+        DISPLAY_KEY, JIRA_ID, BMS_ID, TITLE, DESCRIPTION, STATUS, PRIORITY, CAPITALIZABLE, ASSIGNEE
     }
 
     private record ColumnDef(String category, String header, CoreField core, String fieldKey, ValueType type) {
@@ -70,6 +70,7 @@ public class BacklogExcelExportService {
     private static final List<ColumnDef> COLUMNS = List.of(
             ColumnDef.core("Core", "CR No / ID", CoreField.DISPLAY_KEY, ValueType.TEXT),
             ColumnDef.core("Core", "JIRA ID", CoreField.JIRA_ID, ValueType.TEXT),
+            ColumnDef.core("Core", "BMS ID", CoreField.BMS_ID, ValueType.TEXT),
             ColumnDef.core("Core", "Change Request Name", CoreField.TITLE, ValueType.TEXT),
             ColumnDef.core("Core", "Description", CoreField.DESCRIPTION, ValueType.WRAP),
             ColumnDef.core("Core", "Current Stage", CoreField.STATUS, ValueType.TEXT),
@@ -84,6 +85,7 @@ public class BacklogExcelExportService {
             ColumnDef.field("General", "Delivery Quarter", "delivery_quarter", ValueType.TEXT),
             ColumnDef.field("General", "Delivery Year", "delivery_year", ValueType.TEXT),
             ColumnDef.field("General", "Percentage Completion", "percentage_completion", ValueType.TEXT),
+            ColumnDef.field("General", "RAG Status", "rag_status", ValueType.TEXT),
 
             ColumnDef.field("Dates", "Requirement Initiated Date", "requirement_initiated_date", ValueType.DATE),
             ColumnDef.field("Dates", "BRD Requested Date", "brd_requested_date", ValueType.DATE),
@@ -96,12 +98,15 @@ public class BacklogExcelExportService {
             ColumnDef.field("Dates", "RD Start Date", "rd_start_date", ValueType.DATE),
             ColumnDef.field("Dates", "RD Delivery ETA", "rd_delivery_eta", ValueType.DATE),
             ColumnDef.field("Dates", "RD Sign Off Date", "rd_sign_off_date", ValueType.DATE),
+            ColumnDef.field("Dates", "Highlevel RD Delivery ETA", "highlevel_rd_delivery_eta", ValueType.DATE),
+            ColumnDef.field("Dates", "Pending Highlevel RD Signoff", "pending_highlevel_rd_signoff", ValueType.DATE),
+            ColumnDef.field("Dates", "Requirement Audit Date", "requirement_audit_date", ValueType.DATE),
 
             ColumnDef.field("Financials", "Costing Done?", "costing_done", ValueType.TEXT),
             ColumnDef.field("Financials", "Quote Done?", "quote_done", ValueType.TEXT),
             ColumnDef.field("Financials", "Quotation", "quotation", ValueType.NUMBER),
             ColumnDef.field("Financials", "Quotation Shared Date", "quotation_shared_date", ValueType.DATE),
-            ColumnDef.field("Financials", "Quotation Approved Date", "quotation_approved_date", ValueType.DATE),
+            ColumnDef.field("Financials", "Quotation Accepted Date", "quotation_approved_date", ValueType.DATE),
             ColumnDef.field("Financials", "Deal Desk Approval Status", "deal_desk_approval_status", ValueType.TEXT),
             ColumnDef.field("Financials", "Payment Status", "payment_status", ValueType.TEXT),
 
@@ -110,6 +115,10 @@ public class BacklogExcelExportService {
             ColumnDef.field("Man-days", "Man-days Total", "md_total", ValueType.NUMBER),
             ColumnDef.field("Man-days", "Man-days Actually Utilized", "md_actually_utilized", ValueType.NUMBER),
             ColumnDef.field("Man-days", "Man-days Remaining", "md_remaining", ValueType.NUMBER),
+            ColumnDef.field("Man-days", "Over Utilization %", "over_utilization_pct", ValueType.NUMBER),
+            ColumnDef.field("Man-days", "Completion based on Actual Effort", "completion_based_on_actual_effort", ValueType.NUMBER),
+            ColumnDef.field("Man-days", "Latest client acknowledged percentage", "latest_client_acknowledged_percentage", ValueType.NUMBER),
+            ColumnDef.field("Man-days", "70% of Completion based on Actual effort", "completion_70_pct_based_on_actual_effort", ValueType.NUMBER),
 
             ColumnDef.field("Milestones", "Dev Start Date", "dev_start_date", ValueType.DATE),
             ColumnDef.field("Milestones", "Dev End Date", "dev_end_date", ValueType.DATE),
@@ -118,6 +127,14 @@ public class BacklogExcelExportService {
             ColumnDef.field("Milestones", "UAT Start Date", "uat_start_date", ValueType.DATE),
             ColumnDef.field("Milestones", "UAT End Date", "uat_end_date", ValueType.DATE),
             ColumnDef.field("Milestones", "Prod Date", "prod_date", ValueType.DATE),
+            ColumnDef.field("Milestones", "Next UAT Release", "next_uat_release", ValueType.DATE),
+            ColumnDef.field("Milestones", "Release Count", "release_count", ValueType.NUMBER),
+            ColumnDef.field("Milestones", "UAT Defect Count", "uat_defect_count", ValueType.NUMBER),
+            ColumnDef.field("Milestones", "Next Production Release", "next_production_release", ValueType.DATE),
+            ColumnDef.field("Milestones", "Release Audit Date", "release_audit_date", ValueType.DATE),
+            ColumnDef.field("Milestones", "Last Action date", "last_action_date", ValueType.DATE),
+
+            ColumnDef.field("Risk", "Risk Count", "risk_count", ValueType.NUMBER),
 
             ColumnDef.field("Other", "Notes", "notes", ValueType.WRAP)
     );
@@ -392,7 +409,7 @@ public class BacklogExcelExportService {
                 width = col.core == CoreField.TITLE ? 42 : 36;
             } else if (col.core == CoreField.DISPLAY_KEY) {
                 width = 22;
-            } else if (col.core == CoreField.JIRA_ID) {
+            } else if (col.core == CoreField.JIRA_ID || col.core == CoreField.BMS_ID) {
                 width = 16;
             } else if (col.type == ValueType.WRAP
                     || "Notes".equals(col.header)) {
@@ -455,6 +472,7 @@ public class BacklogExcelExportService {
                 case VP -> setText(row, col, vpName(issue), palette.text);
                 case DISPLAY_KEY -> setText(row, col, displayKey(issue), palette.text);
                 case JIRA_ID -> setText(row, col, issue.getJiraId(), palette.text);
+                case BMS_ID -> setText(row, col, issue.getBmsId(), palette.text);
                 case TITLE -> setText(row, col, issue.getTitle(), palette.text);
                 case DESCRIPTION -> setText(row, col, issue.getDescription(), palette.wrap);
                 case STATUS -> setText(row, col,

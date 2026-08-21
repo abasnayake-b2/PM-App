@@ -56,6 +56,10 @@ public class RdIssue extends AuditableEntity {
     @Column(name = "jira_id", length = 80)
     private String jiraId;
 
+    /** External BMS id (optional). */
+    @Column(name = "bms_id", length = 80)
+    private String bmsId;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

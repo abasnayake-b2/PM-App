@@ -15,6 +15,8 @@ import { P } from '@/utils/permissions';
 import { fetchActiveIssueFields } from '@/api/issueFields.api';
 import { IssueCustomFieldsView } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
+import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
+import { IssueNotesSection } from '@/components/IssueNotesSection';
 import { allowedChildWorkflowCodes, canHaveChildren, childCreateUrl } from '@/utils/issueHierarchy';
 
 export function IssueDetailPage() {
@@ -395,6 +397,10 @@ export function IssueDetailPage() {
               <dd className="font-mono">{issue.jiraId?.trim() ? issue.jiraId : '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
+              <dt className="text-text2">BMS ID</dt>
+              <dd className="font-mono">{issue.bmsId?.trim() ? issue.bmsId : '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
               <dt className="text-text2">Type</dt>
               <dd>
                 <IssueTypeIcon
@@ -441,7 +447,11 @@ export function IssueDetailPage() {
           <IssueDetailCustomFields values={issue.customFields} />
         </section>
 
-        <IssueRisksSection issueId={issue.id} mode="view" />
+        <IssueNotesSection issueId={issue.id} mode="view" />
+
+        <IssueQuarterlyCompletionSection issueId={issue.id} mode="view" />
+
+        <IssueDetailRisks issueId={issue.id} values={issue.customFields} />
       </div>
     </div>
   );
@@ -453,4 +463,25 @@ function IssueDetailCustomFields({ values }: { values?: Record<string, string> |
     queryFn: fetchActiveIssueFields,
   });
   return <IssueCustomFieldsView fields={fields} values={values} />;
+}
+
+function IssueDetailRisks({
+  issueId,
+  values,
+}: {
+  issueId: string;
+  values?: Record<string, string> | null;
+}) {
+  const { data: fields = [] } = useQuery({
+    queryKey: ['issue-fields-active'],
+    queryFn: fetchActiveIssueFields,
+  });
+  return (
+    <IssueRisksSection
+      issueId={issueId}
+      mode="view"
+      customFields={fields}
+      customFieldValues={values}
+    />
+  );
 }

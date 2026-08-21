@@ -9,6 +9,13 @@ const FIELD_LABELS: Record<string, string> = {
   md_total: 'Man-days Total',
   md_actually_utilized: 'Man-days Actually Utilized',
   md_remaining: 'Man-days Remaining',
+  over_utilization_pct: 'Over Utilization %',
+  completion_based_on_actual_effort: 'Completion based on Actual Effort',
+  latest_client_acknowledged_percentage: 'Latest client acknowledged percentage',
+  completion_70_pct_based_on_actual_effort: '70% of Completion based on Actual effort',
+  risk_count: 'Risk Count',
+  release_count: 'Release Count',
+  uat_defect_count: 'UAT Defect Count',
   requirement_initiated_date: 'Requirement Initiated Date',
   brd_requested_date: 'BRD Requested Date',
   brd_received_date: 'BRD Received Date',
@@ -19,7 +26,7 @@ const FIELD_LABELS: Record<string, string> = {
   rd_delivery_eta: 'RD Delivery ETA',
   rd_sign_off_date: 'RD Sign Off Date',
   quotation_shared_date: 'Quotation Shared Date',
-  quotation_approved_date: 'Quotation Approved Date',
+  quotation_approved_date: 'Quotation Accepted Date',
   dev_start_date: 'Dev Start Date',
   dev_end_date: 'Dev End Date',
   sit_start_date: 'SIT Start Date',
@@ -27,6 +34,13 @@ const FIELD_LABELS: Record<string, string> = {
   uat_start_date: 'UAT Start Date',
   uat_end_date: 'UAT End Date',
   prod_date: 'Prod Date',
+  highlevel_rd_delivery_eta: 'Highlevel RD Delivery ETA',
+  pending_highlevel_rd_signoff: 'Pending Highlevel RD Signoff',
+  requirement_audit_date: 'Requirement Audit Date',
+  next_uat_release: 'Next UAT Release',
+  next_production_release: 'Next Production Release',
+  release_audit_date: 'Release Audit Date',
+  last_action_date: 'Last Action date',
 };
 
 /**
@@ -114,6 +128,13 @@ const NON_NEGATIVE_NUMBER_FIELDS = new Set([
   'md_total',
   'md_actually_utilized',
   'md_remaining',
+  'over_utilization_pct',
+  'completion_based_on_actual_effort',
+  'latest_client_acknowledged_percentage',
+  'completion_70_pct_based_on_actual_effort',
+  'risk_count',
+  'release_count',
+  'uat_defect_count',
 ]);
 
 export function isNonNegativeNumberField(fieldKey: string): boolean {

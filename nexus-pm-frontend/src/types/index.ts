@@ -133,6 +133,7 @@ export interface Issue {
   childNumber?: number;
   title: string;
   jiraId?: string;
+  bmsId?: string;
   description?: string;
   releaseId?: string;
   releaseName?: string;

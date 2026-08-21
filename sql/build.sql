@@ -29,6 +29,9 @@ DROP TABLE IF EXISTS holiday_calendar;
 DROP TABLE IF EXISTS time_log;
 DROP TABLE IF EXISTS allocation;
 DROP TABLE IF EXISTS task;
+DROP TABLE IF EXISTS rd_issue_note;
+DROP TABLE IF EXISTS rd_issue_quarterly_completion;
+DROP TABLE IF EXISTS rd_issue_risk;
 DROP TABLE IF EXISTS issue_field_value;
 DROP TABLE IF EXISTS issue_field_definition;
 DROP TABLE IF EXISTS rd_issue;
@@ -439,6 +442,7 @@ CREATE TABLE rd_issue (
     child_number         INT           NULL,
     title                VARCHAR(255)  NOT NULL,
     jira_id              VARCHAR(80)   NULL,
+    bms_id               VARCHAR(80)   NULL,
     description          TEXT          NULL,
     issue_type_id        CHAR(36)      NOT NULL,
     priority_id          CHAR(36)      NOT NULL,
@@ -530,6 +534,42 @@ CREATE TABLE rd_issue_risk (
     UNIQUE KEY uk_issue_risk_number (issue_id, risk_number),
     KEY idx_issue_risk_issue (issue_id, deleted),
     CONSTRAINT fk_issue_risk_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Multiple quarterly completion rows per RD
+CREATE TABLE rd_issue_quarterly_completion (
+    id              CHAR(36)      NOT NULL PRIMARY KEY,
+    issue_id        CHAR(36)      NOT NULL,
+    year            INT           NOT NULL,
+    quarter         INT           NOT NULL,
+    percentage      DECIMAL(5,2)  NOT NULL,
+    deleted         TINYINT(1)    NOT NULL DEFAULT 0,
+    version         BIGINT        NOT NULL DEFAULT 0,
+    created_by      CHAR(36)      NULL,
+    updated_by      CHAR(36)      NULL,
+    created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_issue_qc_issue (issue_id, deleted),
+    KEY idx_issue_qc_year_quarter (issue_id, year, quarter),
+    CONSTRAINT fk_issue_qc_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Multiple notes per RD
+CREATE TABLE rd_issue_note (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    issue_id        CHAR(36)     NOT NULL,
+    note_date       DATE         NOT NULL,
+    note            TEXT         NOT NULL,
+    owner           VARCHAR(120) NOT NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_issue_note_issue (issue_id, deleted),
+    KEY idx_issue_note_date (issue_id, note_date),
+    CONSTRAINT fk_issue_note_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Multiple risks per project

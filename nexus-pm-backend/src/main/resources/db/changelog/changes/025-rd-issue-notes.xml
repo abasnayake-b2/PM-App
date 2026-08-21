@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="025-rd-issue-notes" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="rd_issue_note"/>
+            </not>
+        </preConditions>
+        <comment>Multiple notes per RD (date, note, owner from logged-in user).</comment>
+        <sql>
+            CREATE TABLE rd_issue_note (
+                id              CHAR(36)     NOT NULL PRIMARY KEY,
+                issue_id        CHAR(36)     NOT NULL,
+                note_date       DATE         NOT NULL,
+                note            TEXT         NOT NULL,
+                owner           VARCHAR(120) NOT NULL,
+                deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+                version         BIGINT       NOT NULL DEFAULT 0,
+                created_by      CHAR(36)     NULL,
+                updated_by      CHAR(36)     NULL,
+                created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_issue_note_issue (issue_id, deleted),
+                KEY idx_issue_note_date (issue_id, note_date),
+                CONSTRAINT fk_issue_note_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        </sql>
+    </changeSet>
+
+    <changeSet id="025-deactivate-flat-notes-field" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="issue_field_definition"/>
+        </preConditions>
+        <sql>
+            UPDATE issue_field_definition
+            SET active = 0
+            WHERE field_key = 'notes';
+        </sql>
+    </changeSet>
+
+    <changeSet id="025-migrate-flat-notes" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="rd_issue_note"/>
+            <tableExists tableName="issue_field_value"/>
+        </preConditions>
+        <sql>
+            INSERT INTO rd_issue_note
+            (id, issue_id, note_date, note, owner, deleted, version, created_by, updated_by, created_at, updated_at)
+            SELECT UUID(), ifv.issue_id,
+                   DATE(COALESCE(ifv.updated_at, ifv.created_at, CURRENT_DATE)),
+                   ifv.value_text,
+                   TRIM(CONCAT(COALESCE(e.first_name, ''), ' ', COALESCE(e.last_name, ''))),
+                   0, 0, ifv.created_by, ifv.updated_by, ifv.created_at, ifv.updated_at
+            FROM issue_field_value ifv
+            INNER JOIN issue_field_definition d
+                ON d.id = ifv.field_definition_id AND d.field_key = 'notes'
+            LEFT JOIN employee e ON e.id = COALESCE(ifv.updated_by, ifv.created_by)
+            WHERE ifv.value_text IS NOT NULL
+              AND TRIM(ifv.value_text) &lt;&gt; ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM rd_issue_note n
+                  WHERE n.issue_id = ifv.issue_id AND n.deleted = 0
+              );
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

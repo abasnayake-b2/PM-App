@@ -283,6 +283,7 @@ VALUES
 ('c1000001-0000-0000-0000-000000000004', 'delivery_quarter', 'Delivery Quarter', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 40, '["Q1","Q2","Q3","Q4"]'),
 ('c1000001-0000-0000-0000-000000000005', 'delivery_year', 'Delivery Year', 'YEAR', NULL, 0, 1, 1, 'GENERAL', 50, NULL),
 ('c1000001-0000-0000-0000-000000000006', 'percentage_completion', 'Percentage Completion', 'TEXT', 50, 0, 1, 1, 'GENERAL', 60, NULL),
+('c1000001-0000-0000-0000-000000000007', 'rag_status', 'RAG Status', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 70, '["Yellow","Green","Red"]'),
 
 ('c1000001-0000-0000-0000-000000000010', 'requirement_initiated_date', 'Requirement Initiated Date', 'DATE', NULL, 0, 1, 1, 'DATES', 110, NULL),
 ('c1000001-0000-0000-0000-000000000011', 'brd_requested_date', 'BRD Requested Date', 'DATE', NULL, 0, 1, 1, 'DATES', 120, NULL),
@@ -295,12 +296,15 @@ VALUES
 ('c1000001-0000-0000-0000-000000000018', 'rd_start_date', 'RD Start Date', 'DATE', NULL, 0, 1, 1, 'DATES', 190, NULL),
 ('c1000001-0000-0000-0000-000000000019', 'rd_delivery_eta', 'RD Delivery ETA', 'DATE', NULL, 0, 1, 1, 'DATES', 200, NULL),
 ('c1000001-0000-0000-0000-000000000020', 'rd_sign_off_date', 'RD Sign Off Date', 'DATE', NULL, 0, 1, 1, 'DATES', 210, NULL),
+('c1000001-0000-0000-0000-000000000021', 'highlevel_rd_delivery_eta', 'Highlevel RD Delivery ETA', 'DATE', NULL, 0, 1, 1, 'DATES', 220, NULL),
+('c1000001-0000-0000-0000-000000000022', 'pending_highlevel_rd_signoff', 'Pending Highlevel RD Signoff', 'DATE', NULL, 0, 1, 1, 'DATES', 230, NULL),
+('c1000001-0000-0000-0000-000000000023', 'requirement_audit_date', 'Requirement Audit Date', 'DATE', NULL, 0, 1, 1, 'DATES', 240, NULL),
 
 ('c1000001-0000-0000-0000-000000000030', 'costing_done', 'Costing Done?', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 310, '["Yes","No","Pending","Onhold"]'),
 ('c1000001-0000-0000-0000-000000000031', 'quote_done', 'Quote Done?', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 320, '["Yes","No"]'),
 ('c1000001-0000-0000-0000-000000000032', 'quotation', 'Quotation', 'NUMBER', NULL, 0, 1, 1, 'FINANCIALS', 330, NULL),
 ('c1000001-0000-0000-0000-000000000033', 'quotation_shared_date', 'Quotation Shared Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 340, NULL),
-('c1000001-0000-0000-0000-000000000034', 'quotation_approved_date', 'Quotation Approved Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 350, NULL),
+('c1000001-0000-0000-0000-000000000034', 'quotation_approved_date', 'Quotation Accepted Date', 'DATE', NULL, 0, 1, 1, 'FINANCIALS', 350, NULL),
 ('c1000001-0000-0000-0000-000000000035', 'deal_desk_approval_status', 'Deal Desk Approval Status', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 360, '["Approved","Not Approved","Reject"]'),
 ('c1000001-0000-0000-0000-000000000036', 'payment_status', 'Payment Status', 'DROPDOWN', NULL, 0, 1, 1, 'FINANCIALS', 370, '["Open","Completed"]'),
 
@@ -309,6 +313,10 @@ VALUES
 ('c1000001-0000-0000-0000-000000000042', 'md_total', 'Man-days Total', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 430, NULL),
 ('c1000001-0000-0000-0000-000000000043', 'md_actually_utilized', 'Man-days Actually Utilized', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 440, NULL),
 ('c1000001-0000-0000-0000-000000000044', 'md_remaining', 'Man-days Remaining', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 450, NULL),
+('c1000001-0000-0000-0000-000000000045', 'over_utilization_pct', 'Over Utilization %', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 460, NULL),
+('c1000001-0000-0000-0000-000000000046', 'completion_based_on_actual_effort', 'Completion based on Actual Effort', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 470, NULL),
+('c1000001-0000-0000-0000-000000000047', 'latest_client_acknowledged_percentage', 'Latest client acknowledged percentage', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 480, NULL),
+('c1000001-0000-0000-0000-000000000048', 'completion_70_pct_based_on_actual_effort', '70% of Completion based on Actual effort', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 490, NULL),
 
 ('c1000001-0000-0000-0000-000000000050', 'dev_start_date', 'Dev Start Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 510, NULL),
 ('c1000001-0000-0000-0000-000000000051', 'dev_end_date', 'Dev End Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 520, NULL),
@@ -317,6 +325,12 @@ VALUES
 ('c1000001-0000-0000-0000-000000000054', 'uat_start_date', 'UAT Start Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 550, NULL),
 ('c1000001-0000-0000-0000-000000000055', 'uat_end_date', 'UAT End Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 560, NULL),
 ('c1000001-0000-0000-0000-000000000056', 'prod_date', 'Prod Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 570, NULL),
+('c1000001-0000-0000-0000-000000000057', 'next_uat_release', 'Next UAT Release', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 580, NULL),
+('c1000001-0000-0000-0000-000000000058', 'release_count', 'Release Count', 'NUMBER', NULL, 0, 1, 1, 'MILESTONES', 590, NULL),
+('c1000001-0000-0000-0000-000000000059', 'uat_defect_count', 'UAT Defect Count', 'NUMBER', NULL, 0, 1, 1, 'MILESTONES', 600, NULL),
+('c1000001-0000-0000-0000-000000000071', 'next_production_release', 'Next Production Release', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 610, NULL),
+('c1000001-0000-0000-0000-000000000073', 'release_audit_date', 'Release Audit Date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 620, NULL),
+('c1000001-0000-0000-0000-000000000074', 'last_action_date', 'Last Action date', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 630, NULL),
 
 -- Flat RISK custom fields deactivated; multi-row risks live in rd_issue_risk.
 ('c1000001-0000-0000-0000-000000000060', 'risk_description', 'Risk Description', 'TEXT', 2000, 0, 0, 1, 'RISK', 610, NULL),
@@ -326,6 +340,8 @@ VALUES
 ('c1000001-0000-0000-0000-000000000064', 'risk_impact', 'Risk Impact', 'DROPDOWN', NULL, 0, 0, 1, 'RISK', 650, '["Low","Mid","High"]'),
 ('c1000001-0000-0000-0000-000000000065', 'risk_closed_date', 'Risk Closed Date', 'DATE', NULL, 0, 0, 1, 'RISK', 660, NULL),
 ('c1000001-0000-0000-0000-000000000066', 'risk_mitigation', 'Risk Mitigation', 'TEXT', 2000, 0, 0, 1, 'RISK', 670, NULL),
+('c1000001-0000-0000-0000-000000000072', 'risk_count', 'Risk Count', 'NUMBER', NULL, 0, 1, 1, 'RISK', 600, NULL),
 
-('c1000001-0000-0000-0000-000000000070', 'notes', 'Notes', 'TEXT', 4000, 0, 1, 1, 'OTHER', 710, NULL);
+-- Flat OTHER notes deactivated; multi-row notes live in rd_issue_note.
+('c1000001-0000-0000-0000-000000000070', 'notes', 'Notes', 'TEXT', 4000, 0, 0, 1, 'OTHER', 710, NULL);
 

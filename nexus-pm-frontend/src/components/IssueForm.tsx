@@ -187,6 +187,7 @@ export function IssueForm({
       parentIssueId: parentIssue?.id,
       title: trimmedTitle,
       jiraId: ((fd.get('jiraId') as string) || '').trim() || undefined,
+      bmsId: ((fd.get('bmsId') as string) || '').trim() || undefined,
       description: (fd.get('description') as string).trim() || undefined,
       issueTypeId: resolvedTypeId,
       priorityId: resolvedPriorityId,
@@ -263,16 +264,27 @@ export function IssueForm({
         </label>
       )}
 
-      <label className="block min-w-0">
-        <span className={labelText}>JIRA ID</span>
-        <input
-          name="jiraId"
-          type="text"
-          maxLength={80}
-          className={inputClass}
-          placeholder="e.g. PROJ-123"
-        />
-      </label>
+      <div className={`grid ${compact ? 'grid-cols-2 gap-x-1 gap-y-1.5' : 'grid-cols-1 gap-4 sm:grid-cols-2'}`}>
+        <label className="block min-w-0">
+          <span className={labelText}>JIRA ID</span>
+          <input
+            name="jiraId"
+            type="text"
+            maxLength={80}
+            className={inputClass}
+            placeholder="e.g. PROJ-123"
+          />
+        </label>
+        <label className="block min-w-0">
+          <span className={labelText}>BMS ID</span>
+          <input
+            name="bmsId"
+            type="text"
+            maxLength={80}
+            className={inputClass}
+          />
+        </label>
+      </div>
 
       <label className="block min-w-0" data-issue-field="title">
         <span className={labelText}>
@@ -393,6 +405,7 @@ export function IssueForm({
         }}
         fieldErrors={fieldErrors}
         compact={compact}
+        includeRisk
       />
 
       {localError && (

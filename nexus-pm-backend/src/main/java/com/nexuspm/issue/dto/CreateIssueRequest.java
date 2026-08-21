@@ -23,6 +23,9 @@ public class CreateIssueRequest {
     @Size(max = 80)
     private String jiraId;
 
+    @Size(max = 80)
+    private String bmsId;
+
     private String description;
 
     @NotNull

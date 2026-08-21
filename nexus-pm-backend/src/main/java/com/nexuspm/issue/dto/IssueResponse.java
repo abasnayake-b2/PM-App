@@ -19,6 +19,7 @@ public class IssueResponse {
     private Integer childNumber;
     private String title;
     private String jiraId;
+    private String bmsId;
     private String description;
     private UUID releaseId;
     private String releaseName;

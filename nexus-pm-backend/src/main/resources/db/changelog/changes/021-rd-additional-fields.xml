@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="021-rd-additional-fields" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="issue_field_definition"/>
+        </preConditions>
+        <comment>Additional RD custom fields by section (General, Dates, Man-days, Milestones, Risk).</comment>
+        <sql>
+            INSERT IGNORE INTO issue_field_definition
+            (id, field_key, label, data_type, max_length, required, active, system_field, section_code, display_order, options_json)
+            VALUES
+            ('c1000001-0000-0000-0000-000000000007', 'rag_status', 'RAG Status', 'DROPDOWN', NULL, 0, 1, 1, 'GENERAL', 70, '["Yellow","Green","Red"]'),
+            ('c1000001-0000-0000-0000-000000000021', 'highlevel_rd_delivery_eta', 'Highlevel RD Delivery ETA', 'DATE', NULL, 0, 1, 1, 'DATES', 220, NULL),
+            ('c1000001-0000-0000-0000-000000000022', 'pending_highlevel_rd_signoff', 'Pending Highlevel RD Signoff', 'DATE', NULL, 0, 1, 1, 'DATES', 230, NULL),
+            ('c1000001-0000-0000-0000-000000000023', 'requirement_audit_date', 'Requirement Audit Date', 'DATE', NULL, 0, 1, 1, 'DATES', 240, NULL),
+            ('c1000001-0000-0000-0000-000000000045', 'over_utilization_pct', 'Over Utilization %', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 460, NULL),
+            ('c1000001-0000-0000-0000-000000000046', 'completion_based_on_actual_effort', 'Completion based on Actual Effort', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 470, NULL),
+            ('c1000001-0000-0000-0000-000000000047', 'latest_client_acknowledged_percentage', 'Latest client acknowledged percentage', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 480, NULL),
+            ('c1000001-0000-0000-0000-000000000048', 'completion_70_pct_based_on_actual_effort', '70% of Completion based on Actual effort', 'NUMBER', NULL, 0, 1, 1, 'MAN_DAYS', 490, NULL),
+            ('c1000001-0000-0000-0000-000000000057', 'next_uat_release', 'Next UAT Release', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 580, NULL),
+            ('c1000001-0000-0000-0000-000000000058', 'release_count', 'Release Count', 'NUMBER', NULL, 0, 1, 1, 'MILESTONES', 590, NULL),
+            ('c1000001-0000-0000-0000-000000000059', 'uat_defect_count', 'UAT Defect Count', 'NUMBER', NULL, 0, 1, 1, 'MILESTONES', 600, NULL),
+            ('c1000001-0000-0000-0000-000000000071', 'next_production_release', 'Next Production Release', 'DATE', NULL, 0, 1, 1, 'MILESTONES', 610, NULL),
+            ('c1000001-0000-0000-0000-000000000072', 'risk_count', 'Risk Count', 'NUMBER', NULL, 0, 1, 1, 'RISK', 600, NULL);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

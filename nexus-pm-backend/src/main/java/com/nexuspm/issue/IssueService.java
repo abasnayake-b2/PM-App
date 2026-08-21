@@ -498,6 +498,7 @@ public class IssueService {
         issue.setParentIssue(parentIssue);
         issue.setTitle(request.getTitle().trim());
         issue.setJiraId(trimToNull(request.getJiraId()));
+        issue.setBmsId(trimToNull(request.getBmsId()));
         issue.setDescription(request.getDescription());
         issue.setIssueType(issueType);
         issue.setPriority(priority);
@@ -589,6 +590,11 @@ public class IssueService {
             issue.setJiraId(null);
         } else if (request.getJiraId() != null) {
             issue.setJiraId(trimToNull(request.getJiraId()));
+        }
+        if (Boolean.TRUE.equals(request.getClearBmsId())) {
+            issue.setBmsId(null);
+        } else if (request.getBmsId() != null) {
+            issue.setBmsId(trimToNull(request.getBmsId()));
         }
         if (request.getDescription() != null) {
             issue.setDescription(request.getDescription());

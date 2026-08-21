@@ -315,6 +315,16 @@ export function IssueTrackerTable({
             <span className="block truncate">{issue.jiraId?.trim() ? issue.jiraId : '—'}</span>
           </td>
         );
+      case 'bmsId':
+        return (
+          <td
+            key={column.key}
+            style={cellStyle}
+            className={`${base} ${freeze.className} font-mono text-[10px] ${compact ? 'text-text2' : theme.text}`}
+          >
+            <span className="block truncate">{issue.bmsId?.trim() ? issue.bmsId : '—'}</span>
+          </td>
+        );
       case 'title':
         return (
           <td
