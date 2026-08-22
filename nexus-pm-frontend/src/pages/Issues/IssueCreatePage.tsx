@@ -1,4 +1,4 @@
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Bug } from 'lucide-react';
 import { IssueForm } from '@/components/IssueForm';
@@ -8,6 +8,10 @@ import { fetchIssue } from '@/api/issues.api';
 import { useCreateIssue } from '@/hooks/useIssues';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
+import {
+  EMPTY_CREATE_CHILD_ROWS,
+  persistIssueChildRows,
+} from '@/utils/issueCreateChildren';
 
 export function IssueCreatePage() {
   const { can } = usePermissions();
@@ -15,7 +19,8 @@ export function IssueCreatePage() {
   const parentId = searchParams.get('parentId') ?? undefined;
   const initialProjectId = searchParams.get('projectId') ?? undefined;
   const initialChildWorkflowCode = searchParams.get('childType') ?? undefined;
-  const createIssue = useCreateIssue();
+  const createIssue = useCreateIssue({ redirectTo: false });
+  const navigate = useNavigate();
 
   const { data: parentIssue } = useQuery({
     queryKey: ['issue', parentId],
@@ -63,7 +68,13 @@ export function IssueCreatePage() {
         </div>
       </div>
 
-      <div className="mt-8 max-w-2xl">
+      {createIssue.isError && (
+        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          Could not create item. Try again.
+        </p>
+      )}
+
+      <div className="mt-8 max-w-5xl">
         <IssueForm
           projects={projectsData?.content?.map((p) => ({ id: p.id, label: p.name })) ?? []}
           priorities={priorities ?? []}
@@ -71,9 +82,29 @@ export function IssueCreatePage() {
           initialProjectId={initialProjectId}
           parentIssue={parentFormProps}
           initialChildWorkflowCode={initialChildWorkflowCode}
+          variant="panel"
           loading={createIssue.isPending}
           onCancel={() => window.history.back()}
-          onSubmit={(payload) => createIssue.mutate(payload)}
+          onSubmit={async (payload, extras) => {
+            try {
+              const issue = await createIssue.mutateAsync(payload);
+              const childRows = extras ?? EMPTY_CREATE_CHILD_ROWS;
+              try {
+                if (
+                  childRows.notes.length > 0 ||
+                  childRows.risks.length > 0 ||
+                  childRows.quarterlyCompletions.length > 0
+                ) {
+                  await persistIssueChildRows(issue.id, childRows);
+                }
+              } catch {
+                /* RD is created; child rows can be added on the edit page */
+              }
+              navigate(`/issues/${issue.id}`);
+            } catch {
+              /* error shown by mutation */
+            }
+          }}
         />
       </div>
     </div>

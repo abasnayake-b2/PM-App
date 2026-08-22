@@ -14,6 +14,7 @@ import {
   useUpdateIssueRisk,
 } from '@/hooks/useIssueRisks';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatMmDdYyyy } from '@/utils/dateFormat';
 import { P } from '@/utils/permissions';
 import {
   IssueCustomFieldsEditor,
@@ -255,28 +256,42 @@ function RiskForm({
   );
 }
 
+function newLocalId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function IssueRisksSection({
   issueId,
   mode = 'view',
+  localRows,
+  onLocalRowsChange,
   customFields,
   customFieldValues,
   onCustomFieldChange,
   customFieldErrors,
 }: {
-  issueId: string;
+  issueId?: string;
   /** 'edit' forces manage controls; 'view' still allows manage when user has ISSUES_UPDATE. */
   mode?: 'view' | 'edit';
+  /** When set (create form, no issue yet), rows are kept in parent state until the RD is saved. */
+  localRows?: IssueRisk[];
+  onLocalRowsChange?: (rows: IssueRisk[]) => void;
   customFields?: IssueFieldDefinition[];
   customFieldValues?: Record<string, string> | null;
   onCustomFieldChange?: (fieldKey: string, value: string) => void;
   customFieldErrors?: Record<string, string>;
 }) {
   const { can } = usePermissions();
-  const canManage = can(P.ISSUES_UPDATE);
-  const { data: risks = [], isLoading } = useIssueRisks(issueId);
-  const createRisk = useCreateIssueRisk(issueId);
-  const updateRisk = useUpdateIssueRisk(issueId);
-  const deleteRisk = useDeleteIssueRisk(issueId);
+  const localMode = !issueId;
+  const canManage = localMode || can(P.ISSUES_UPDATE);
+  const { data: remoteRisks = [], isLoading: remoteLoading } = useIssueRisks(issueId);
+  const createRisk = useCreateIssueRisk(issueId ?? '');
+  const updateRisk = useUpdateIssueRisk(issueId ?? '');
+  const deleteRisk = useDeleteIssueRisk(issueId ?? '');
+  const risks = localMode ? (localRows ?? []) : remoteRisks;
+  const isLoading = localMode ? false : remoteLoading;
   const riskFields = riskSectionFields(customFields ?? []);
 
   const [adding, setAdding] = useState(false);
@@ -364,7 +379,29 @@ export function IssueRisksSection({
           error={createRisk.error}
           onCancel={cancelForm}
           onSubmit={() => {
-            createRisk.mutate(toCreatePayload(draft), {
+            const payload = toCreatePayload(draft);
+            if (localMode) {
+              const nextNumber = risks.length + 1;
+              onLocalRowsChange?.([
+                ...risks,
+                {
+                  id: newLocalId(),
+                  issueId: '',
+                  riskNumber: nextNumber,
+                  displayKey: `R${nextNumber}`,
+                  description: payload.description,
+                  createdDate: payload.createdDate ?? undefined,
+                  owner: payload.owner ?? undefined,
+                  status: payload.status ?? undefined,
+                  impact: payload.impact ?? undefined,
+                  closedDate: payload.closedDate ?? undefined,
+                  mitigation: payload.mitigation,
+                },
+              ]);
+              cancelForm();
+              return;
+            }
+            createRisk.mutate(payload, {
               onSuccess: cancelForm,
             });
           }}
@@ -380,10 +417,34 @@ export function IssueRisksSection({
           error={updateRisk.error}
           onCancel={cancelForm}
           onSubmit={() => {
-            updateRisk.mutate(
-              { id: editingRisk.id, payload: toUpdatePayload(draft, editingRisk) },
-              { onSuccess: cancelForm },
-            );
+            const payload = toUpdatePayload(draft, editingRisk);
+            if (localMode) {
+              onLocalRowsChange?.(
+                risks.map((risk) =>
+                  risk.id === editingRisk.id
+                    ? {
+                        ...risk,
+                        description: payload.description ?? risk.description,
+                        createdDate: payload.clearCreatedDate
+                          ? undefined
+                          : (payload.createdDate ?? risk.createdDate),
+                        owner: payload.clearOwner ? undefined : (payload.owner ?? risk.owner),
+                        status: payload.clearStatus ? undefined : (payload.status ?? risk.status),
+                        impact: payload.clearImpact ? undefined : (payload.impact ?? risk.impact),
+                        closedDate: payload.clearClosedDate
+                          ? undefined
+                          : (payload.closedDate ?? risk.closedDate),
+                        mitigation: payload.clearMitigation
+                          ? undefined
+                          : (payload.mitigation ?? risk.mitigation),
+                      }
+                    : risk,
+                ),
+              );
+              cancelForm();
+              return;
+            }
+            updateRisk.mutate({ id: editingRisk.id, payload }, { onSuccess: cancelForm });
           }}
         />
       )}
@@ -429,13 +490,13 @@ export function IssueRisksSection({
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-1 text-text2">
-                        {risk.createdDate || '—'}
+                        {formatMmDdYyyy(risk.createdDate)}
                       </td>
                       <td className="px-1.5 py-1">{risk.owner?.trim() || '—'}</td>
                       <td className="px-1.5 py-1">{risk.status || '—'}</td>
                       <td className="px-1.5 py-1">{risk.impact || '—'}</td>
                       <td className="whitespace-nowrap px-1.5 py-1 text-text2">
-                        {risk.closedDate || '—'}
+                        {formatMmDdYyyy(risk.closedDate)}
                       </td>
                       <td className="max-w-[10rem] px-1.5 py-1">
                         <span className="line-clamp-2 whitespace-pre-wrap">
@@ -462,7 +523,11 @@ export function IssueRisksSection({
                                     `Delete risk ${risk.displayKey}? This cannot be undone from the list.`,
                                   )
                                 ) {
-                                  deleteRisk.mutate(risk.id);
+                                  if (localMode) {
+                                    onLocalRowsChange?.(risks.filter((row) => row.id !== risk.id));
+                                  } else {
+                                    deleteRisk.mutate(risk.id);
+                                  }
                                 }
                               }}
                               disabled={deleteRisk.isPending}

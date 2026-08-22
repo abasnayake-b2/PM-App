@@ -7,6 +7,7 @@ import {
   sanitizeNonNegativeNumberInput,
   sanitizePercentageCompletionInput,
 } from '@/utils/issueFieldValidation';
+import { formatCustomFieldDisplay } from '@/utils/dateFormat';
 
 /** Compact controls for RD panel grids — accent focus, soft fill. */
 export const rdFieldInputClass =
@@ -405,6 +406,7 @@ export function IssueCustomFieldsView({
           <dl className="grid grid-cols-3 gap-1 text-[11px] sm:grid-cols-6 lg:grid-cols-7">
             {group.items.map((field) => {
               const raw = (map[field.fieldKey] ?? '').trim();
+              const display = formatCustomFieldDisplay(field, raw);
               const isLong =
                 field.fieldKey.includes('notes') ||
                 field.fieldKey.includes('description') ||
@@ -424,7 +426,7 @@ export function IssueCustomFieldsView({
                       raw ? 'font-medium text-text' : 'text-text3'
                     }`}
                   >
-                    {raw || '—'}
+                    {display}
                   </dd>
                 </div>
               );

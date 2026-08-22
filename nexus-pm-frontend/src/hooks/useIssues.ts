@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { fetchIssues, fetchIssue, fetchIssueChildren, createIssue, updateIssue, transitionIssue, deleteIssue, restoreIssue, importProjectBacklog, importBacklogAllProjects, type CreateIssuePayload, type UpdateIssuePayload } from '@/api/issues.api';
+import { fetchIssues, fetchIssue, fetchIssueChildren, createIssue, updateIssue, transitionIssue, deleteIssue, restoreIssue, importProjectBacklog, importBacklogAllProjects, importNewRdExcel, type CreateIssuePayload, type UpdateIssuePayload } from '@/api/issues.api';
 
 export type { CreateIssuePayload, UpdateIssuePayload };
 
@@ -165,6 +165,16 @@ export function useImportBacklogAll() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: importBacklogAllProjects,
+    onSuccess: () => {
+      invalidateBacklogQueries(qc);
+    },
+  });
+}
+
+export function useImportNewRdExcel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: importNewRdExcel,
     onSuccess: () => {
       invalidateBacklogQueries(qc);
     },

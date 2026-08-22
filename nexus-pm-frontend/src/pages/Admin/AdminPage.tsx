@@ -5,6 +5,7 @@ import { AdminRolePermissionsSection } from '@/components/AdminRolePermissionsSe
 import { AdminRdFieldsSection } from '@/components/AdminRdFieldsSection';
 import { ProjectExcelUpload } from '@/components/ProjectExcelUpload';
 import { BacklogExcelUpload } from '@/components/BacklogExcelUpload';
+import { NewRdExcelUpload } from '@/components/NewRdExcelUpload';
 import { ListPagination } from '@/components/ListPagination';
 import { AiToolsSection } from '@/pages/Admin/AiToolsSection';
 import { AiSettingsSection } from '@/pages/Admin/AiSettingsSection';
@@ -227,6 +228,7 @@ export function AdminPage() {
         <div className="mt-6 space-y-6">
           {can(P.IMPORT_CREATE) && <ProjectExcelUpload />}
           {superAdmin && <BacklogExcelUpload variant="admin" />}
+          {superAdmin && <NewRdExcelUpload />}
         </div>
       )}
 

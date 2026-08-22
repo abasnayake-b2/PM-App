@@ -189,19 +189,32 @@ function QuarterForm({
   );
 }
 
+function newLocalId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function IssueQuarterlyCompletionSection({
   issueId,
   mode = 'view',
+  localRows,
+  onLocalRowsChange,
 }: {
-  issueId: string;
+  issueId?: string;
   mode?: 'view' | 'edit';
+  localRows?: IssueQuarterlyCompletion[];
+  onLocalRowsChange?: (rows: IssueQuarterlyCompletion[]) => void;
 }) {
   const { can } = usePermissions();
-  const canManage = can(P.ISSUES_UPDATE);
-  const { data: rows = [], isLoading } = useIssueQuarterlyCompletions(issueId);
-  const createRow = useCreateIssueQuarterlyCompletion(issueId);
-  const updateRow = useUpdateIssueQuarterlyCompletion(issueId);
-  const deleteRow = useDeleteIssueQuarterlyCompletion(issueId);
+  const localMode = !issueId;
+  const canManage = localMode || can(P.ISSUES_UPDATE);
+  const { data: remoteRows = [], isLoading: remoteLoading } = useIssueQuarterlyCompletions(issueId);
+  const createRow = useCreateIssueQuarterlyCompletion(issueId ?? '');
+  const updateRow = useUpdateIssueQuarterlyCompletion(issueId ?? '');
+  const deleteRow = useDeleteIssueQuarterlyCompletion(issueId ?? '');
+  const rows = localMode ? (localRows ?? []) : remoteRows;
+  const isLoading = localMode ? false : remoteLoading;
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -290,6 +303,28 @@ export function IssueQuarterlyCompletionSection({
           onCancel={cancelForm}
           onSubmit={() =>
             submitDraft((payload) => {
+              if (localMode) {
+                const duplicate = rows.some(
+                  (row) => row.year === payload.year && row.quarter === payload.quarter,
+                );
+                if (duplicate) {
+                  setLocalError(`Q${payload.quarter} ${payload.year} is already added`);
+                  return;
+                }
+                onLocalRowsChange?.([
+                  ...rows,
+                  {
+                    id: newLocalId(),
+                    issueId: '',
+                    year: payload.year,
+                    quarter: payload.quarter,
+                    displayKey: `Q${payload.quarter} ${payload.year}`,
+                    percentage: payload.percentage,
+                  },
+                ]);
+                cancelForm();
+                return;
+              }
               createRow.mutate(payload, { onSuccess: cancelForm });
             })
           }
@@ -310,6 +345,33 @@ export function IssueQuarterlyCompletionSection({
           onCancel={cancelForm}
           onSubmit={() =>
             submitDraft((payload) => {
+              if (localMode) {
+                const duplicate = rows.some(
+                  (row) =>
+                    row.id !== editingRow.id &&
+                    row.year === payload.year &&
+                    row.quarter === payload.quarter,
+                );
+                if (duplicate) {
+                  setLocalError(`Q${payload.quarter} ${payload.year} is already added`);
+                  return;
+                }
+                onLocalRowsChange?.(
+                  rows.map((row) =>
+                    row.id === editingRow.id
+                      ? {
+                          ...row,
+                          year: payload.year,
+                          quarter: payload.quarter,
+                          displayKey: `Q${payload.quarter} ${payload.year}`,
+                          percentage: payload.percentage,
+                        }
+                      : row,
+                  ),
+                );
+                cancelForm();
+                return;
+              }
               updateRow.mutate({ id: editingRow.id, payload }, { onSuccess: cancelForm });
             })
           }
@@ -367,7 +429,11 @@ export function IssueQuarterlyCompletionSection({
                                     `Delete ${row.displayKey}? This cannot be undone from the list.`,
                                   )
                                 ) {
-                                  deleteRow.mutate(row.id);
+                                  if (localMode) {
+                                    onLocalRowsChange?.(rows.filter((r) => r.id !== row.id));
+                                  } else {
+                                    deleteRow.mutate(row.id);
+                                  }
                                 }
                               }}
                               disabled={deleteRow.isPending}

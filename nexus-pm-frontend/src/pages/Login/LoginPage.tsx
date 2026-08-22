@@ -12,6 +12,7 @@ import {
   loadRememberedLogin,
   saveRememberedLogin,
 } from '@/utils/rememberLogin';
+import { IDLE_TIMEOUT_MINUTES } from '@/hooks/useIdleLogout';
 
 const DIRECTFN_LOGO = '/directfn-login-bg.png';
 const DIRECTFN_VIDEO = '/directfn-login-bg.mp4';
@@ -37,7 +38,11 @@ function postLoginPath(
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const fromState = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  const fromState = (location.state as { from?: { pathname?: string }; idleTimeout?: boolean } | null)
+    ?.from?.pathname;
+  const idleTimeout =
+    (location.state as { idleTimeout?: boolean } | null)?.idleTimeout === true ||
+    new URLSearchParams(location.search).get('reason') === 'idle';
   const fromQuery = new URLSearchParams(location.search).get('next') ?? undefined;
   const fromPathname = fromState || fromQuery;
   const setSession = useAuthStore((s) => s.setSession);
@@ -48,7 +53,11 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [restoring, setRestoring] = useState(() => !useAuthStore.getState().accessToken);
+  const [restoring, setRestoring] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    if (new URLSearchParams(window.location.search).get('reason') === 'idle') return false;
+    return !useAuthStore.getState().accessToken;
+  });
 
   // Login is always dark (no theme / glass picker). Restore app preference on leave.
   useEffect(() => {
@@ -64,6 +73,10 @@ export function LoginPage() {
 
   // If a refresh cookie still exists, restore the session instead of showing login.
   useEffect(() => {
+    if (idleTimeout) {
+      setRestoring(false);
+      return;
+    }
     if (accessToken) {
       setRestoring(false);
       navigate(postLoginPath(false, fromPathname), { replace: true });
@@ -83,7 +96,7 @@ export function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, fromPathname, navigate]);
+  }, [accessToken, fromPathname, idleTimeout, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -263,6 +276,12 @@ export function LoginPage() {
                 Remember me on this device
               </label>
 
+              {idleTimeout && !error && (
+                <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text">
+                  You were signed out after {IDLE_TIMEOUT_MINUTES} minute
+                  {IDLE_TIMEOUT_MINUTES === 1 ? '' : 's'} of inactivity.
+                </p>
+              )}
               {error && (
                 <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
                   {error}

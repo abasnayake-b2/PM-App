@@ -95,6 +95,15 @@ public class IssueCustomFieldService {
      */
     @Transactional
     public void saveValues(UUID issueId, Map<String, String> values, boolean enforceRequired) {
+        saveValues(issueId, values, enforceRequired, true);
+    }
+
+    /**
+     * @param enforceDateOrder when false, skip RD date-sequence rules (used by Excel import).
+     */
+    @Transactional
+    public void saveValues(
+            UUID issueId, Map<String, String> values, boolean enforceRequired, boolean enforceDateOrder) {
         if (values == null) {
             return;
         }
@@ -139,7 +148,7 @@ public class IssueCustomFieldService {
                 effectiveValues.put(entry.getKey(), raw.trim());
             }
         }
-        validateBusinessRules(effectiveValues, defsByKey);
+        validateBusinessRules(effectiveValues, defsByKey, enforceDateOrder);
 
         for (Map.Entry<String, String> entry : values.entrySet()) {
             IssueFieldDefinition definition = defsByKey.get(entry.getKey());
@@ -176,7 +185,8 @@ public class IssueCustomFieldService {
 
     private void validateBusinessRules(
             Map<String, String> values,
-            Map<String, IssueFieldDefinition> defsByKey) {
+            Map<String, IssueFieldDefinition> defsByKey,
+            boolean enforceDateOrder) {
         String pctRaw = values.get("percentage_completion");
         if (pctRaw != null && !pctRaw.isBlank()) {
             try {
@@ -193,6 +203,10 @@ public class IssueCustomFieldService {
                         "Percentage Completion must be a number between 0 and 100",
                         400);
             }
+        }
+
+        if (!enforceDateOrder) {
+            return;
         }
 
         for (List<String> chain : DATE_CHAINS) {

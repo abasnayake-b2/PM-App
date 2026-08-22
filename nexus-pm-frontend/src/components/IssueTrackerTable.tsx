@@ -19,6 +19,7 @@ import {
   type BacklogColumnKey,
   type BacklogDensity,
 } from '@/utils/backlogGridColumns';
+import { formatMmDdYyyy, looksLikeDateFieldKey, parseDateParts } from '@/utils/dateFormat';
 
 const MIN_RESIZE_WIDTH = 120;
 interface IssueTrackerTableProps {
@@ -49,16 +50,6 @@ function deleteConfirmMessage(issue: Issue, hasChildren: boolean): string {
 function cfValue(issue: Issue, key: string): string {
   const value = issue.customFields?.[key];
   return value != null && String(value).trim() !== '' ? String(value) : '—';
-}
-
-function formatCellDate(value: string): string {
-  if (!value || value === '—') return '—';
-  // Prefer readable date when ISO YYYY-MM-DD
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!m) return value;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = months[Number(m[2]) - 1] ?? m[2];
-  return `${m[3]}-${month}-${m[1]}`;
 }
 
 export function IssueTrackerTable({
@@ -428,8 +419,9 @@ export function IssueTrackerTable({
           );
         }
         const raw = cfValue(issue, fieldKey);
-        const looksDate = fieldKey.includes('_date') || fieldKey.endsWith('_eta');
-        const display = looksDate ? formatCellDate(raw) : raw;
+        const looksDate =
+          looksLikeDateFieldKey(fieldKey) || (raw !== '—' && parseDateParts(raw) != null);
+        const display = looksDate ? formatMmDdYyyy(raw) : raw;
         return (
           <td key={column.key} style={cellStyle} className={`${base} whitespace-nowrap text-text2`}>
             <span className="block truncate">{display}</span>

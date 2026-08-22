@@ -15,6 +15,8 @@ public class IssueImportResult {
     private int updated;
     private int skipped;
     private List<String> errors;
+    private List<String> detectedColumns;
+    private String message;
     private String importedByName;
     private Instant importedAt;
 }

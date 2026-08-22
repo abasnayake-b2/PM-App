@@ -1,8 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { SlideOverPanel } from '@/components/SlideOverPanel';
 import { IssueForm, type IssueFormOption } from '@/components/IssueForm';
 import { fetchPriorities, fetchIssueTypes } from '@/api/lookup.api';
 import { useCreateIssue, type CreateIssuePayload } from '@/hooks/useIssues';
+import {
+  EMPTY_CREATE_CHILD_ROWS,
+  persistIssueChildRows,
+  type IssueCreateChildRows,
+} from '@/utils/issueCreateChildren';
 
 interface IssueCreateSlideOverPanelProps {
   /** When set with lockProject (default), project is fixed. */
@@ -29,6 +35,7 @@ export function IssueCreateSlideOverPanel({
   onCreated,
 }: IssueCreateSlideOverPanelProps) {
   const createIssue = useCreateIssue({ redirectTo: false });
+  const [savingChildren, setSavingChildren] = useState(false);
   const { data: priorities } = useQuery({ queryKey: ['priorities'], queryFn: fetchPriorities });
   const { data: issueTypes } = useQuery({ queryKey: ['issue-types'], queryFn: fetchIssueTypes });
 
@@ -40,13 +47,29 @@ export function IssueCreateSlideOverPanel({
         ? [{ id: projectId, label: projectLabel ?? 'This project' }]
         : [];
 
-  const handleSubmit = (payload: CreateIssuePayload) => {
-    createIssue.mutate(payload, {
-      onSuccess: (issue) => {
-        onCreated?.(issue.id);
-        onClose();
-      },
-    });
+  const handleSubmit = async (payload: CreateIssuePayload, extras?: IssueCreateChildRows) => {
+    try {
+      const issue = await createIssue.mutateAsync(payload);
+      const childRows = extras ?? EMPTY_CREATE_CHILD_ROWS;
+      if (
+        childRows.notes.length > 0 ||
+        childRows.risks.length > 0 ||
+        childRows.quarterlyCompletions.length > 0
+      ) {
+        setSavingChildren(true);
+        try {
+          await persistIssueChildRows(issue.id, childRows);
+        } catch {
+          /* RD is created; child rows can be added on the edit page */
+        } finally {
+          setSavingChildren(false);
+        }
+      }
+      onCreated?.(issue.id);
+      onClose();
+    } catch {
+      setSavingChildren(false);
+    }
   };
 
   const subtitle = lockProject
@@ -76,7 +99,7 @@ export function IssueCreateSlideOverPanel({
           initialProjectId={projectId}
           lockProject={lockProject}
           variant="panel"
-          loading={createIssue.isPending}
+          loading={createIssue.isPending || savingChildren}
           onCancel={onClose}
           onSubmit={handleSubmit}
         />

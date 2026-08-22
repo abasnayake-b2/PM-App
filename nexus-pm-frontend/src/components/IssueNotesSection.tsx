@@ -9,6 +9,7 @@ import {
   useUpdateIssueNote,
 } from '@/hooks/useIssueNotes';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatMmDdYyyy } from '@/utils/dateFormat';
 import { useAuthStore } from '@/store/useAuthStore';
 import { P } from '@/utils/permissions';
 import {
@@ -154,20 +155,33 @@ function NoteForm({
   );
 }
 
+function newLocalId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function IssueNotesSection({
   issueId,
   mode = 'view',
+  localRows,
+  onLocalRowsChange,
 }: {
-  issueId: string;
+  issueId?: string;
   mode?: 'view' | 'edit';
+  localRows?: IssueNote[];
+  onLocalRowsChange?: (rows: IssueNote[]) => void;
 }) {
   const { can } = usePermissions();
-  const canManage = can(P.ISSUES_UPDATE);
+  const localMode = !issueId;
+  const canManage = localMode || can(P.ISSUES_UPDATE);
   const loggedInName = useAuthStore((s) => s.user?.name?.trim() || '');
-  const { data: notes = [], isLoading } = useIssueNotes(issueId);
-  const createNote = useCreateIssueNote(issueId);
-  const updateNote = useUpdateIssueNote(issueId);
-  const deleteNote = useDeleteIssueNote(issueId);
+  const { data: remoteNotes = [], isLoading: remoteLoading } = useIssueNotes(issueId);
+  const createNote = useCreateIssueNote(issueId ?? '');
+  const updateNote = useUpdateIssueNote(issueId ?? '');
+  const deleteNote = useDeleteIssueNote(issueId ?? '');
+  const notes = localMode ? (localRows ?? []) : remoteNotes;
+  const isLoading = localMode ? false : remoteLoading;
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -252,6 +266,20 @@ export function IssueNotesSection({
           onCancel={cancelForm}
           onSubmit={() =>
             submitDraft((payload) => {
+              if (localMode) {
+                onLocalRowsChange?.([
+                  ...notes,
+                  {
+                    id: newLocalId(),
+                    issueId: '',
+                    date: payload.date ?? todayIso(),
+                    note: payload.note,
+                    owner: loggedInName,
+                  },
+                ]);
+                cancelForm();
+                return;
+              }
               createNote.mutate(payload, { onSuccess: cancelForm });
             })
           }
@@ -273,6 +301,21 @@ export function IssueNotesSection({
           onCancel={cancelForm}
           onSubmit={() =>
             submitDraft((payload) => {
+              if (localMode) {
+                onLocalRowsChange?.(
+                  notes.map((row) =>
+                    row.id === editingRow.id
+                      ? {
+                          ...row,
+                          date: payload.date ?? row.date,
+                          note: payload.note,
+                        }
+                      : row,
+                  ),
+                );
+                cancelForm();
+                return;
+              }
               updateNote.mutate({ id: editingRow.id, payload }, { onSuccess: cancelForm });
             })
           }
@@ -306,7 +349,7 @@ export function IssueNotesSection({
                 notes.map((row) =>
                   editingId === row.id ? null : (
                     <tr key={row.id} className="border-b border-border/80 align-top last:border-0">
-                      <td className="whitespace-nowrap px-1.5 py-1 text-text2">{row.date || '—'}</td>
+                      <td className="whitespace-nowrap px-1.5 py-1 text-text2">{formatMmDdYyyy(row.date)}</td>
                       <td className="max-w-[22rem] px-1.5 py-1">
                         <span className="whitespace-pre-wrap">{row.note?.trim() || '—'}</span>
                       </td>
@@ -327,7 +370,11 @@ export function IssueNotesSection({
                               type="button"
                               onClick={() => {
                                 if (window.confirm('Delete this note? This cannot be undone from the list.')) {
-                                  deleteNote.mutate(row.id);
+                                  if (localMode) {
+                                    onLocalRowsChange?.(notes.filter((n) => n.id !== row.id));
+                                  } else {
+                                    deleteNote.mutate(row.id);
+                                  }
                                 }
                               }}
                               disabled={deleteNote.isPending}

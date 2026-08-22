@@ -57,4 +57,62 @@ public class IssueKeyAllocator {
         issue.setChildNumber(nextChild);
         issue.setDisplayKey(IssueDisplayKeys.childKey(rdKey, workflowCode, nextChild));
     }
+
+    /**
+     * New root RD from Excel: {@code <Project Name>-RD-<CR #>}, or the next project
+     * sequence when CR # is missing / not numeric.
+     */
+    public void assignRootFromExcel(RdIssue issue, Project project, Integer excelRdNumber) {
+        if (excelRdNumber != null) {
+            applyRootRdNumber(issue, project, excelRdNumber);
+            return;
+        }
+        assign(issue, project, null, "CHANGE");
+    }
+
+    /**
+     * Sets (or retargets) a root RD key to {@code <Project Name>-RD-<rdNumber>}
+     * and rewrites child keys that shared the previous RD number.
+     */
+    public void applyRootRdNumber(RdIssue issue, Project project, int rdNumber) {
+        if (project.getName() == null || project.getName().isBlank()) {
+            throw new BusinessException(
+                    "VALIDATION",
+                    "Project needs a name (e.g. SABI-GBL) to generate issue keys",
+                    400);
+        }
+        String prefix = IssueDisplayKeys.projectKeyPrefix(project);
+        String key = IssueDisplayKeys.rdKey(prefix, rdNumber);
+        issueRepository.findByDisplayKeyIgnoreCase(key).ifPresent(other -> {
+            if (issue.getId() == null || !other.getId().equals(issue.getId())) {
+                throw new BusinessException(
+                        "IMPORT_FAILED",
+                        "CR No / ID " + key + " already exists",
+                        400);
+            }
+        });
+
+        Integer previousRd = issue.getRdNumber();
+        boolean sameKey = key.equalsIgnoreCase(issue.getDisplayKey())
+                && previousRd != null
+                && previousRd == rdNumber;
+        issue.setRdNumber(rdNumber);
+        issue.setChildNumber(null);
+        issue.setDisplayKey(key);
+        if (!sameKey && previousRd != null && previousRd != rdNumber && issue.getId() != null) {
+            rekeyDescendants(project, previousRd, rdNumber);
+        }
+    }
+
+    private void rekeyDescendants(Project project, int previousRd, int newRd) {
+        String rdKey = IssueDisplayKeys.rdKey(IssueDisplayKeys.projectKeyPrefix(project), newRd);
+        for (RdIssue child : issueRepository.findDescendantsByProjectAndRdNumber(project.getId(), previousRd)) {
+            String workflow = child.getIssueType() != null ? child.getIssueType().getWorkflowCode() : null;
+            child.setRdNumber(newRd);
+            if (child.getChildNumber() != null) {
+                child.setDisplayKey(IssueDisplayKeys.childKey(rdKey, workflow, child.getChildNumber()));
+            }
+            issueRepository.save(child);
+        }
+    }
 }

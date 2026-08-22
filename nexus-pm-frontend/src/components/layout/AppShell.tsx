@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { Link, Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import {
@@ -27,6 +27,7 @@ import { useUIStore } from '@/store/useUIStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { logout } from '@/api/auth.api';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 
 const PROJECT_MANAGEMENT_PATHS = ['/projects', '/issues', '/resources'];
 const ORGANIZATION_PATHS = ['/organization'];
@@ -109,14 +110,25 @@ export function AppShell() {
     setDismissPasswordBanner(false);
   }, [user?.userId, user?.passwordChangeDue]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await logout();
     } finally {
       clearSession();
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
-  };
+  }, [clearSession, navigate]);
+
+  const handleIdleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } finally {
+      clearSession();
+      navigate('/login?reason=idle', { replace: true, state: { idleTimeout: true } });
+    }
+  }, [clearSession, navigate]);
+
+  useIdleLogout(handleIdleLogout);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx('nav-link', isActive && 'nav-link-active');

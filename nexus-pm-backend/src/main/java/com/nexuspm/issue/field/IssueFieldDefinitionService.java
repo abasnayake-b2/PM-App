@@ -159,7 +159,7 @@ public class IssueFieldDefinitionService {
                 .build();
     }
 
-    List<String> parseOptions(String optionsJson) {
+    public List<String> parseOptions(String optionsJson) {
         if (optionsJson == null || optionsJson.isBlank()) {
             return List.of();
         }

@@ -31,6 +31,7 @@ public class IssueController {
 
     private final IssueService issueService;
     private final IssueImportService issueImportService;
+    private final IssueNewRdImportService issueNewRdImportService;
     private final JiraWorklogService jiraWorklogService;
 
     @PostMapping("/import")
@@ -38,6 +39,13 @@ public class IssueController {
     @PreAuthorize("@perm.superAdmin()")
     public IssueImportResult importBacklog(@RequestParam("file") MultipartFile file) {
         return issueImportService.importBacklogExcel(file, null);
+    }
+
+    @PostMapping("/import/new-rd")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("@perm.superAdmin()")
+    public IssueImportResult importNewRd(@RequestParam("file") MultipartFile file) {
+        return issueNewRdImportService.importNewRdExcel(file);
     }
 
     @GetMapping

@@ -167,6 +167,8 @@ export interface IssueImportResult {
   updated: number;
   skipped: number;
   errors: string[];
+  detectedColumns?: string[];
+  message?: string;
   importedByName?: string;
   importedAt?: string;
 }
@@ -184,6 +186,15 @@ export async function importBacklogAllProjects(file: File): Promise<IssueImportR
   const form = new FormData();
   form.append('file', file);
   const { data } = await api.post<IssueImportResult>('/issues/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function importNewRdExcel(file: File): Promise<IssueImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<IssueImportResult>('/issues/import/new-rd', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;

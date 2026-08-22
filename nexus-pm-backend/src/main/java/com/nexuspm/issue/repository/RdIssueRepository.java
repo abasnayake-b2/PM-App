@@ -18,6 +18,29 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
 
     Optional<RdIssue> findByProjectIdAndJiraIdIgnoreCaseAndDeletedFalse(UUID projectId, String jiraId);
 
+    @Query("""
+            SELECT i FROM RdIssue i
+            JOIN FETCH i.project
+            WHERE LOWER(i.bmsId) = LOWER(:bmsId)
+              AND i.deleted = false
+            """)
+    List<RdIssue> findByBmsIdIgnoreCaseAndDeletedFalse(@Param("bmsId") String bmsId);
+
+    Optional<RdIssue> findByDisplayKeyIgnoreCase(String displayKey);
+
+    Optional<RdIssue> findByDisplayKeyIgnoreCaseAndDeletedFalse(String displayKey);
+
+    @Query("""
+            SELECT i FROM RdIssue i
+            JOIN FETCH i.issueType
+            WHERE i.project.id = :projectId
+              AND i.rdNumber = :rdNumber
+              AND i.parentIssue IS NOT NULL
+              AND i.deleted = false
+            """)
+    List<RdIssue> findDescendantsByProjectAndRdNumber(
+            @Param("projectId") UUID projectId, @Param("rdNumber") int rdNumber);
+
     long countByDisplayKeyIsNull();
 
     @Query("""
