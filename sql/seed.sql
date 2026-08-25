@@ -203,10 +203,11 @@ INSERT INTO user_auth (id, employee_id, password_hash, password_changed_at, fail
 
 -- Delivery lookups (required for RD/issue workflows; no sample issues)
 INSERT INTO priority (id, label, level, sla_response_hrs, sla_resolve_hrs, colour) VALUES
-('44444444-4444-4444-4444-444444444401', 'Critical', 1,  1,   4,   '#E24B4A'),
-('44444444-4444-4444-4444-444444444402', 'High',     2,  4,   24,  '#BA7517'),
-('44444444-4444-4444-4444-444444444403', 'Medium',   3,  8,   72,  '#185FA5'),
-('44444444-4444-4444-4444-444444444404', 'Low',      4,  24,  240, '#888780');
+('44444444-4444-4444-4444-444444444405', 'Highest',  1,  1,   2,   '#B42318'),
+('44444444-4444-4444-4444-444444444401', 'Critical', 2,  1,   4,   '#E24B4A'),
+('44444444-4444-4444-4444-444444444402', 'High',     3,  4,   24,  '#BA7517'),
+('44444444-4444-4444-4444-444444444403', 'Medium',   4,  8,   72,  '#185FA5'),
+('44444444-4444-4444-4444-444444444404', 'Low',      5,  24,  240, '#888780');
 
 INSERT INTO issue_status (id, name, sequence, terminal, colour) VALUES
 ('55555555-5555-5555-5555-555555555501', 'Requirements Initiated',              1,  FALSE, '#888780'),
