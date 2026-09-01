@@ -16,7 +16,7 @@ import {
 } from '@/hooks/useUserManagement';
 import type { UserAccount } from '@/api/userManagement.api';
 import type { CreateUserAccountPayload, UpdateUserAccountPayload } from '@/api/userManagement.api';
-import { isAdminRole, isDeliveryManagerRole, hasEmployeeAppRole } from '@/utils/orgRoles';
+import { isAdminRole, isDeliveryManagerRole, hasEmployeeAppRole, isPmAppRole } from '@/utils/orgRoles';
 
 function isCxoRole(role?: string | null): boolean {
   return role === 'CXO' || role === 'CTO';
@@ -64,7 +64,7 @@ export function UserManagementPage() {
     [users],
   );
 
-  const { adminUsers, cxoUsers, vpUsers, managerUsers, employeeUsers } = useMemo(() => {
+  const { adminUsers, cxoUsers, vpUsers, managerUsers, pmUsers, employeeUsers } = useMemo(() => {
     const list = users ?? [];
     const codesOf = (u: (typeof list)[number]) =>
       (u.roleCodes?.length ? u.roleCodes : [u.roleCode]).map((c) => c.toUpperCase());
@@ -76,7 +76,9 @@ export function UserManagementPage() {
     const afterCxo = remaining.filter((u) => !has(u, isCxoRole));
     const vpUsers = afterCxo.filter((u) => has(u, isVpRole));
     const afterVp = afterCxo.filter((u) => !has(u, isVpRole));
-    const managerUsers = afterVp.filter(
+    const pmUsers = afterVp.filter((u) => has(u, isPmAppRole));
+    const afterPm = afterVp.filter((u) => !has(u, isPmAppRole));
+    const managerUsers = afterPm.filter(
       (u) =>
         !hasEmployeeAppRole(u.roleCodes, u.roleCode) &&
         (has(u, isManagerGridRole) ||
@@ -87,10 +89,10 @@ export function UserManagementPage() {
             !has(u, isManagerGridRole))),
     );
     const placed = new Set(
-      [...adminUsers, ...cxoUsers, ...vpUsers, ...managerUsers].map((u) => u.id),
+      [...adminUsers, ...cxoUsers, ...vpUsers, ...pmUsers, ...managerUsers].map((u) => u.id),
     );
     const employeeUsers = list.filter((u) => !placed.has(u.id));
-    return { adminUsers, cxoUsers, vpUsers, managerUsers, employeeUsers };
+    return { adminUsers, cxoUsers, vpUsers, managerUsers, pmUsers, employeeUsers };
   }, [users]);
 
   if (!can(P.USERS_VIEW)) {
@@ -247,8 +249,23 @@ export function UserManagementPage() {
             onDeactivate={handleDeactivate}
           />
           <UserAccountGrid
+            title="PMs"
+            description="Users with the PM app role, including delivery managers and project managers."
+            users={pmUsers}
+            emptyMessage={
+              search ? `No PM accounts matching "${search}".` : 'No PM accounts yet.'
+            }
+            showManagementRole
+            search={search}
+            unlockPending={unlockUser.isPending}
+            formatLockedUntil={formatLockedUntil}
+            onEdit={openEdit}
+            onUnlock={handleUnlock}
+            onDeactivate={handleDeactivate}
+          />
+          <UserAccountGrid
             title="Employee"
-            description="Users with the Employee role (may also have other roles such as PM)."
+            description="Users with the Employee role."
             users={employeeUsers}
             emptyMessage={
               search

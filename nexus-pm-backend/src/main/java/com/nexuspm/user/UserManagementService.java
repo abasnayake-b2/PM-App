@@ -48,6 +48,11 @@ public class UserManagementService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final OrgHierarchyService orgHierarchyService;
+
+    private static final Set<String> VISIBILITY_TOGGLE_ROLES = Set.of(
+            "MANAGER", "SEM", "SR_SEM",
+            "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER",
+            "VP", "VP_ENG");
     private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
@@ -127,7 +132,7 @@ public class UserManagementService {
         applyDepartment(employee, request.getDepartmentId());
         applyDesignation(employee, request.getDesignationId());
         applyManager(employee, request.getManagerId(), primary, management);
-        applyOrgWideVisibility(employee, primary.getCode(), request.getOrgWideVisibility());
+        applyOrgWideVisibility(employee, request.getOrgWideVisibility());
 
         employeeRepository.save(employee);
         createAuth(employee, request.getPassword());
@@ -157,7 +162,7 @@ public class UserManagementService {
         applyDepartment(employee, request.getDepartmentId());
         applyDesignation(employee, request.getDesignationId());
         applyManager(employee, request.getManagerId(), primary, employee.getTeamManagement());
-        applyOrgWideVisibility(employee, primary.getCode(), request.getOrgWideVisibility());
+        applyOrgWideVisibility(employee, request.getOrgWideVisibility());
 
         employeeRepository.save(employee);
         createAuth(employee, request.getPassword());
@@ -195,10 +200,9 @@ public class UserManagementService {
 
         if (request.getRoleCodes() != null || (request.getRoleCode() != null && !request.getRoleCode().isBlank())) {
             Set<Role> roles = resolveRoles(request.getRoleCodes(), request.getRoleCode());
-            Role primary = pickPrimaryRole(roles);
             employee.getRoles().clear();
             employee.getRoles().addAll(roles);
-            syncRosterForRoleChange(employee, primary.getCode());
+            syncRosterForRoleChange(employee, roles);
         }
 
         if (request.getDepartmentId() != null) {
@@ -220,11 +224,10 @@ public class UserManagementService {
         if (request.getOrgWideVisibility() != null
                 || request.getRoleCode() != null
                 || request.getRoleCodes() != null) {
-            String roleCode = employee.getPrimaryRoleCode();
             Boolean requested = request.getOrgWideVisibility() != null
                     ? request.getOrgWideVisibility()
                     : employee.isOrgWideVisibility();
-            applyOrgWideVisibility(employee, roleCode, requested);
+            applyOrgWideVisibility(employee, requested);
         }
 
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
@@ -302,6 +305,15 @@ public class UserManagementService {
                     .map(Employee::getId)
                     .orElse(null);
         }
+        if (resolvedManagerId == null && employee.getManager() != null) {
+            resolvedManagerId = employee.getManager().getId();
+        }
+        if (resolvedManagerId == null && employee.getEngineeringManagerManagement() != null) {
+            resolvedManagerId = employeeRepository.findByTeamManagementId(
+                            employee.getEngineeringManagerManagement().getId())
+                    .map(Employee::getId)
+                    .orElse(null);
+        }
         if (resolvedManagerId == null) {
             orgHierarchyService.validateManagerAssignment(role, null);
             employee.setManager(null);
@@ -355,6 +367,12 @@ public class UserManagementService {
     }
 
     private static Role pickPrimaryRole(Set<Role> roles) {
+        // Employee + extra roles (PM, Admin, …) stay at employee org level.
+        for (Role role : roles) {
+            if (role.getCode() != null && "EMPLOYEE".equalsIgnoreCase(role.getCode())) {
+                return role;
+            }
+        }
         // Prefer org/hierarchy roles over SUPER_ADMIN/ADMIN when multiple are assigned,
         // so adding Super Admin does not wipe the reporting line for VP/Manager/etc.
         List<Role> orgRoles = roles.stream()
@@ -381,19 +399,23 @@ public class UserManagementService {
     }
 
     /**
-     * Keep team_management in sync with app role:
-     * Employee → Manager+ creates a management row; Manager+ → Employee removes it.
+     * Keep team_management in sync with hierarchy role:
+     * Employee (even with extra permission roles like PM) stays on the employee roster;
+     * Manager+ without Employee creates a management row.
      */
-    private void syncRosterForRoleChange(Employee employee, String newRole) {
+    private void syncRosterForRoleChange(Employee employee, Set<Role> roles) {
+        boolean staysEmployee = roles.stream()
+                .anyMatch(r -> r.getCode() != null && "EMPLOYEE".equalsIgnoreCase(r.getCode()));
+        if (staysEmployee) {
+            if (employee.getTeamManagement() != null) {
+                teamRosterService.removeManagementLink(employee);
+            }
+            return;
+        }
+        String newRole = pickPrimaryRole(roles).getCode();
         if (requiresManagementRoster(newRole) && employee.getTeamManagement() == null) {
             teamRosterService.ensureManagementLink(employee, defaultManagementRoleTitle(newRole));
-        } else if (isEmployeeAppRole(newRole) && employee.getTeamManagement() != null) {
-            teamRosterService.removeManagementLink(employee);
         }
-    }
-
-    private static boolean isEmployeeAppRole(String roleCode) {
-        return roleCode != null && "EMPLOYEE".equalsIgnoreCase(roleCode.trim());
     }
 
     private static boolean requiresManagementRoster(String roleCode) {
@@ -456,12 +478,12 @@ public class UserManagementService {
                 .build();
     }
 
-    private void applyOrgWideVisibility(Employee employee, String roleCode, Boolean requested) {
-        String code = roleCode == null ? "" : roleCode.trim().toUpperCase();
-        boolean toggleRole = Set.of(
-                "MANAGER", "SEM", "SR_SEM",
-                "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER",
-                "VP", "VP_ENG").contains(code);
+    private void applyOrgWideVisibility(Employee employee, Boolean requested) {
+        boolean toggleRole = employee.getRoles().stream()
+                .map(Role::getCode)
+                .filter(code -> code != null && !code.isBlank())
+                .map(code -> code.trim().toUpperCase())
+                .anyMatch(VISIBILITY_TOGGLE_ROLES::contains);
         if (!toggleRole) {
             employee.setOrgWideVisibility(false);
             return;
@@ -470,8 +492,10 @@ public class UserManagementService {
             employee.setOrgWideVisibility(requested);
             return;
         }
-        // Defaults: VP org-wide; Manager / PM own-team
-        employee.setOrgWideVisibility("VP".equals(code) || "VP_ENG".equals(code));
+        boolean vp = employee.getRoles().stream()
+                .map(Role::getCode)
+                .anyMatch(code -> "VP".equalsIgnoreCase(code) || "VP_ENG".equalsIgnoreCase(code));
+        employee.setOrgWideVisibility(vp);
     }
 
     private EligibleManagementOption toEligibleOption(TeamManagement management) {

@@ -4,6 +4,10 @@ import { TeamRosterMemberForm } from '@/components/TeamRosterMemberForm';
 import { TeamRosterMemberPanel } from '@/components/TeamRosterMemberPanel';
 import { SlideOverPanel } from '@/components/SlideOverPanel';
 import {
+  RosterMemberFilterBar,
+  useRosterMemberFilters,
+} from '@/components/RosterMemberFilterBar';
+import {
   useTeamRosterMembers,
   useUpdateTeamRosterMember,
 } from '@/hooks/useTeamRoster';
@@ -40,6 +44,8 @@ export function OrgStructureEmployeesTab() {
   const [selected, setSelected] = useState<TeamRosterMember | null>(null);
 
   const { data: rows = [], isLoading, error } = useTeamRosterMembers(search);
+  const filters = useRosterMemberFilters(rows);
+  const visibleRows = filters.filteredRows;
   const updateRow = useUpdateTeamRosterMember(editing?.id ?? '');
 
   useEffect(() => {
@@ -49,7 +55,7 @@ export function OrgStructureEmployeesTab() {
 
   const exportRows = useMemo(
     () =>
-      rows.map((row, index) => [
+      visibleRows.map((row, index) => [
         index + 1,
         row.fullName,
         row.designationCode ?? '',
@@ -65,7 +71,7 @@ export function OrgStructureEmployeesTab() {
         row.email ?? '',
         row.phone ?? '',
       ]),
-    [rows],
+    [visibleRows],
   );
 
   const handleExport = async (format: 'excel' | 'pdf') => {
@@ -110,24 +116,27 @@ export function OrgStructureEmployeesTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <label className="min-w-[14rem] flex-1 text-sm">
-          <span className="text-text2">Search</span>
-          <div className="relative mt-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text2" size={16} />
-            <input
-              type="search"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Name, VP, EM, designation, team, skills, product, country…"
-              className="w-full rounded-lg border border-border bg-bg3 py-2 pl-9 pr-3 text-sm"
-            />
-          </div>
-        </label>
+        <div className="flex min-w-[14rem] flex-1 flex-col gap-3">
+          <label className="text-sm">
+            <span className="text-text2">Search</span>
+            <div className="relative mt-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text2" size={16} />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Name, VP, EM, designation, team, skills, product, country…"
+                className="w-full rounded-lg border border-border bg-bg3 py-2 pl-9 pr-3 text-sm"
+              />
+            </div>
+          </label>
+          <RosterMemberFilterBar filters={filters} />
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Download size={14} className="text-text2" />
           <button
             type="button"
-            disabled={!!exporting || rows.length === 0}
+            disabled={!!exporting || visibleRows.length === 0}
             onClick={() => void handleExport('excel')}
             className="text-accent hover:underline disabled:opacity-50"
           >
@@ -136,7 +145,7 @@ export function OrgStructureEmployeesTab() {
           <span className="text-text2">/</span>
           <button
             type="button"
-            disabled={!!exporting || rows.length === 0}
+            disabled={!!exporting || visibleRows.length === 0}
             onClick={() => void handleExport('pdf')}
             className="text-accent hover:underline disabled:opacity-50"
           >
@@ -167,7 +176,7 @@ export function OrgStructureEmployeesTab() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
+                {visibleRows.map((row, index) => (
                   <tr key={row.id} className="border-t border-border hover:bg-bg2/50">
                     <td className="whitespace-nowrap px-3 py-2 text-center text-xs tabular-nums text-text2">
                       {index + 1}
@@ -217,10 +226,12 @@ export function OrgStructureEmployeesTab() {
                     )}
                   </tr>
                 ))}
-                {rows.length === 0 && (
+                {visibleRows.length === 0 && (
                   <tr>
                     <td colSpan={colCount} className="px-4 py-8 text-center text-text2">
-                      No engineers.
+                      {filters.hasFilters || search
+                        ? 'No engineers match the current search or filters.'
+                        : 'No engineers.'}
                     </td>
                   </tr>
                 )}
@@ -228,8 +239,9 @@ export function OrgStructureEmployeesTab() {
             </table>
           </div>
           <p className="border-t border-border px-4 py-2 text-xs text-text2">
-            {rows.length} engineer{rows.length !== 1 ? 's' : ''}
+            {visibleRows.length} engineer{visibleRows.length !== 1 ? 's' : ''}
             {search ? ` matching "${search}"` : ''}
+            {filters.hasFilters ? ' with filters applied' : ''}
           </p>
         </div>
       )}

@@ -16,11 +16,6 @@ public final class SecurityUtils {
             "CTO", "VP_ENG", "SR_SEM", "SEM", "TECH_LEAD",
             "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER");
 
-    private static final Set<String> VISIBILITY_TOGGLE_ROLES = Set.of(
-            "MANAGER", "SEM", "SR_SEM",
-            "PM", "PROJECT_MANAGER", "DM", "DELIVERY_MANAGER",
-            "VP", "VP_ENG");
-
     private SecurityUtils() {
     }
 
@@ -65,15 +60,8 @@ public final class SecurityUtils {
         if ("CXO".equals(role) || "CTO".equals(role)) {
             return true;
         }
-        if (!VISIBILITY_TOGGLE_ROLES.contains(role)) {
-            return false;
-        }
-        boolean flag = currentUser().isOrgWideVisibility();
-        // VP defaults to org-wide when flag was never set false — stored value is authoritative.
-        if ("VP".equals(role) || "VP_ENG".equals(role)) {
-            return flag;
-        }
-        return flag;
+        // Stored flag is authoritative (including Employee + extra permission roles such as PM).
+        return currentUser().isOrgWideVisibility();
     }
 
     public static boolean hasPermission(String permissionCode) {

@@ -1,10 +1,11 @@
 import type { TeamRosterMember } from '@/api/teamRoster.api';
 
-export type EngineerTrack = 'software' | 'qa' | 'other';
+export type EngineerTrack = 'project' | 'software' | 'qa' | 'other';
 
-export const TRACK_ORDER: EngineerTrack[] = ['software', 'qa', 'other'];
+export const TRACK_ORDER: EngineerTrack[] = ['project', 'software', 'qa', 'other'];
 
 export const TRACK_LABELS: Record<EngineerTrack, string> = {
+  project: 'Project Managers',
   software: 'Software Engineers',
   qa: 'QA Engineers',
   other: 'Other',
@@ -85,6 +86,7 @@ export function classifyEngineerTrack(member: TeamRosterMember): EngineerTrack {
   const code = (member.designationCode ?? '').trim().toLowerCase();
   const team = (member.teamName ?? '').toLowerCase();
   const haystack = `${designation} ${code} ${team}`;
+  const codeKey = code.replace(/[^a-z0-9]/g, '');
 
   if (
     /\bqa\b/.test(haystack) ||
@@ -96,6 +98,13 @@ export function classifyEngineerTrack(member: TeamRosterMember): EngineerTrack {
     code === 'qae'
   ) {
     return 'qa';
+  }
+
+  if (
+    ['spm', 'pjm', 'pm', 'pgm', 'pgmm'].includes(codeKey) ||
+    /project\s*manager|programme\s*manager|program\s*manager/.test(designation)
+  ) {
+    return 'project';
   }
 
   if (

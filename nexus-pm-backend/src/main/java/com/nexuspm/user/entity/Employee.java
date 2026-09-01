@@ -131,6 +131,16 @@ public class Employee extends AuditableEntity {
     }
 
     public String getPrimaryRoleCode() {
+        if (roles == null || roles.isEmpty()) {
+            return "EMPLOYEE";
+        }
+        // Employee + extra roles (PM, Admin, …) must stay at employee org level.
+        // Extra roles add permissions only and must not promote hierarchy.
+        for (Role role : roles) {
+            if (role.getCode() != null && "EMPLOYEE".equalsIgnoreCase(role.getCode())) {
+                return role.getCode();
+            }
+        }
         // Prefer org hierarchy roles when admin roles are combined with them.
         java.util.List<Role> orgRoles = roles.stream()
                 .filter(r -> {

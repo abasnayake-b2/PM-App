@@ -7,6 +7,10 @@ import { TeamRosterMemberPanel } from '@/components/TeamRosterMemberPanel';
 import { TeamRosterMemberForm } from '@/components/TeamRosterMemberForm';
 import { SlideOverPanel } from '@/components/SlideOverPanel';
 import {
+  RosterMemberFilterBar,
+  useRosterMemberFilters,
+} from '@/components/RosterMemberFilterBar';
+import {
   useTeamRosterMembers,
   useCreateTeamRosterMember,
   useUpdateTeamRosterMember,
@@ -175,6 +179,7 @@ export function TeamEmployeesPage() {
   const [promoting, setPromoting] = useState<TeamRosterMember | null>(null);
 
   const { data: rows, isLoading, error } = useTeamRosterMembers(search);
+  const filters = useRosterMemberFilters(rows);
   const { data: management = [] } = useTeamManagement('', canPromote && dialog === 'promote');
   const createRow = useCreateTeamRosterMember();
   const updateRow = useUpdateTeamRosterMember(editing?.id ?? '');
@@ -187,7 +192,7 @@ export function TeamEmployeesPage() {
   }, [searchInput]);
 
   const { activeRows, inactiveRows, visibleRows } = useMemo(() => {
-    const list = rows ?? [];
+    const list = filters.filteredRows;
     const active = list.filter((row) => (row.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE');
     const inactive = list.filter((row) => (row.status ?? '').toUpperCase() === 'INACTIVE');
     return {
@@ -195,7 +200,7 @@ export function TeamEmployeesPage() {
       inactiveRows: inactive,
       visibleRows: statusTab === 'INACTIVE' ? inactive : active,
     };
-  }, [rows, statusTab]);
+  }, [filters.filteredRows, statusTab]);
 
   const closeDialog = () => {
     setDialog(null);
@@ -216,14 +221,15 @@ export function TeamEmployeesPage() {
   };
 
   const cellClass = 'whitespace-nowrap px-4 py-2';
+  const hasFilters = filters.hasFilters;
 
   return (
     <div className="space-y-6">
       <TeamExcelUpload variant="employees" />
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-1 items-end gap-3 min-w-[12rem]">
-          <label className="flex-1 text-sm">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-[12rem] flex-1 flex-col gap-3">
+          <label className="text-sm">
             <span className="text-text2">Search</span>
             <div className="relative mt-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text2" size={16} />
@@ -236,6 +242,7 @@ export function TeamEmployeesPage() {
               />
             </div>
           </label>
+          <RosterMemberFilterBar filters={filters} />
         </div>
         {canEdit && statusTab === 'ACTIVE' && (
           <button
@@ -393,9 +400,11 @@ export function TeamEmployeesPage() {
                 {visibleRows.length === 0 && (
                   <tr>
                     <td colSpan={canEdit ? 17 : 16} className="px-4 py-8 text-center text-text2">
-                      {statusTab === 'INACTIVE'
-                        ? 'No inactive employees.'
-                        : 'No active employees. Upload a Team Excel file or add manually.'}
+                      {hasFilters || search
+                        ? 'No employees match the current search or filters.'
+                        : statusTab === 'INACTIVE'
+                          ? 'No inactive employees.'
+                          : 'No active employees. Upload a Team Excel file or add manually.'}
                     </td>
                   </tr>
                 )}
@@ -406,6 +415,7 @@ export function TeamEmployeesPage() {
             {visibleRows.length} {statusTab === 'INACTIVE' ? 'inactive' : 'active'} employee
             {visibleRows.length !== 1 ? 's' : ''}
             {search ? ` matching "${search}"` : ''}
+            {hasFilters ? ' with filters applied' : ''}
           </p>
         </div>
       )}

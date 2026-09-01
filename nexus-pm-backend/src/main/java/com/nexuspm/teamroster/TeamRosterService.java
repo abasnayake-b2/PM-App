@@ -461,6 +461,7 @@ public class TeamRosterService {
 
     /**
      * Remove management link for a login employee (used when app role becomes Employee).
+     * Keeps engineering-manager reporting when it still exists, or restores it from the login manager.
      */
     @Transactional
     public void removeManagementLink(Employee employee) {
@@ -468,12 +469,31 @@ public class TeamRosterService {
         if (management == null) {
             return;
         }
+        UUID preserveEmId = null;
+        if (employee.getEngineeringManagerManagement() != null) {
+            UUID emId = employee.getEngineeringManagerManagement().getId();
+            if (!emId.equals(management.getId())) {
+                preserveEmId = emId;
+            }
+        }
+        if (preserveEmId == null
+                && employee.getManager() != null
+                && employee.getManager().getTeamManagement() != null) {
+            UUID managerMgmtId = employee.getManager().getTeamManagement().getId();
+            if (!managerMgmtId.equals(management.getId())) {
+                preserveEmId = managerMgmtId;
+            }
+        }
+
         DemoteManagementToEmployeeRequest request = new DemoteManagementToEmployeeRequest();
         request.setSetEmployeeRole(false);
+        request.setEngineeringManagerManagementId(preserveEmId);
         demoteManagementToEmployee(management.getId(), request);
-        // Reload link cleared on employee in caller's persistence context
         employee.setTeamManagement(null);
-        employee.setEngineeringManagerManagement(null);
+        if (preserveEmId != null) {
+            employee.setEngineeringManagerManagement(
+                    managementRepository.findById(preserveEmId).orElse(null));
+        }
     }
 
     @Transactional

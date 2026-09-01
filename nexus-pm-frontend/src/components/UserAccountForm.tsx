@@ -14,6 +14,8 @@ import type { SupervisorOption } from '@/components/TeamMemberForm';
 import {
   canSuperviseRole,
   defaultOrgWideVisibility,
+  pickPrimaryRoleCode,
+  pickVisibilityRoleCode,
   requiredSupervisorRank,
   supervisorRequirementHint,
   supportsVisibilityToggle,
@@ -25,36 +27,6 @@ const inputClass =
 const STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'] as const;
 
 type PersonSource = 'management' | 'employee';
-
-/** Org/hierarchy primary — skip SUPER_ADMIN/ADMIN when other roles are also assigned. */
-function pickPrimaryRoleCode(codes: string[]): string {
-  const order = [
-    'CXO',
-    'CTO',
-    'VP',
-    'VP_ENG',
-    'MANAGER',
-    'SEM',
-    'SR_SEM',
-    'TECH_LEAD',
-    'PM',
-    'PROJECT_MANAGER',
-    'DM',
-    'DELIVERY_MANAGER',
-    'EMPLOYEE',
-  ];
-  const adminCodes = new Set(['SUPER_ADMIN', 'ADMIN']);
-  const upper = codes.map((c) => c.toUpperCase());
-  const orgPool = upper.filter((c) => !adminCodes.has(c));
-  const pool = orgPool.length > 0 ? orgPool : upper;
-  for (const code of order) {
-    if (pool.includes(code)) return code;
-  }
-  // Prefer admin only when that is the sole assignment
-  if (pool.includes('SUPER_ADMIN')) return 'SUPER_ADMIN';
-  if (pool.includes('ADMIN')) return 'ADMIN';
-  return pool[0] ?? 'EMPLOYEE';
-}
 
 function matchDesignationId(
   designations: { id: string; name: string; code?: string; departmentId?: string }[],
@@ -75,10 +47,10 @@ function matchDesignationId(
   return '';
 }
 
-function initialRoleCodes(account?: UserAccount): string[] {
+function initialRoleCodes(account?: UserAccount, personSource: PersonSource = 'management'): string[] {
   if (account?.roleCodes?.length) return [...account.roleCodes];
   if (account?.roleCode) return [account.roleCode];
-  return ['MANAGER'];
+  return personSource === 'employee' ? ['EMPLOYEE'] : ['MANAGER'];
 }
 
 function apiErrorMessage(error: unknown): string {
@@ -111,6 +83,14 @@ function resolveAutoManagerId(
   return person?.supervisorEmployeeId ?? '';
 }
 
+function resolveEmployeeSupervisorId(employee?: EligibleEmployeeOption): string {
+  return employee?.managerId ?? '';
+}
+
+function isDefaultCreateRole(codes: string[]): boolean {
+  return codes.length === 1 && (codes[0] === 'MANAGER' || codes[0] === 'EMPLOYEE');
+}
+
 export function UserAccountForm({
   mode,
   initial,
@@ -129,10 +109,15 @@ export function UserAccountForm({
   const [departmentId, setDepartmentId] = useState(initial?.departmentId ?? '');
   const [designationId, setDesignationId] = useState(initial?.designationId ?? '');
   const [managerId, setManagerId] = useState(initial?.managerId ?? '');
-  const [roleCodes, setRoleCodes] = useState<string[]>(() => initialRoleCodes(initial));
+  const [roleCodes, setRoleCodes] = useState<string[]>(() => initialRoleCodes(initial, 'management'));
   const roleCode = useMemo(() => pickPrimaryRoleCode(roleCodes), [roleCodes]);
+  const visibilityRole = useMemo(
+    () => pickVisibilityRoleCode(roleCodes, roleCode),
+    [roleCodes, roleCode],
+  );
   const [orgWideVisibility, setOrgWideVisibility] = useState(
-    initial?.orgWideVisibility ?? defaultOrgWideVisibility(pickPrimaryRoleCode(initialRoleCodes(initial))),
+    initial?.orgWideVisibility ??
+      defaultOrgWideVisibility(pickVisibilityRoleCode(initialRoleCodes(initial))),
   );
 
   const toggleRole = (code: string) => {
@@ -168,10 +153,12 @@ export function UserAccountForm({
     [eligibleEmployees, employeeId],
   );
 
-  const autoManagerId = useMemo(
-    () => resolveAutoManagerId(managementId, eligibleManagement),
-    [managementId, eligibleManagement],
-  );
+  const autoManagerId = useMemo(() => {
+    if (personSource === 'management') {
+      return resolveAutoManagerId(managementId, eligibleManagement);
+    }
+    return resolveEmployeeSupervisorId(selectedEmployee);
+  }, [personSource, managementId, eligibleManagement, selectedEmployee]);
 
   useEffect(() => {
     if (mode !== 'create') return;
@@ -189,8 +176,8 @@ export function UserAccountForm({
     if (selectedEmployee.email) setEmail(selectedEmployee.email);
     setDepartmentId(selectedEmployee.departmentId ?? '');
     setDesignationId(selectedEmployee.designationId ?? '');
-    setManagerId(selectedEmployee.managerId ?? '');
-  }, [mode, personSource, selectedEmployee]);
+    setManagerId(autoManagerId);
+  }, [mode, personSource, selectedEmployee, autoManagerId]);
 
   // Edit: fill designation from linked management title when empty.
   useEffect(() => {
@@ -241,25 +228,26 @@ export function UserAccountForm({
   ]);
 
   useEffect(() => {
-    if (!supportsVisibilityToggle(roleCode)) {
+    if (!supportsVisibilityToggle(visibilityRole)) {
       if (orgWideVisibility) setOrgWideVisibility(false);
       return;
     }
-    if (!initial || pickPrimaryRoleCode(initialRoleCodes(initial)) !== roleCode) {
-      setOrgWideVisibility(defaultOrgWideVisibility(roleCode));
+    if (!initial || pickVisibilityRoleCode(initialRoleCodes(initial)) !== visibilityRole) {
+      setOrgWideVisibility(defaultOrgWideVisibility(visibilityRole));
     }
-  }, [roleCode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visibilityRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Only clear manager when it is invalid for the org primary role — never wipe just because
-  // an admin role was added alongside a normal org role.
+  // On edit, drop a manager that cannot supervise the new org-primary role.
+  // On create, keep the roster supervisor so it stays visible (hint shows if invalid).
   useEffect(() => {
+    if (mode === 'create') return;
     if (needsNoManager) return;
     if (!managerId) return;
     const selected = supervisors.find((s) => s.id === managerId);
     if (selected?.roleCode && !canSuperviseRole(selected.roleCode, roleCode)) {
       setManagerId('');
     }
-  }, [roleCode, needsNoManager, managerId, supervisors]);
+  }, [mode, roleCode, needsNoManager, managerId, supervisors]);
 
   const managerHint = useMemo(() => {
     if (needsNoManager) {
@@ -279,6 +267,12 @@ export function UserAccountForm({
       ) {
         return selectedManagement.supervisorEmployeeName;
       }
+      if (selectedEmployee?.managerId === managerId && selectedEmployee.managerName) {
+        return selectedEmployee.managerName;
+      }
+    }
+    if (selectedEmployee?.engineeringManagerName && !managerId) {
+      return `Org chart reports to ${selectedEmployee.engineeringManagerName}, but they have no login yet — pick a supervisor with a user account.`;
     }
     if (eligibleSupervisors.length === 0) {
       return `${supervisorRequirementHint(roleCode)} No matching login users yet — create a CXO/VP account first if needed.`;
@@ -294,6 +288,7 @@ export function UserAccountForm({
     supervisors,
     initial,
     selectedManagement,
+    selectedEmployee,
     roleCode,
     needsNoManager,
     eligibleSupervisors.length,
@@ -319,7 +314,7 @@ export function UserAccountForm({
         departmentId: departmentId || undefined,
         designationId: designationId || undefined,
         managerId: needsNoManager ? undefined : managerId || undefined,
-        orgWideVisibility: supportsVisibilityToggle(roleCode) ? orgWideVisibility : false,
+        orgWideVisibility: supportsVisibilityToggle(visibilityRole) ? orgWideVisibility : false,
       };
       if (personSource === 'management') {
         payload.managementId = managementId;
@@ -339,7 +334,7 @@ export function UserAccountForm({
       designationId: designationId || undefined,
       // Preserve existing manager when org-primary needs none (e.g. admin-only); omit field.
       ...(needsNoManager ? {} : { managerId: managerId || undefined }),
-      orgWideVisibility: supportsVisibilityToggle(roleCode) ? orgWideVisibility : false,
+      orgWideVisibility: supportsVisibilityToggle(visibilityRole) ? orgWideVisibility : false,
     };
     const password = (fd.get('password') as string).trim();
     if (password) payload.password = password;
@@ -367,6 +362,8 @@ export function UserAccountForm({
                   onChange={() => {
                     setPersonSource('management');
                     setEmployeeId('');
+                    setManagerId('');
+                    setRoleCodes((prev) => (isDefaultCreateRole(prev) ? ['MANAGER'] : prev));
                   }}
                 />
                 Management roster
@@ -379,7 +376,9 @@ export function UserAccountForm({
                   onChange={() => {
                     setPersonSource('employee');
                     setManagementId('');
+                    setEmployeeId('');
                     setManagerId('');
+                    setRoleCodes((prev) => (isDefaultCreateRole(prev) ? ['EMPLOYEE'] : prev));
                   }}
                 />
                 Employee roster
@@ -497,14 +496,15 @@ export function UserAccountForm({
       <fieldset className="space-y-2">
         <legend className="text-sm text-text2">Application roles</legend>
         <p className="text-xs text-text2">
-          Select one or more. Permissions are combined. Hierarchy / manager rules use{' '}
-          <span className="font-medium text-text">{roleCode}</span>
+          Select one or more. Permissions are combined.
+          {roleCodes.some((c) => c.toUpperCase() === 'EMPLOYEE')
+            ? ' Employee stays the org level — extra roles add permissions only and do not change manager or the org chart.'
+            : ` Hierarchy / manager rules use ${roleCode}.`}
           {roleCodes.some((c) => c === 'SUPER_ADMIN' || c === 'ADMIN') &&
           roleCode !== 'SUPER_ADMIN' &&
           roleCode !== 'ADMIN'
-            ? ' (admin roles do not replace org reporting)'
+            ? ' Admin roles do not replace org reporting.'
             : ''}
-          .
         </p>
         <div className="max-h-48 space-y-1.5 overflow-auto rounded-lg border border-border bg-bg3 p-3">
           {roleOptions.map((r) => {
@@ -533,7 +533,7 @@ export function UserAccountForm({
         )}
       </fieldset>
 
-      {supportsVisibilityToggle(roleCode) && (
+      {supportsVisibilityToggle(visibilityRole) && (
         <div className="rounded-lg border border-border px-3 py-3">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -630,11 +630,7 @@ export function UserAccountForm({
           required={!needsNoManager && roleCode !== 'SUPER_ADMIN' && roleCode !== 'ADMIN'}
         >
           <option value="">
-            {needsNoManager
-              ? 'None (top of reporting line)'
-              : autoManagerId && personSource === 'management'
-                ? 'Auto from management supervisor'
-                : 'Select supervisor…'}
+            {needsNoManager ? 'None (top of reporting line)' : 'Select supervisor…'}
           </option>
           {eligibleSupervisors.map((s) => (
             <option key={s.id} value={s.id}>

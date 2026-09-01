@@ -39,6 +39,12 @@ export function isDeliveryManagerRole(role?: string | null): boolean {
   );
 }
 
+/** App role PM (project manager), including combined logins such as MANAGER+PM or PM+EMPLOYEE. */
+export function isPmAppRole(role?: string | null): boolean {
+  const code = (role ?? '').toUpperCase();
+  return code === 'PM' || code === 'PROJECT_MANAGER';
+}
+
 /** True when the login includes the Employee app role (may be combined with PM, etc.). */
 export function isEmployeeAppRole(role?: string | null): boolean {
   return (role ?? '').toUpperCase() === 'EMPLOYEE';
@@ -80,8 +86,7 @@ export function supportsVisibilityToggle(role?: string | null): boolean {
 export function hasOrgWideVisibility(role?: string | null, orgWideVisibility?: boolean): boolean {
   if (isAdminRole(role) || role === 'CXO' || role === 'CTO') return true;
   if (role === 'VP' || role === 'VP_ENG') return orgWideVisibility !== false;
-  if (isScopedEngineeringManagerRole(role) || isDeliveryManagerRole(role)) return !!orgWideVisibility;
-  return false;
+  return !!orgWideVisibility;
 }
 
 /** Org overview / By VP dashboard widgets. */
@@ -96,6 +101,46 @@ export function defaultOrgWideVisibility(role?: string | null): boolean {
 
 /** Product reporting line used for manager assignment checks. */
 export const ORG_HIERARCHY = ['CXO', 'VP', 'MANAGER', 'EMPLOYEE'] as const;
+
+/**
+ * Org/hierarchy primary. If Employee is assigned, extra roles add permissions only
+ * and must not promote the person to manager on the org chart.
+ */
+export function pickPrimaryRoleCode(codes: string[]): string {
+  const order = [
+    'CXO',
+    'CTO',
+    'VP',
+    'VP_ENG',
+    'MANAGER',
+    'SEM',
+    'SR_SEM',
+    'TECH_LEAD',
+    'PM',
+    'PROJECT_MANAGER',
+    'DM',
+    'DELIVERY_MANAGER',
+    'EMPLOYEE',
+  ];
+  const adminCodes = new Set(['SUPER_ADMIN', 'ADMIN']);
+  const upper = codes.map((c) => c.toUpperCase());
+  if (upper.includes('EMPLOYEE')) {
+    return 'EMPLOYEE';
+  }
+  const orgPool = upper.filter((c) => !adminCodes.has(c));
+  const pool = orgPool.length > 0 ? orgPool : upper;
+  for (const code of order) {
+    if (pool.includes(code)) return code;
+  }
+  if (pool.includes('SUPER_ADMIN')) return 'SUPER_ADMIN';
+  if (pool.includes('ADMIN')) return 'ADMIN';
+  return pool[0] ?? 'EMPLOYEE';
+}
+
+export function pickVisibilityRoleCode(codes: string[], fallback?: string | null): string {
+  const match = codes.find((code) => supportsVisibilityToggle(code));
+  return match ?? fallback ?? pickPrimaryRoleCode(codes);
+}
 
 const SUPERVISOR_ROLE_RANK: Record<string, number> = {
   SUPER_ADMIN: 0,

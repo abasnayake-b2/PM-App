@@ -76,6 +76,7 @@ public class OrgAccessScopeService {
                             false,
                             List.of(EMPTY_EM_SCOPE_ID));
             // Engineers / employees: see the same project portfolio as their Engineering Manager.
+            // Extra permission roles (PM, etc.) may still opt into org-wide via the visibility flag.
             default -> {
                 var em = employee.getEngineeringManagerManagement();
                 UUID emManagementId = em != null ? em.getId() : null;
@@ -85,7 +86,7 @@ public class OrgAccessScopeService {
                         emManagementId,
                         emFullName,
                         false,
-                        false,
+                        employee.isOrgWideVisibility(),
                         false,
                         List.of(EMPTY_EM_SCOPE_ID));
             }

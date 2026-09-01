@@ -13,6 +13,13 @@ import {
   resolveSupervisorId,
   shortCxoLabel,
 } from '@/utils/managementRoles';
+import {
+  TRACK_LABELS,
+  TRACK_ORDER,
+  classifyEngineerTrack,
+  designationLevelRank,
+  type EngineerTrack,
+} from '@/utils/designationLevels';
 
 function normalizeName(value?: string | null): string {
   return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -64,113 +71,21 @@ function buildManagementIndex(management: TeamManagement[]) {
 }
 
 function shortManagementLabel(roleTitle: string): string {
-  if (isCxoRole(roleTitle)) return shortCxoLabel(roleTitle);
-  if (isVpRole(roleTitle)) return 'VP';
-  if (isEngineeringManagerRole(roleTitle)) return 'EM';
-  const token = roleTitle.match(/\b([A-Z]{2,5})\b/);
-  return token?.[1] ?? roleTitle.split(/\s+/)[0] ?? '';
-}
-
-type EngineerTrack = 'software' | 'qa' | 'other';
-
-const TRACK_ORDER: EngineerTrack[] = ['software', 'qa', 'other'];
-
-const TRACK_LABELS: Record<EngineerTrack, string> = {
-  software: 'Software Engineers',
-  qa: 'QA Engineers',
-  other: 'Other',
-};
-
-function classifyEngineerTrack(member: TeamRosterMember): EngineerTrack {
-  const designation = (member.designation ?? '').toLowerCase();
-  const code = (member.designationCode ?? '').trim().toLowerCase();
-  const team = (member.teamName ?? '').toLowerCase();
-  const haystack = `${designation} ${code} ${team}`;
-
-  if (
-    /\bqa\b/.test(haystack) ||
-    haystack.includes('quality') ||
-    haystack.includes('test engineer') ||
-    haystack.includes('sdet') ||
-    code.startsWith('qa') ||
-    code === 'qe' ||
-    code === 'qae'
-  ) {
-    return 'qa';
+  const title = roleTitle.trim();
+  if (isCxoRole(title)) return shortCxoLabel(title);
+  if (isVpRole(title)) {
+    const compact = title.replace(/vice\s*president/i, 'VP').replace(/\s+/g, ' ').trim();
+    return /^vp$/i.test(compact) ? 'VP' : compact;
   }
-
-  if (
-    designation.includes('software') ||
-    designation.includes('developer') ||
-    designation.includes('tech lead') ||
-    designation.includes('engineer') ||
-    /^(se|sse|ase|jse|stl|tl|sde|dev)/i.test(code)
-  ) {
-    return 'software';
+  if (/senior\s*delivery\s*manager|software\s*delivery\s*manager/i.test(title)) {
+    return 'SDM';
   }
-
-  // Default engineering roster people without a clear QA signal to Software
-  return code || designation ? 'software' : 'other';
-}
-
-/** Lower number = more junior; Software ladder left → right. */
-const DESIGNATION_CODE_LEVEL: Record<string, number> = {
-  // Software Engineers (requested order)
-  ASE: 10,
-  SE: 20,
-  SSE: 30,
-  ATL: 40,
-  TL: 50,
-  STL: 60,
-  AARCH: 70,
-  ARCH: 80,
-  SARCH: 90,
-  // Common aliases / typos
-  SARCK: 90,
-  AARH: 70,
-  // QA Engineers (junior → senior)
-  INT: 5,
-  INTERN: 5,
-  TRAINEE: 5,
-  JQA: 10,
-  AQA: 15,
-  QA: 20,
-  QAE: 20,
-  QE: 20,
-  SQA: 30,
-  SQAE: 30,
-  QTL: 40,
-  QAL: 50,
-};
-
-function designationLevelRank(code: string, designationName?: string): number {
-  const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (normalized && normalized !== '') {
-    if (DESIGNATION_CODE_LEVEL[normalized] != null) {
-      return DESIGNATION_CODE_LEVEL[normalized];
-    }
-    // e.g. SE1 / SSE2 → base code + step
-    const numbered = normalized.match(/^([A-Z]+)(\d+)$/);
-    if (numbered) {
-      const base = DESIGNATION_CODE_LEVEL[numbered[1]];
-      if (base != null) return base + Number(numbered[2]);
-    }
+  if (/delivery\s*manager/i.test(title)) {
+    return 'DM';
   }
-
-  const name = (designationName ?? '').toLowerCase();
-  if (/associate\s*architect|asst\.?\s*architect|a-?arch/.test(name)) return 70;
-  if (/senior\s*architect|s-?arch/.test(name)) return 90;
-  if (/architect/.test(name)) return 80;
-  if (/senior\s*tech\s*lead|stl/.test(name)) return 60;
-  if (/associate\s*tech\s*lead|atl/.test(name)) return 40;
-  if (/tech\s*lead|\blead\b/.test(name)) return 50;
-  if (/senior\s*software|sse/.test(name)) return 30;
-  if (/associate\s*software|ase/.test(name)) return 10;
-  if (/software\s*engineer|\bse\b/.test(name)) return 20;
-  if (/intern|trainee/.test(name)) return 5;
-  if (/junior|associate|entry/.test(name)) return 15;
-  if (/senior|\bsr\.?\b/.test(name)) return 30;
-  return 999; // unknown codes go to the right
+  if (isEngineeringManagerRole(title)) return 'EM';
+  const token = title.match(/\b([A-Z]{2,5})\b/);
+  return token?.[1] ?? title.split(/\s+/)[0] ?? '';
 }
 
 function groupTeamByDesignation(team: TeamRosterMember[]) {
@@ -295,7 +210,7 @@ function PersonCard({
 }) {
   return (
     <div
-      className={`relative mx-auto w-[112px] rounded-lg border px-1.5 py-1.5 text-center shadow-sm ${bandStyles[band]}`}
+      className={`relative mx-auto w-[128px] rounded-lg border px-1.5 py-1.5 text-center shadow-sm ${bandStyles[band]}`}
       title={[name, role].filter(Boolean).join(' · ')}
     >
       {onNameClick ? (

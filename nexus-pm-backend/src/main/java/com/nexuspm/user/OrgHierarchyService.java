@@ -109,6 +109,15 @@ public class OrgHierarchyService {
     }
 
     private Optional<OrgLevel> resolveOrgLevel(Employee employee) {
+        // Employee + extra roles must not resolve as Manager/PM for reporting rules.
+        Optional<OrgLevel> employeeLevel = employee.getRoles().stream()
+                .filter(role -> role.getCode() != null && "EMPLOYEE".equalsIgnoreCase(role.getCode()))
+                .map(Role::getOrgLevel)
+                .filter(level -> level != null)
+                .findFirst();
+        if (employeeLevel.isPresent()) {
+            return employeeLevel;
+        }
         return employee.getRoles().stream()
                 .map(Role::getOrgLevel)
                 .filter(level -> level != null)
