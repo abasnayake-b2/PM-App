@@ -1,5 +1,5 @@
 import type { Allocation } from '@/types';
-import { projectColor } from '@/utils/allocationUi';
+import { allocationTargetLabel, projectColor } from '@/utils/allocationUi';
 
 interface StackedAllocationBarProps {
   allocations: Allocation[];
@@ -18,8 +18,8 @@ export function StackedAllocationBar({
     id: a.id,
     width: a.percentage,
     color: projectColor(a.projectId, a.projectName),
-    label: a.issueTitle,
-    title: `${a.issueTitle} · ${a.projectName}`,
+    label: allocationTargetLabel(a),
+    title: `${allocationTargetLabel(a)} · ${a.projectName}`,
   }));
 
   const free = Math.max(0, 100 - totalPercentage);

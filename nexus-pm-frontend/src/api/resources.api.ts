@@ -30,7 +30,9 @@ export async function fetchAllocations(params: AllocationQueryParams = {}): Prom
 
 export interface CreateAllocationPayload {
   employeeId: string;
-  issueId: string;
+  issueId?: string;
+  projectTaskId?: string;
+  rdIssueTaskId?: string;
   roleOnProject?: string;
   percentage: number;
   fromDate: string;

@@ -266,8 +266,33 @@ export function formatAllocationCardLabel(allocation: Allocation): string {
   return `${allocation.projectName}: ${allocation.percentage}%: ${formatAllocationDateRange(allocation)}`;
 }
 
+export function allocationTargetLabel(allocation: Allocation): string {
+  return allocation.issueTitle?.trim() || allocation.projectName;
+}
+
+/** Compact id for timeline bars: RD task, project task, or RD key. */
+export function allocationItemKey(allocation: Allocation): string {
+  const rdTask = allocation.rdIssueTaskKey?.trim();
+  if (rdTask) return rdTask;
+  const projectTask = allocation.projectTaskKey?.trim();
+  if (projectTask) return projectTask;
+  const rd = allocation.issueDisplayKey?.trim();
+  if (rd) return rd;
+  const title = allocation.issueTitle?.trim();
+  if (title) {
+    const dash = title.indexOf(' — ');
+    return dash > 0 ? title.slice(0, dash) : title;
+  }
+  return allocation.projectName;
+}
+
+export function allocationTargetHref(allocation: Allocation): string {
+  if (allocation.issueId) return `/issues/${allocation.issueId}`;
+  return `/projects/${allocation.projectId}`;
+}
+
 export function allocationIssueTooltip(allocation: Allocation): string {
-  return allocation.issueTitle;
+  return allocationTargetLabel(allocation);
 }
 
 export function defaultDateRange(): { from: string; to: string } {
@@ -505,10 +530,11 @@ export function weekIndex(dateStr: string, weeks: TimelineWeek[]): number {
 }
 
 export function timelineBarLabel(allocation: Allocation, showDates: boolean): string {
+  const item = allocationItemKey(allocation);
   if (showDates) {
-    return `${allocation.projectName} ${allocation.percentage}% · ${formatAllocationDateRange(allocation)}`;
+    return `${item} ${allocation.percentage}% · ${formatAllocationDateRange(allocation)}`;
   }
-  return `${allocation.projectName} ${allocation.percentage}%`;
+  return `${item} ${allocation.percentage}%`;
 }
 
 export interface AllocationLaneSpan {

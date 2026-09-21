@@ -7,15 +7,15 @@ import { useAllocations } from '@/hooks/useResources';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/store/useAuthStore';
 import { P } from '@/utils/permissions';
-import { partitionAllocations, sumAllocationPercent } from '@/utils/allocationUi';
+import { partitionAllocations, sumAllocationPercent, allocationTargetHref, allocationTargetLabel } from '@/utils/allocationUi';
 import type { Allocation } from '@/types';
 
 function AllocationListItem({ allocation }: { allocation: Allocation }) {
   return (
     <li>
       <div className="flex justify-between gap-3 text-sm">
-        <Link to={`/issues/${allocation.issueId}`} className="font-medium hover:text-accent">
-          {allocation.issueTitle}
+        <Link to={allocationTargetHref(allocation)} className="font-medium hover:text-accent">
+          {allocationTargetLabel(allocation)}
         </Link>
         <span>{allocation.percentage}%</span>
       </div>

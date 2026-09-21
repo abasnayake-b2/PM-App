@@ -42,6 +42,7 @@ const SECTION_TINT: Record<string, string> = {
   MILESTONES: 'from-indigo-500/10 to-transparent',
   QUARTERLY_COMPLETION: 'from-cyan-500/10 to-transparent',
   RISK: 'from-rose-500/10 to-transparent',
+  TASKS: 'from-violet-500/10 to-transparent',
   OTHER: 'from-[color:var(--bg3)] to-transparent',
 };
 

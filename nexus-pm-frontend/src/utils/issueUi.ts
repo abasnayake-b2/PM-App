@@ -9,6 +9,25 @@ export function issueDisplayKey(issue: Issue): string {
   return `IX-${suffix}`;
 }
 
+/** e.g. ABIC-GBL-RD-1-RT-1 */
+export function formatTaskDisplayKey(prefix: string | undefined, taskNumber: number): string {
+  const p = prefix?.trim();
+  return p ? `${p}-RT-${taskNumber}` : `RT-${taskNumber}`;
+}
+
+/** e.g. ABIC-GBL-PT-1 */
+export function formatProjectTaskDisplayKey(prefix: string | undefined, taskNumber: number): string {
+  const p = prefix?.trim();
+  return p ? `${p}-PT-${taskNumber}` : `PT-${taskNumber}`;
+}
+
+/** Match backend IssueDisplayKeys.projectKeyPrefix for project-level task preview. */
+export function projectTaskKeyPrefix(name?: string | null, product?: string | null): string {
+  const raw = (name?.trim() || product?.trim() || '').toUpperCase().replace(/[^A-Z0-9]+/g, '-');
+  const cleaned = raw.replace(/^-+/, '').replace(/-+$/, '');
+  return cleaned || 'PROJ';
+}
+
 /** Primary assignee label: resource allocations take precedence over legacy assignee field. */
 export function issueAssigneeName(issue: Issue): string | undefined {
   return issue.allocatedToNames ?? issue.assignedToName ?? undefined;

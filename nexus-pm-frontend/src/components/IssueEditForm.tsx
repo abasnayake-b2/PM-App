@@ -15,6 +15,7 @@ import {
 import { IssueRisksSection } from '@/components/IssueRisksSection';
 import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
 import { IssueNotesSection } from '@/components/IssueNotesSection';
+import { IssueTasksSection } from '@/components/IssueTasksSection';
 import {
   firstCustomFieldErrorMessage,
   firstFieldErrorKey,
@@ -22,6 +23,7 @@ import {
   scrollToIssueField,
   validateIssueCustomFields,
 } from '@/utils/issueFieldValidation';
+import { issueDisplayKey } from '@/utils/issueUi';
 
 interface IssueEditFormProps {
   issue: Issue;
@@ -341,6 +343,8 @@ export function IssueEditForm({
       />
 
       <IssueNotesSection issueId={issue.id} mode="edit" />
+
+      <IssueTasksSection issueId={issue.id} mode="edit" rdDisplayKey={issueDisplayKey(issue)} />
 
       <IssueQuarterlyCompletionSection issueId={issue.id} mode="edit" />
 

@@ -14,7 +14,7 @@ import {
 } from '@/hooks/useResources';
 import { fetchRosterAllocationResources } from '@/api/resources.api';
 import type { Allocation } from '@/types';
-import { aggregateProjectUtilisation, todayLocalIso } from '@/utils/allocationUi';
+import { aggregateProjectUtilisation, allocationTargetLabel, todayLocalIso } from '@/utils/allocationUi';
 
 interface ProjectUtilisationSectionProps {
   projectId: string;
@@ -87,7 +87,7 @@ export function ProjectUtilisationSection({ projectId, canEdit }: ProjectUtilisa
   const handleDelete = (allocation: Allocation) => {
     if (
       window.confirm(
-        `Remove ${allocation.employeeName} from "${allocation.issueTitle}" (${allocation.percentage}%)?`,
+        `Remove ${allocation.employeeName} from "${allocationTargetLabel(allocation)}" (${allocation.percentage}%)?`,
       )
     ) {
       deleteAllocation.mutate(allocation.id, {

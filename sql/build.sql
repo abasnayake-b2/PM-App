@@ -5,7 +5,11 @@
 --   mysql -u root -p < build.sql
 --   mysql -u root -p < seed.sql
 --
--- Sources: JPA entities, Liquibase 001–011, bootstrap runners, live schema.
+-- Existing databases (do not rebuild): run sql/Release-9-21-2026.sql instead
+-- (RD / project tasks + allocation project_id / task links).
+--
+-- Sources: JPA entities, Liquibase 001–011, bootstrap runners, live schema,
+-- Release-9-21-2026 (027 rd_issue_task / project_task, 028 allocation tasks).
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS dfn_pm
@@ -29,6 +33,8 @@ DROP TABLE IF EXISTS holiday_calendar;
 DROP TABLE IF EXISTS time_log;
 DROP TABLE IF EXISTS allocation;
 DROP TABLE IF EXISTS task;
+DROP TABLE IF EXISTS rd_issue_task;
+DROP TABLE IF EXISTS project_task;
 DROP TABLE IF EXISTS rd_issue_note;
 DROP TABLE IF EXISTS rd_issue_quarterly_completion;
 DROP TABLE IF EXISTS rd_issue_risk;
@@ -572,6 +578,24 @@ CREATE TABLE rd_issue_note (
     CONSTRAINT fk_issue_note_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Multiple tasks per RD (Release-9-21-2026 / 027)
+CREATE TABLE rd_issue_task (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    issue_id        CHAR(36)     NOT NULL,
+    task_number     INT          NOT NULL,
+    description     TEXT         NOT NULL,
+    module          VARCHAR(120) NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_issue_task_number (issue_id, task_number),
+    KEY idx_issue_task_issue (issue_id, deleted),
+    CONSTRAINT fk_issue_task_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Multiple risks per project
 CREATE TABLE project_risk (
     id              CHAR(36)     NOT NULL PRIMARY KEY,
@@ -593,6 +617,24 @@ CREATE TABLE project_risk (
     UNIQUE KEY uk_project_risk_number (project_id, risk_number),
     KEY idx_project_risk_project (project_id, deleted),
     CONSTRAINT fk_project_risk_project FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Multiple tasks per project (Release-9-21-2026 / 027)
+CREATE TABLE project_task (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    project_id      CHAR(36)     NOT NULL,
+    task_number     INT          NOT NULL,
+    description     TEXT         NOT NULL,
+    module          VARCHAR(120) NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_project_task_number (project_id, task_number),
+    KEY idx_project_task_project (project_id, deleted),
+    CONSTRAINT fk_project_task_project FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Multiple risks per release
@@ -633,10 +675,14 @@ CREATE TABLE task (
     CONSTRAINT fk_task_status   FOREIGN KEY (status_id)   REFERENCES issue_status(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Allocations: required project; optional RD, project task, or RD task (Release-9-21-2026 / 028)
 CREATE TABLE allocation (
     id              CHAR(36)    NOT NULL PRIMARY KEY,
     employee_id     CHAR(36)    NOT NULL,
-    issue_id        CHAR(36)    NOT NULL,
+    project_id      CHAR(36)    NOT NULL,
+    issue_id        CHAR(36)    NULL,
+    project_task_id CHAR(36)    NULL,
+    rd_issue_task_id CHAR(36)   NULL,
     role_on_project VARCHAR(50) NULL,
     percentage      INT         NOT NULL,
     from_date       DATE        NOT NULL,
@@ -649,7 +695,10 @@ CREATE TABLE allocation (
     created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_alloc_employee FOREIGN KEY (employee_id) REFERENCES employee(id),
-    CONSTRAINT fk_alloc_issue    FOREIGN KEY (issue_id)    REFERENCES rd_issue(id)
+    CONSTRAINT fk_alloc_project  FOREIGN KEY (project_id)  REFERENCES project(id),
+    CONSTRAINT fk_alloc_issue    FOREIGN KEY (issue_id)    REFERENCES rd_issue(id),
+    CONSTRAINT fk_alloc_project_task FOREIGN KEY (project_task_id) REFERENCES project_task(id),
+    CONSTRAINT fk_alloc_rd_issue_task FOREIGN KEY (rd_issue_task_id) REFERENCES rd_issue_task(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE time_log (

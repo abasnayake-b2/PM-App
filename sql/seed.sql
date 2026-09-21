@@ -5,9 +5,11 @@
 -- Usage:
 --   mysql -u root -p < build.sql
 --   mysql -u root -p < seed.sql
+-- Existing DBs: apply sql/Release-9-21-2026.sql (no extra seed rows).
 --
 -- Seeds reference data, RBAC, and delivery lookups only.
 -- Management roster, team employees, projects, and RD issues are loaded via Excel import.
+-- RD tasks, project-level tasks, and allocations are created in the app (no seed rows).
 --
 -- Bootstrap login (password Admin@12345):
 --   admin@dfnpm.local — Super Admin

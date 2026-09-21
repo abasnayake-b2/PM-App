@@ -31,5 +31,7 @@
     <include file="db/changelog/changes/024-rename-quotation-approved-date-label.xml"/>
     <include file="db/changelog/changes/025-rd-issue-notes.xml"/>
     <include file="db/changelog/changes/026-rd-issue-bms-id.xml"/>
+    <include file="db/changelog/changes/027-rd-project-tasks.xml"/>
+    <include file="db/changelog/changes/028-allocation-tasks.xml"/>
 
 </databaseChangeLog>

@@ -14,8 +14,14 @@ public class CreateAllocationRequest {
     @NotNull
     private UUID employeeId;
 
-    @NotNull
+    /** RD to allocate on. Omit when allocating to a project-level task. */
     private UUID issueId;
+
+    /** Project-level task. Mutually exclusive with issueId / rdIssueTaskId. */
+    private UUID projectTaskId;
+
+    /** RD-level task on the selected issue. */
+    private UUID rdIssueTaskId;
 
     private String roleOnProject;
 

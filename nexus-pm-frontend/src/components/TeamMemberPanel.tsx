@@ -13,6 +13,8 @@ import {
   formatAllocationDateRange,
   projectColor,
   roleLabel,
+  allocationTargetHref,
+  allocationTargetLabel,
 } from '@/utils/allocationUi';
 import { isOpenIssueStatus } from '@/utils/issueLifecycle';
 
@@ -91,7 +93,7 @@ export function TeamMemberPanel({
   );
 
   const handleRemoveAllocation = (allocation: Allocation) => {
-    if (!window.confirm(`Remove ${row.employeeName} from "${allocation.issueTitle}"?`)) return;
+    if (!window.confirm(`Remove ${row.employeeName} from "${allocationTargetLabel(allocation)}"?`)) return;
     deleteAllocation.mutate(allocation.id, {
       onSuccess: () => {
         if (editingAllocation?.id === allocation.id) {
@@ -180,7 +182,7 @@ export function TeamMemberPanel({
           )}
 
           <section className="mt-6">
-            <h3 className="text-sm font-semibold">Issue allocations</h3>
+            <h3 className="text-sm font-semibold">Allocations</h3>
             {canMutateAllocations && editingAllocation && (
               <div className="mt-3">
                 <AllocationForm
@@ -213,15 +215,15 @@ export function TeamMemberPanel({
             )}
 
             {allocations.length === 0 ? (
-              <p className="mt-2 text-sm text-text2">No issue allocations in this period.</p>
+              <p className="mt-2 text-sm text-text2">No allocations in this period.</p>
             ) : (
               <ul className="mt-3 space-y-4">
                 {allocations.map((allocation) =>
                   editingAllocation?.id === allocation.id ? null : (
                     <li key={allocation.id}>
                       <div className="flex items-start justify-between gap-3 text-sm">
-                        <Link to={`/issues/${allocation.issueId}`} className="font-medium hover:text-accent">
-                          {allocation.issueTitle}
+                        <Link to={allocationTargetHref(allocation)} className="font-medium hover:text-accent">
+                          {allocationTargetLabel(allocation)}
                         </Link>
                         <div className="flex shrink-0 items-center gap-1.5">
                           <span className="text-text2">{allocation.percentage}%</span>
@@ -304,7 +306,7 @@ export function TeamMemberPanel({
                   to={`/resources/${row.employeeId}`}
                   className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg3"
                 >
-                  System profile
+                  User profile
                 </Link>
               ) : (
                 <Link
@@ -327,7 +329,7 @@ export function TeamMemberPanel({
                 className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
                 style={{ color: 'var(--accent-fg)' }}
               >
-                Allocate on issue
+                Allocate
               </button>
             )}
           </div>

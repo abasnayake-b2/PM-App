@@ -15,8 +15,15 @@ public class AllocationResponse {
     private String employeeName;
     private UUID issueId;
     private String issueTitle;
+    private String issueDisplayKey;
     private UUID projectId;
     private String projectName;
+    private UUID projectTaskId;
+    private String projectTaskKey;
+    private String projectTaskDescription;
+    private UUID rdIssueTaskId;
+    private String rdIssueTaskKey;
+    private String rdIssueTaskDescription;
     private String roleOnProject;
     private Integer percentage;
     private LocalDate fromDate;

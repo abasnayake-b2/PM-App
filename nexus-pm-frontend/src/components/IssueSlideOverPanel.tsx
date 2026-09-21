@@ -33,6 +33,7 @@ import {
 import { IssueRisksSection } from '@/components/IssueRisksSection';
 import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
 import { IssueNotesSection } from '@/components/IssueNotesSection';
+import { IssueTasksSection } from '@/components/IssueTasksSection';
 import { IssueJiraWorklogPanel } from '@/components/IssueJiraWorklogPanel';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
@@ -58,7 +59,7 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
   const [addingAllocation, setAddingAllocation] = useState(false);
   const [editingAllocationId, setEditingAllocationId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
-  const [panelTab, setPanelTab] = useState<'details' | 'worklog'>('details');
+  const [panelTab, setPanelTab] = useState<'details' | 'worklog' | 'tasks'>('details');
 
   useEffect(() => {
     setEditing(false);
@@ -279,10 +280,27 @@ export function IssueSlideOverPanel({ issueId, onClose, onOpenIssue }: IssueSlid
             >
               Work log
             </button>
+            <button
+              type="button"
+              onClick={() => setPanelTab('tasks')}
+              className={`rounded-t-md px-3 py-1.5 text-xs font-medium ${
+                panelTab === 'tasks'
+                  ? 'border border-b-0 border-border bg-bg2 text-accent'
+                  : 'text-text2 hover:text-text'
+              }`}
+            >
+              Tasks
+            </button>
           </div>
 
           {panelTab === 'worklog' ? (
             <IssueJiraWorklogPanel issueId={issue.id} jiraId={issue.jiraId} />
+          ) : panelTab === 'tasks' ? (
+            <IssueTasksSection
+              issueId={issue.id}
+              mode="view"
+              rdDisplayKey={issueDisplayKey(issue)}
+            />
           ) : (
             <>
           <RdSectionCard title="Description" sectionCode="OTHER" mode="view">

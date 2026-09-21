@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { TeamExcelUpload } from '@/components/TeamExcelUpload';
+import { downloadTeamMembersExcel } from '@/utils/teamMembersExcelExport';
 import { TeamRosterMemberPanel } from '@/components/TeamRosterMemberPanel';
 import { TeamRosterMemberForm } from '@/components/TeamRosterMemberForm';
 import { SlideOverPanel } from '@/components/SlideOverPanel';
@@ -177,8 +178,11 @@ export function TeamEmployeesPage() {
   const [editing, setEditing] = useState<TeamRosterMember | null>(null);
   const [selected, setSelected] = useState<TeamRosterMember | null>(null);
   const [promoting, setPromoting] = useState<TeamRosterMember | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { data: rows, isLoading, error } = useTeamRosterMembers(search);
+  const { data: exportRows = [] } = useTeamRosterMembers('');
   const filters = useRosterMemberFilters(rows);
   const { data: management = [] } = useTeamManagement('', canPromote && dialog === 'promote');
   const createRow = useCreateTeamRosterMember();
@@ -223,9 +227,29 @@ export function TeamEmployeesPage() {
   const cellClass = 'whitespace-nowrap px-4 py-2';
   const hasFilters = filters.hasFilters;
 
+  const handleDownloadExcel = async () => {
+    if (downloading || exportRows.length === 0) return;
+    setDownloadError(null);
+    setDownloading(true);
+    try {
+      await downloadTeamMembersExcel(exportRows);
+    } catch (err) {
+      console.error(err);
+      setDownloadError('Could not download employee Excel. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <TeamExcelUpload variant="employees" />
+      <TeamExcelUpload
+        variant="employees"
+        onDownload={handleDownloadExcel}
+        downloading={downloading}
+        downloadDisabled={exportRows.length === 0}
+      />
+      {downloadError && <p className="text-sm text-danger">{downloadError}</p>}
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-[12rem] flex-1 flex-col gap-3">

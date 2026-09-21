@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
+import { Plus } from 'lucide-react';
 import { fetchAllocations, type OverAllocationError } from '@/api/resources.api';
 import { fetchProjects } from '@/api/projects.api';
 import { fetchIssues } from '@/api/issues.api';
@@ -11,7 +12,16 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { hasOrgWideVisibility } from '@/utils/orgRoles';
 import { todayLocalIso } from '@/utils/allocationUi';
 import { isOpenIssueStatus } from '@/utils/issueLifecycle';
-import { issueDisplayKey } from '@/utils/issueUi';
+import { issueDisplayKey, formatProjectTaskDisplayKey, formatTaskDisplayKey, projectTaskKeyPrefix } from '@/utils/issueUi';
+import {
+  useCreateIssueTask,
+  useCreateProjectTask,
+  useIssueTasks,
+  useProjectTasks,
+} from '@/hooks/useScopedTasks';
+import type { TaskRecord } from '@/api/scopedTasks.api';
+import { usePermissions } from '@/hooks/usePermissions';
+import { P } from '@/utils/permissions';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -24,6 +34,19 @@ interface ResourceIssueAllocateFormProps {
   onSubmit: (payload: CreateAllocationPayload) => void;
 }
 
+function allocationApiErrorMessage(error: unknown): string {
+  if (!isAxiosError(error)) return 'Failed to save allocation.';
+  const data = error.response?.data as
+    | { detail?: string; errors?: Record<string, string> }
+    | undefined;
+  const fieldErrors = data?.errors
+    ? Object.entries(data.errors)
+        .map(([field, message]) => `${field}: ${message}`)
+        .join('; ')
+    : '';
+  return fieldErrors || data?.detail || 'Failed to save allocation.';
+}
+
 function parseOverAllocationError(error: unknown): OverAllocationError | null {
   if (!isAxiosError(error) || error.response?.status !== 400) return null;
   const data = error.response.data as Record<string, unknown>;
@@ -34,6 +57,110 @@ function parseOverAllocationError(error: unknown): OverAllocationError | null {
 function defaultPercentage(available: number): number {
   if (available <= 0) return 0;
   return Math.min(50, available);
+}
+
+function taskOptionLabel(
+  task: TaskRecord,
+  style: 'rd' | 'project',
+  prefix?: string,
+): string {
+  const key =
+    style === 'project'
+      ? formatProjectTaskDisplayKey(prefix, task.taskNumber)
+      : formatTaskDisplayKey(prefix, task.taskNumber);
+  const desc = task.description?.trim();
+  return desc ? `${key} — ${desc}` : key;
+}
+
+function nextTaskNumber(rows: TaskRecord[]): number {
+  return rows.reduce((max, row) => Math.max(max, row.taskNumber || 0), 0) + 1;
+}
+
+function InlineNewTask({
+  title,
+  numberPreview,
+  loading,
+  error,
+  onCancel,
+  onCreate,
+}: {
+  title: string;
+  numberPreview: string;
+  loading?: boolean;
+  error?: unknown;
+  onCancel: () => void;
+  onCreate: (payload: { description: string; module?: string }) => void;
+}) {
+  const [description, setDescription] = useState('');
+  const [module, setModule] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const save = () => {
+    const desc = description.trim();
+    if (!desc) {
+      setLocalError('Task description is required');
+      return;
+    }
+    setLocalError(null);
+    onCreate({ description: desc, module: module.trim() || undefined });
+  };
+
+  return (
+    <div className="space-y-2 rounded-lg border border-accent/30 bg-bg p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">{title}</p>
+      <label className="block text-sm">
+        <span className="text-text2">Task number</span>
+        <input type="text" readOnly value={`${numberPreview} (auto)`} className={`${inputClass} bg-bg3 text-text2`} />
+      </label>
+      <label className="block text-sm">
+        <span className="text-text2">
+          Task description <span className="text-danger">*</span>
+        </span>
+        <textarea
+          rows={2}
+          value={description}
+          maxLength={4000}
+          className={inputClass}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            setLocalError(null);
+          }}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="text-text2">Module</span>
+        <input
+          type="text"
+          value={module}
+          maxLength={120}
+          className={inputClass}
+          onChange={(e) => setModule(e.target.value)}
+        />
+      </label>
+      {(localError || error != null) && (
+        <p className="text-xs text-danger">{localError || allocationApiErrorMessage(error)}</p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={save}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          style={{ color: 'var(--accent-fg)' }}
+        >
+          {loading ? 'Saving…' : 'Create task'}
+        </button>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onCancel}
+          className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-bg3 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function issueMatchesSearch(issue: Issue, query: string): boolean {
@@ -58,6 +185,10 @@ export function ResourceIssueAllocateForm({
   const userName = useAuthStore((s) => s.user?.name);
   const isScopedManager = !hasOrgWideVisibility(role, orgWideVisibility);
 
+  const { can } = usePermissions();
+  const canAddProjectTask = can(P.PROJECTS_UPDATE);
+  const canAddRdTask = can(P.ISSUES_UPDATE);
+
   const defaultEm = row.engineeringManagerName?.trim() || '';
   const [engineeringManager, setEngineeringManager] = useState(
     isScopedManager && userName ? userName : defaultEm,
@@ -65,6 +196,10 @@ export function ResourceIssueAllocateForm({
   const [projectId, setProjectId] = useState('');
   const [issueId, setIssueId] = useState('');
   const [issueSearch, setIssueSearch] = useState('');
+  const [projectTaskId, setProjectTaskId] = useState('');
+  const [rdTaskId, setRdTaskId] = useState('');
+  const [addingProjectTask, setAddingProjectTask] = useState(false);
+  const [addingRdTask, setAddingRdTask] = useState(false);
   const [fromDate, setFromDate] = useState(todayLocalIso());
   const [toDate, setToDate] = useState('');
   const [percentage, setPercentage] = useState(50);
@@ -129,6 +264,25 @@ export function ResourceIssueAllocateForm({
     [availableIssues, issueId],
   );
 
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === projectId) ?? null,
+    [projects, projectId],
+  );
+
+  const { data: projectTasks = [], isLoading: projectTasksLoading } = useProjectTasks(
+    projectId || undefined,
+    !!projectId && !issueId,
+  );
+  const { data: rdTasks = [], isLoading: rdTasksLoading } = useIssueTasks(
+    issueId || undefined,
+    !!issueId,
+  );
+  const createProjectTask = useCreateProjectTask(projectId);
+  const createIssueTask = useCreateIssueTask(issueId);
+
+  const projectTaskPrefix = projectTaskKeyPrefix(selectedProject?.name, selectedProject?.product);
+  const rdTaskPrefix = selectedIssue ? issueDisplayKey(selectedIssue) : undefined;
+
   const { data: overlapping, isLoading: overlapLoading } = useQuery({
     queryKey: ['allocations', 'overlap', row.employeeId, fromDate, toDate || 'ongoing'],
     queryFn: () =>
@@ -159,12 +313,27 @@ export function ResourceIssueAllocateForm({
     setProjectId('');
     setIssueId('');
     setIssueSearch('');
+    setProjectTaskId('');
+    setRdTaskId('');
+    setAddingProjectTask(false);
+    setAddingRdTask(false);
   }, [engineeringManager]);
 
   useEffect(() => {
     setIssueId('');
     setIssueSearch('');
+    setProjectTaskId('');
+    setRdTaskId('');
+    setAddingProjectTask(false);
+    setAddingRdTask(false);
   }, [projectId]);
+
+  useEffect(() => {
+    setRdTaskId('');
+    setProjectTaskId('');
+    setAddingProjectTask(false);
+    setAddingRdTask(false);
+  }, [issueId]);
 
   useEffect(() => {
     if (issueId && !availableIssues.some((issue) => issue.id === issueId)) {
@@ -184,9 +353,11 @@ export function ResourceIssueAllocateForm({
 
   const datesInvalid = !!fromDate && !!toDate && fromDate > toDate;
 
+  const projectLevelReady = !!projectId && !issueId && !!projectTaskId;
+  const rdLevelReady = !!projectId && !!issueId;
+
   const canSubmit =
-    !!issueId &&
-    !!projectId &&
+    (projectLevelReady || rdLevelReady) &&
     !!toDate &&
     !datesInvalid &&
     percentage >= 1 &&
@@ -200,7 +371,9 @@ export function ResourceIssueAllocateForm({
     setDismissedError(false);
     onSubmit({
       employeeId: row.employeeId,
-      issueId,
+      ...(issueId
+        ? { issueId, ...(rdTaskId ? { rdIssueTaskId: rdTaskId } : {}) }
+        : { projectTaskId }),
       roleOnProject: row.designationName || undefined,
       percentage,
       fromDate,
@@ -211,7 +384,7 @@ export function ResourceIssueAllocateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-bg3 p-4">
-      <h3 className="font-semibold">Allocate on issue</h3>
+      <h3 className="font-semibold">Allocation</h3>
 
       {overAllocation && (
         <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm">
@@ -232,8 +405,7 @@ export function ResourceIssueAllocateForm({
       {submitError && !overAllocation && (
         <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
           {isAxiosError(submitError)
-            ? ((submitError.response?.data as { detail?: string })?.detail ??
-              'Failed to save allocation.')
+            ? allocationApiErrorMessage(submitError)
             : 'Failed to save allocation.'}
         </p>
       )}
@@ -286,35 +458,34 @@ export function ResourceIssueAllocateForm({
 
       <div className="space-y-2">
         <label className="block text-sm">
-          <span className="text-text2">Search issues</span>
+          <span className="text-text2">Search RDs</span>
           <input
             type="search"
             className={inputClass}
             value={issueSearch}
             disabled={!projectId}
-            placeholder="Search by description or issue number…"
+            placeholder="Search by description or RD number…"
             onChange={(e) => setIssueSearch(e.target.value)}
           />
         </label>
         <label className="block text-sm">
-          <span className="text-text2">Issue</span>
+          <span className="text-text2">RD</span>
           <select
             className={inputClass}
             value={issueId}
             disabled={!projectId || issuesLoading}
             onChange={(e) => setIssueId(e.target.value)}
-            required
           >
-            <option value="" disabled>
+            <option value="">
               {!projectId
                 ? 'Select a project first…'
                 : issuesLoading
-                  ? 'Loading issues…'
+                  ? 'Loading RDs…'
                   : availableIssues.length === 0
                     ? issueSearch.trim()
-                      ? 'No matching issues…'
-                      : 'No open issues on this project…'
-                    : 'Select issue…'}
+                      ? 'No matching RDs…'
+                      : 'No open RDs on this project…'
+                    : 'None — use a project-level task'}
             </option>
             {availableIssues.map((issue) => (
               <option key={issue.id} value={issue.id}>
@@ -327,6 +498,138 @@ export function ResourceIssueAllocateForm({
           <p className="line-clamp-3 text-xs text-text2">{selectedIssue.description}</p>
         )}
       </div>
+
+      {!issueId && (
+        <div className="space-y-2">
+          <div className="flex items-end gap-2">
+            <label className="min-w-0 flex-1 text-sm">
+              <span className="text-text2">Project task</span>
+              <select
+                className={inputClass}
+                value={projectTaskId}
+                disabled={!projectId || projectTasksLoading}
+                onChange={(e) => setProjectTaskId(e.target.value)}
+                required={!issueId && !addingProjectTask}
+              >
+                <option value="" disabled>
+                  {!projectId
+                    ? 'Select a project first…'
+                    : projectTasksLoading
+                      ? 'Loading project tasks…'
+                      : projectTasks.length === 0
+                        ? 'No project-level tasks…'
+                        : 'Select project task…'}
+                </option>
+                {projectTasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {taskOptionLabel(task, 'project', projectTaskPrefix)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!!projectId && canAddProjectTask && !addingProjectTask && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingProjectTask(true);
+                  createProjectTask.reset();
+                }}
+                className="mb-px inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-bg px-2.5 py-2 text-xs hover:bg-bg3"
+              >
+                <Plus size={12} />
+                New
+              </button>
+            )}
+          </div>
+          {addingProjectTask && (
+            <InlineNewTask
+              title="New project task"
+              numberPreview={formatProjectTaskDisplayKey(
+                projectTaskPrefix,
+                nextTaskNumber(projectTasks),
+              )}
+              loading={createProjectTask.isPending}
+              error={createProjectTask.error}
+              onCancel={() => {
+                setAddingProjectTask(false);
+                createProjectTask.reset();
+              }}
+              onCreate={(payload) => {
+                createProjectTask.mutate(payload, {
+                  onSuccess: (task) => {
+                    setProjectTaskId(task.id);
+                    setAddingProjectTask(false);
+                    createProjectTask.reset();
+                  },
+                });
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {!!issueId && (
+        <div className="space-y-2">
+          <div className="flex items-end gap-2">
+            <label className="min-w-0 flex-1 text-sm">
+              <span className="text-text2">RD task</span>
+              <select
+                className={inputClass}
+                value={rdTaskId}
+                disabled={rdTasksLoading}
+                onChange={(e) => setRdTaskId(e.target.value)}
+              >
+                <option value="">
+                  {rdTasksLoading
+                    ? 'Loading RD tasks…'
+                    : rdTasks.length === 0
+                      ? 'None — allocate to this RD'
+                      : 'Optional — or allocate to this RD'}
+                </option>
+                {rdTasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {taskOptionLabel(task, 'rd', rdTaskPrefix)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {canAddRdTask && !addingRdTask && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingRdTask(true);
+                  createIssueTask.reset();
+                }}
+                className="mb-px inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-bg px-2.5 py-2 text-xs hover:bg-bg3"
+              >
+                <Plus size={12} />
+                New
+              </button>
+            )}
+          </div>
+          {addingRdTask && (
+            <InlineNewTask
+              title="New RD task"
+              numberPreview={formatTaskDisplayKey(rdTaskPrefix, nextTaskNumber(rdTasks))}
+              loading={createIssueTask.isPending}
+              error={createIssueTask.error}
+              onCancel={() => {
+                setAddingRdTask(false);
+                createIssueTask.reset();
+              }}
+              onCreate={(payload) => {
+                createIssueTask.mutate(payload, {
+                  onSuccess: (task) => {
+                    setRdTaskId(task.id);
+                    setAddingRdTask(false);
+                    createIssueTask.reset();
+                  },
+                });
+              }}
+            />
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">

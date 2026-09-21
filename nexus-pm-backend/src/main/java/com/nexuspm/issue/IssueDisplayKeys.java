@@ -39,6 +39,17 @@ public final class IssueDisplayKeys {
         return projectPrefix + "-RD-" + rdNumber;
     }
 
+    /** e.g. {@code ABIC-GBL-RD-1-RT-1} */
+    public static String rdTaskKey(String rdDisplayKey, int taskNumber) {
+        String prefix = (rdDisplayKey == null || rdDisplayKey.isBlank()) ? "RD" : rdDisplayKey.trim();
+        return prefix + "-RT-" + taskNumber;
+    }
+
+    /** e.g. {@code ABIC-GBL-PT-1} for project-level tasks. */
+    public static String projectTaskKey(Project project, int taskNumber) {
+        return projectKeyPrefix(project) + "-PT-" + taskNumber;
+    }
+
     /**
      * Reads the RD sequence from Excel CR # (or a full key like {@code SABI-GBL-RD-9}).
      * Blank / non-numeric values return {@code null} so the allocator can use the next number.

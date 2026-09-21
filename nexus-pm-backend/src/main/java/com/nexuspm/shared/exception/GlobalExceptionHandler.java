@@ -73,8 +73,14 @@ public class GlobalExceptionHandler {
         for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
-        log.warn("Validation failed fields={}", errors.keySet());
-        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed");
+        log.warn("Validation failed fields={}", errors);
+        String detail = errors.isEmpty()
+                ? "Request validation failed"
+                : errors.entrySet().stream()
+                        .map(e -> e.getKey() + ": " + e.getValue())
+                        .reduce((a, b) -> a + "; " + b)
+                        .orElse("Request validation failed");
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", detail);
         problem.setProperty("errors", errors);
         return problem;
     }

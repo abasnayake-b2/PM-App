@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Pencil, Trash2 } from 'lucide-react';
 import { AllocationBar } from '@/components/AllocationBar';
 import type { Allocation } from '@/types';
-import type { ProjectUtilisationRow } from '@/utils/allocationUi';
+import { allocationTargetHref, allocationTargetLabel, type ProjectUtilisationRow } from '@/utils/allocationUi';
 
 interface ProjectUtilisationGridProps {
   rows: ProjectUtilisationRow[];
@@ -59,8 +59,8 @@ export function ProjectUtilisationGrid({
                   {row.allocations.map((allocation) => (
                     <li key={allocation.id} className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <Link to={`/issues/${allocation.issueId}`} className="text-accent hover:underline">
-                          {allocation.issueTitle}
+                        <Link to={allocationTargetHref(allocation)} className="text-accent hover:underline">
+                          {allocationTargetLabel(allocation)}
                         </Link>
                         <p className="text-xs text-text2">
                           {allocation.fromDate}

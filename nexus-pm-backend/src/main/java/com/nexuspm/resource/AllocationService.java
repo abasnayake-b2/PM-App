@@ -1,8 +1,13 @@
 package com.nexuspm.resource;
 
 import com.nexuspm.issue.entity.RdIssue;
+import com.nexuspm.issue.entity.RdIssueTask;
 import com.nexuspm.issue.repository.RdIssueRepository;
+import com.nexuspm.issue.repository.RdIssueTaskRepository;
 import com.nexuspm.project.ProjectService;
+import com.nexuspm.project.entity.Project;
+import com.nexuspm.project.entity.ProjectTask;
+import com.nexuspm.project.repository.ProjectTaskRepository;
 import com.nexuspm.resource.dto.*;
 import com.nexuspm.resource.entity.Allocation;
 import com.nexuspm.resource.exception.OverAllocationException;
@@ -40,6 +45,8 @@ public class AllocationService {
     private final EmployeeRepository employeeRepository;
     private final UserAuthRepository userAuthRepository;
     private final RdIssueRepository issueRepository;
+    private final RdIssueTaskRepository rdIssueTaskRepository;
+    private final ProjectTaskRepository projectTaskRepository;
     private final ProjectService projectService;
     private final ResourceMapper resourceMapper;
     private final AuditLogService auditLogService;
@@ -63,7 +70,7 @@ public class AllocationService {
             LocalDate rangeEnd = to != null ? to : OPEN_ENDED_RANGE_END;
             return mapAndScope(
                     allocationRepository.findOverlapping(employeeId, from, rangeEnd).stream()
-                            .filter(a -> projectId == null || a.getIssue().getProject().getId().equals(projectId))
+                            .filter(a -> projectId == null || a.getProject().getId().equals(projectId))
                             .toList(),
                     scopedProjectIds);
         }
@@ -329,9 +336,8 @@ public class AllocationService {
             throw new BusinessException("ACCESS_DENIED", "Only managers can create allocations", 403);
         }
 
-        RdIssue issue = issueRepository.findById(request.getIssueId())
-                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Issue not found", 404));
-        projectService.getProject(issue.getProject().getId());
+        ResolvedTarget target = resolveTarget(request.getIssueId(), request.getProjectTaskId(), request.getRdIssueTaskId());
+        projectService.getProject(target.project().getId());
 
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
@@ -356,7 +362,10 @@ public class AllocationService {
         Allocation allocation = new Allocation();
         allocation.setId(UUID.randomUUID());
         allocation.setEmployee(employee);
-        allocation.setIssue(issue);
+        allocation.setProject(target.project());
+        allocation.setIssue(target.issue());
+        allocation.setProjectTask(target.projectTask());
+        allocation.setRdIssueTask(target.rdIssueTask());
         allocation.setRoleOnProject(request.getRoleOnProject());
         allocation.setPercentage(request.getPercentage());
         allocation.setFromDate(request.getFromDate());
@@ -364,12 +373,13 @@ public class AllocationService {
         allocation.setBillable(request.getBillable() == null || request.getBillable());
 
         allocationRepository.save(allocation);
-        var projectName = issue.getProject().getName();
+        String targetTitle = ResourceMapper.targetTitle(allocation);
+        var projectName = target.project().getName();
         auditLogService.log(SecurityUtils.currentUserId(), "CREATE", "ALLOCATION", allocation.getId(),
-                employee.getFirstName() + " → " + issue.getTitle(), null);
+                employee.getFirstName() + " → " + targetTitle, null);
         notificationService.notifyEmployee(
                 employee.getId(),
-                "New allocation: " + issue.getTitle(),
+                "New allocation: " + targetTitle,
                 "You have been allocated " + request.getPercentage() + "% on " + projectName
                         + " from " + request.getFromDate() + ".",
                 "ALLOCATION");
@@ -384,7 +394,7 @@ public class AllocationService {
 
         Allocation allocation = allocationRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Allocation not found", 404));
-        projectService.getProject(allocation.getIssue().getProject().getId());
+        projectService.getProject(allocation.getProject().getId());
 
         Employee employee = allocation.getEmployee();
         if (employee == null || !"ACTIVE".equalsIgnoreCase(employee.getStatus())) {
@@ -411,9 +421,8 @@ public class AllocationService {
         }
 
         allocationRepository.save(allocation);
-        var issue = allocation.getIssue();
         auditLogService.log(SecurityUtils.currentUserId(), "UPDATE", "ALLOCATION", id,
-                allocation.getEmployee().getFirstName() + " → " + issue.getTitle(), null);
+                allocation.getEmployee().getFirstName() + " → " + ResourceMapper.targetTitle(allocation), null);
         return resourceMapper.toResponse(allocation);
     }
 
@@ -479,7 +488,7 @@ public class AllocationService {
         Stream<Allocation> stream = allocations.stream();
         if (scopedProjectIds != null) {
             Set<UUID> allowed = new HashSet<>(scopedProjectIds);
-            stream = stream.filter(a -> allowed.contains(a.getIssue().getProject().getId()));
+            stream = stream.filter(a -> allowed.contains(a.getProject().getId()));
         }
         return stream.map(resourceMapper::toResponse).toList();
     }
@@ -499,11 +508,12 @@ public class AllocationService {
         if (totalWouldBe > 100) {
             List<AllocationOverlapItem> breakdown = overlapping.stream()
                     .map(a -> {
-                        var project = a.getIssue().getProject();
+                        var project = a.getProject();
+                        var issue = a.getIssue();
                         return AllocationOverlapItem.builder()
                                 .allocationId(a.getId())
-                                .issueId(a.getIssue().getId())
-                                .issueTitle(a.getIssue().getTitle())
+                                .issueId(issue != null ? issue.getId() : null)
+                                .issueTitle(ResourceMapper.targetTitle(a))
                                 .projectId(project.getId())
                                 .projectName(project.getName())
                                 .percentage(a.getPercentage())
@@ -514,5 +524,54 @@ public class AllocationService {
                     .toList();
             throw new OverAllocationException(existingTotal, totalWouldBe, breakdown);
         }
+    }
+
+    private ResolvedTarget resolveTarget(UUID issueId, UUID projectTaskId, UUID rdIssueTaskId) {
+        boolean hasProjectTask = projectTaskId != null;
+        boolean hasIssue = issueId != null;
+        boolean hasRdTask = rdIssueTaskId != null;
+        if (hasProjectTask && (hasIssue || hasRdTask)) {
+            throw new BusinessException(
+                    "VALIDATION",
+                    "Choose either a project-level task or an RD task, not both",
+                    400);
+        }
+        if (!hasProjectTask && !hasIssue && !hasRdTask) {
+            throw new BusinessException(
+                    "VALIDATION",
+                    "Select a project-level task or an RD",
+                    400);
+        }
+
+        if (hasProjectTask) {
+            ProjectTask projectTask = projectTaskRepository.findActiveDetailedById(projectTaskId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "Project task not found", 404));
+            return new ResolvedTarget(projectTask.getProject(), null, projectTask, null);
+        }
+
+        RdIssueTask rdTask = null;
+        if (hasRdTask) {
+            rdTask = rdIssueTaskRepository.findActiveDetailedById(rdIssueTaskId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "RD task not found", 404));
+        }
+
+        RdIssue issue;
+        if (hasIssue) {
+            issue = issueRepository.findById(issueId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "Issue not found", 404));
+            if (rdTask != null && !rdTask.getIssue().getId().equals(issue.getId())) {
+                throw new BusinessException("VALIDATION", "RD task does not belong to the selected RD", 400);
+            }
+        } else {
+            issue = rdTask.getIssue();
+        }
+        return new ResolvedTarget(issue.getProject(), issue, null, rdTask);
+    }
+
+    private record ResolvedTarget(
+            Project project,
+            RdIssue issue,
+            ProjectTask projectTask,
+            RdIssueTask rdIssueTask) {
     }
 }

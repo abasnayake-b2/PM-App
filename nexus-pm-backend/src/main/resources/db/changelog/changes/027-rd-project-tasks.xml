@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="027-rd-issue-task" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="rd_issue_task"/>
+            </not>
+        </preConditions>
+        <comment>Multiple tasks per RD (task number, description, module).</comment>
+        <sql>
+            CREATE TABLE rd_issue_task (
+                id              CHAR(36)     NOT NULL PRIMARY KEY,
+                issue_id        CHAR(36)     NOT NULL,
+                task_number     INT          NOT NULL,
+                description     TEXT         NOT NULL,
+                module          VARCHAR(120) NULL,
+                deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+                version         BIGINT       NOT NULL DEFAULT 0,
+                created_by      CHAR(36)     NULL,
+                updated_by      CHAR(36)     NULL,
+                created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_issue_task_number (issue_id, task_number),
+                KEY idx_issue_task_issue (issue_id, deleted),
+                CONSTRAINT fk_issue_task_issue FOREIGN KEY (issue_id) REFERENCES rd_issue(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        </sql>
+    </changeSet>
+
+    <changeSet id="027-project-task" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="project_task"/>
+            </not>
+        </preConditions>
+        <comment>Multiple project-level tasks (task number, description, module).</comment>
+        <sql>
+            CREATE TABLE project_task (
+                id              CHAR(36)     NOT NULL PRIMARY KEY,
+                project_id      CHAR(36)     NOT NULL,
+                task_number     INT          NOT NULL,
+                description     TEXT         NOT NULL,
+                module          VARCHAR(120) NULL,
+                deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+                version         BIGINT       NOT NULL DEFAULT 0,
+                created_by      CHAR(36)     NULL,
+                updated_by      CHAR(36)     NULL,
+                created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_project_task_number (project_id, task_number),
+                KEY idx_project_task_project (project_id, deleted),
+                CONSTRAINT fk_project_task_project FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

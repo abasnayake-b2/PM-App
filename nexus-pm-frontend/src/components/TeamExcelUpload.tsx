@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 import {
   useImportTeamManagement,
   useImportTeamMembers,
@@ -14,6 +14,10 @@ type TeamExcelUploadVariant = 'management' | 'employees';
 interface TeamExcelUploadProps {
   variant: TeamExcelUploadVariant;
   onImported?: () => void;
+  /** Employees: download a Team sheet that can be re-uploaded. */
+  onDownload?: () => void | Promise<void>;
+  downloading?: boolean;
+  downloadDisabled?: boolean;
 }
 
 const COPY: Record<
@@ -43,7 +47,7 @@ const COPY: Record<
   employees: {
     title: 'Import employees from Excel',
     description:
-      'Upload an Excel file with a Team sheet (Name, Designation code, Team, EM, etc.). Designation codes (e.g. SE, QA) are matched to reference designation names. Each EM must exist in the management roster — upload Management Excel first. This replaces the current employee roster.',
+      'Upload an Excel file with a Team sheet (Name, Code, Designation, Team, EM, NTP/GBL, Country, Product, Email, Tel). Download Excel first to get a file you can edit and re-upload. Designation codes (e.g. SE, QA) are matched to reference designation names. Each EM must exist in the management roster — upload Management Excel first. Re-import replaces the current employee roster.',
     sheetName: 'Team',
     success: (count, fileName) => `Imported ${count} employee${count !== 1 ? 's' : ''} from ${fileName}.`,
     lastImport: (latest) =>
@@ -53,7 +57,13 @@ const COPY: Record<
   },
 };
 
-export function TeamExcelUpload({ variant, onImported }: TeamExcelUploadProps) {
+export function TeamExcelUpload({
+  variant,
+  onImported,
+  onDownload,
+  downloading = false,
+  downloadDisabled = false,
+}: TeamExcelUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const importManagement = useImportTeamManagement();
@@ -97,7 +107,18 @@ export function TeamExcelUpload({ variant, onImported }: TeamExcelUploadProps) {
           <p className="mt-1 text-xs text-text2">{copy.description}</p>
           {latest && <p className="mt-2 text-xs text-text2">{copy.lastImport(latest)}</p>}
         </div>
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onDownload && (
+            <button
+              type="button"
+              onClick={() => void onDownload()}
+              disabled={downloading || downloadDisabled}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-bg3 disabled:opacity-50"
+            >
+              <Download size={16} />
+              {downloading ? 'Preparing…' : 'Download Excel'}
+            </button>
+          )}
           <input
             ref={fileRef}
             type="file"

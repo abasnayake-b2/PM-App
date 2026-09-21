@@ -45,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -216,6 +217,7 @@ public class TeamRosterService {
         DesignationLookup designationLookup = indexDesignations();
         StreamLookup streamLookup = indexStreams();
         List<TeamManagement> managementRoster = managementRepository.findAll();
+        Map<String, Skill> skillsByName = indexSkillsByName();
         for (ImportedMemberRow imported : memberRows) {
             applyRosterReferences(
                     imported.employee(),
@@ -223,6 +225,7 @@ public class TeamRosterService {
                     designationLookup,
                     streamLookup,
                     managementRoster);
+            applyImportedMemberExtras(imported.employee(), imported.fields(), skillsByName);
         }
 
         clearRosterEmployees();
@@ -811,7 +814,12 @@ public class TeamRosterService {
                     trimOrNull(cellString(row.getCell(3))),
                     trimOrNull(cellString(row.getCell(4))),
                     trimOrNull(cellString(row.getCell(5))),
-                    trimOrNull(cellString(row.getCell(6))));
+                    trimOrNull(cellString(row.getCell(6))),
+                    trimOrNull(cellString(row.getCell(10))),
+                    trimOrNull(cellString(row.getCell(11))),
+                    trimOrNull(cellString(row.getCell(12))),
+                    trimOrNull(cellString(row.getCell(13))),
+                    trimOrNull(cellString(row.getCell(14))));
             employee.setProduct(trimOrNull(cellString(row.getCell(7))));
             employee.setEmail(trimOrNull(cellString(row.getCell(8))));
             employee.setPhone(trimOrNull(cellString(row.getCell(9))));
@@ -889,7 +897,12 @@ public class TeamRosterService {
             String teamName,
             String engineeringManagerName,
             String workType,
-            String country) {}
+            String country,
+            String skills,
+            String expTotal,
+            String experienceInDfn,
+            String employmentType,
+            String status) {}
 
     private record RosterLinkInput(
             UUID designationId,
@@ -916,7 +929,12 @@ public class TeamRosterService {
                             trimOrNullStatic(request.getTeamName()),
                             trimOrNullStatic(request.getEngineeringManagerName()),
                             trimOrNullStatic(request.getWorkType()),
-                            trimOrNullStatic(request.getCountry())));
+                            trimOrNullStatic(request.getCountry()),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null));
         }
     }
 
@@ -1149,6 +1167,59 @@ public class TeamRosterService {
             throw new BusinessException("NOT_FOUND", "One or more skills were not found", 400);
         }
         entity.getSkills().addAll(skills);
+    }
+
+    private Map<String, Skill> indexSkillsByName() {
+        Map<String, Skill> index = new LinkedHashMap<>();
+        for (Skill skill : skillRepository.findAll()) {
+            if (skill.getName() == null || skill.getName().isBlank()) {
+                continue;
+            }
+            index.putIfAbsent(skill.getName().trim().toLowerCase(Locale.ROOT), skill);
+        }
+        return index;
+    }
+
+    private void applyImportedMemberExtras(
+            Employee employee, RosterImportFields fields, Map<String, Skill> skillsByName) {
+        employee.setEmploymentType(trimOrNull(fields.employmentType()));
+        employee.setTotalYearsOfExperience(parseDecimal(fields.expTotal()));
+        employee.setExperienceInDfn(parseDecimal(fields.experienceInDfn()));
+        if (!isBlank(fields.status())) {
+            employee.setStatus(fields.status().trim().toUpperCase(Locale.ROOT));
+        }
+        applyImportedSkills(employee, fields.skills(), skillsByName);
+    }
+
+    private void applyImportedSkills(Employee employee, String skillsCsv, Map<String, Skill> skillsByName) {
+        employee.getSkills().clear();
+        if (isBlank(skillsCsv) || skillsByName.isEmpty()) {
+            return;
+        }
+        LinkedHashSet<Skill> matched = new LinkedHashSet<>();
+        for (String part : skillsCsv.split("[,;|]")) {
+            String name = part.trim().toLowerCase(Locale.ROOT);
+            if (name.isEmpty()) {
+                continue;
+            }
+            Skill skill = skillsByName.get(name);
+            if (skill != null) {
+                matched.add(skill);
+            }
+        }
+        employee.getSkills().addAll(matched);
+    }
+
+    private static BigDecimal parseDecimal(String raw) {
+        String value = trimOrNullStatic(raw);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value.replace(",", "").trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private void applyName(Employee entity, String fullName) {

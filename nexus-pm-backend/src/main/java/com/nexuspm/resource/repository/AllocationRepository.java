@@ -14,16 +14,18 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE (:projectId IS NULL OR p.id = :projectId)
               AND (:issueId IS NULL OR i.id = :issueId)
               AND (:employeeId IS NULL OR e.id = :employeeId)
               AND a.fromDate <= :asOf
               AND (a.toDate IS NULL OR a.toDate >= :asOf)
               AND a.deleted = false
-              AND i.deleted = false
+              AND (i.id IS NULL OR i.deleted = false)
             ORDER BY e.lastName, e.firstName, p.name, i.title
             """)
     List<Allocation> findActive(UUID projectId, UUID issueId, UUID employeeId, LocalDate asOf);
@@ -31,13 +33,14 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
+            JOIN FETCH a.project p
             JOIN FETCH a.issue i
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE i.id IN :issueIds
               AND a.fromDate <= :asOf
               AND (a.toDate IS NULL OR a.toDate >= :asOf)
               AND a.deleted = false
               AND i.deleted = false
-              AND a.deleted = false
             ORDER BY i.id, e.lastName, e.firstName
             """)
     List<Allocation> findActiveByIssueIds(List<UUID> issueIds, LocalDate asOf);
@@ -47,13 +50,15 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             JOIN FETCH a.employee e
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE a.fromDate <= :rangeEnd
               AND (a.toDate IS NULL OR a.toDate >= :rangeStart)
               AND a.deleted = false
-              AND i.deleted = false
+              AND (i.id IS NULL OR i.deleted = false)
               AND (:departmentId IS NULL OR e.department.id = :departmentId)
             ORDER BY e.lastName, e.firstName, p.name, i.title
             """)
@@ -64,13 +69,15 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             JOIN FETCH a.employee e
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE a.fromDate <= :rangeEnd
               AND (a.toDate IS NULL OR a.toDate >= :rangeStart)
               AND a.deleted = false
-              AND i.deleted = false
+              AND (i.id IS NULL OR i.deleted = false)
               AND p.id IN :projectIds
             ORDER BY e.lastName, e.firstName, p.name, i.title
             """)
@@ -80,16 +87,18 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE p.id IN :projectIds
               AND (:issueId IS NULL OR i.id = :issueId)
               AND (:employeeId IS NULL OR e.id = :employeeId)
               AND a.fromDate <= :asOf
               AND (a.toDate IS NULL OR a.toDate >= :asOf)
               AND a.deleted = false
-              AND i.deleted = false
+              AND (i.id IS NULL OR i.deleted = false)
             ORDER BY e.lastName, e.firstName, p.name, i.title
             """)
     List<Allocation> findActiveForProjects(
@@ -110,10 +119,10 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT e.id, e.firstName, e.lastName, SUM(a.percentage)
             FROM Allocation a
             JOIN a.employee e
-            JOIN a.issue i
+            JOIN a.project p
             WHERE a.fromDate <= :asOf
               AND (a.toDate IS NULL OR a.toDate >= :asOf)
-              AND i.project.id IN :projectIds
+              AND p.id IN :projectIds
             GROUP BY e.id, e.firstName, e.lastName
             ORDER BY e.lastName, e.firstName
             """)
@@ -121,9 +130,11 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
 
     @Query("""
             SELECT a FROM Allocation a
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE a.employee.id = :employeeId
               AND a.fromDate <= :rangeEnd
               AND (a.toDate IS NULL OR a.toDate >= :rangeStart)
@@ -134,9 +145,10 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
+            JOIN FETCH a.project p
             JOIN FETCH a.issue i
-            JOIN FETCH i.project p
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE i.id = :issueId
               AND a.deleted = false
             ORDER BY e.lastName, e.firstName
@@ -146,9 +158,11 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE p.id = :projectId
             ORDER BY e.lastName, e.firstName, i.title
             """)
@@ -157,9 +171,11 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
-            JOIN FETCH a.issue i
-            JOIN FETCH i.project p
+            JOIN FETCH a.project p
+            LEFT JOIN FETCH a.issue i
             LEFT JOIN FETCH i.release r
+            LEFT JOIN FETCH a.projectTask pt
+            LEFT JOIN FETCH a.rdIssueTask rt
             WHERE e.id = :employeeId
             ORDER BY p.name, i.title
             """)

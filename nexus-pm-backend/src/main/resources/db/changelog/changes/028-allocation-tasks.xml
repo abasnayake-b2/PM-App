@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="028-allocation-project-id" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="allocation" columnName="project_id"/>
+            </not>
+        </preConditions>
+        <comment>Direct project on allocation so project-level tasks do not require an RD.</comment>
+        <addColumn tableName="allocation">
+            <column name="project_id" type="CHAR(36)"/>
+        </addColumn>
+        <sql>
+            UPDATE allocation a
+            INNER JOIN rd_issue i ON i.id = a.issue_id
+            SET a.project_id = i.project_id
+            WHERE a.project_id IS NULL;
+        </sql>
+        <addNotNullConstraint tableName="allocation" columnName="project_id" columnDataType="CHAR(36)"/>
+        <addForeignKeyConstraint
+                baseTableName="allocation" baseColumnNames="project_id"
+                referencedTableName="project" referencedColumnNames="id"
+                constraintName="fk_alloc_project"/>
+    </changeSet>
+
+    <changeSet id="028-allocation-issue-nullable" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <changeSetExecuted id="028-allocation-issue-nullable" author="dfn-pm" changeLogFile="db/changelog/changes/028-allocation-tasks.xml"/>
+            </not>
+        </preConditions>
+        <comment>Project-level task allocations have no RD.</comment>
+        <dropNotNullConstraint tableName="allocation" columnName="issue_id" columnDataType="CHAR(36)"/>
+    </changeSet>
+
+    <changeSet id="028-allocation-project-task" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="allocation" columnName="project_task_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="allocation">
+            <column name="project_task_id" type="CHAR(36)"/>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="allocation" baseColumnNames="project_task_id"
+                referencedTableName="project_task" referencedColumnNames="id"
+                constraintName="fk_alloc_project_task"/>
+    </changeSet>
+
+    <changeSet id="028-allocation-rd-issue-task" author="dfn-pm">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="allocation" columnName="rd_issue_task_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="allocation">
+            <column name="rd_issue_task_id" type="CHAR(36)"/>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="allocation" baseColumnNames="rd_issue_task_id"
+                referencedTableName="rd_issue_task" referencedColumnNames="id"
+                constraintName="fk_alloc_rd_issue_task"/>
+    </changeSet>
+
+</databaseChangeLog>

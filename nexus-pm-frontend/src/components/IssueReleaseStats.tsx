@@ -47,6 +47,7 @@ export function IssueReleaseStats({
   const allocationsByIssue = useMemo(() => {
     const map = new Map<string, Allocation[]>();
     for (const allocation of allocations) {
+      if (!allocation.issueId) continue;
       const list = map.get(allocation.issueId) ?? [];
       list.push(allocation);
       map.set(allocation.issueId, list);

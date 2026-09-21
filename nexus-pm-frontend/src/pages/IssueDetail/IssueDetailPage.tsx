@@ -17,7 +17,9 @@ import { IssueCustomFieldsView } from '@/components/IssueCustomFields';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
 import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
 import { IssueNotesSection } from '@/components/IssueNotesSection';
+import { IssueTasksSection } from '@/components/IssueTasksSection';
 import { allowedChildWorkflowCodes, canHaveChildren, childCreateUrl } from '@/utils/issueHierarchy';
+import { issueDisplayKey } from '@/utils/issueUi';
 
 export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -448,6 +450,12 @@ export function IssueDetailPage() {
         </section>
 
         <IssueNotesSection issueId={issue.id} mode="view" />
+
+        <IssueTasksSection
+          issueId={issue.id}
+          mode="view"
+          rdDisplayKey={issueDisplayKey(issue)}
+        />
 
         <IssueQuarterlyCompletionSection issueId={issue.id} mode="view" />
 

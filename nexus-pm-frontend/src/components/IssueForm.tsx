@@ -4,6 +4,7 @@ import type { CreateIssuePayload } from '@/hooks/useIssues';
 import type { Priority, IssueType } from '@/api/lookup.api';
 import type { IssueNote } from '@/api/issueNotes.api';
 import type { IssueRisk } from '@/api/issueRisks.api';
+import type { TaskRecord } from '@/api/scopedTasks.api';
 import type { IssueQuarterlyCompletion } from '@/api/issueQuarterlyCompletions.api';
 import { IssueTypeIcon } from '@/components/IssueTypeIcon';
 import { filterIssueTypesForParent } from '@/utils/issueHierarchy';
@@ -16,6 +17,7 @@ import {
   rdFieldTextareaClass,
 } from '@/components/IssueCustomFields';
 import { IssueNotesSection } from '@/components/IssueNotesSection';
+import { IssueTasksSection } from '@/components/IssueTasksSection';
 import { IssueQuarterlyCompletionSection } from '@/components/IssueQuarterlyCompletionSection';
 import { IssueRisksSection } from '@/components/IssueRisksSection';
 import {
@@ -122,6 +124,7 @@ export function IssueForm({
   const [title, setTitle] = useState('');
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [draftNotes, setDraftNotes] = useState<IssueNote[]>([]);
+  const [draftTasks, setDraftTasks] = useState<TaskRecord[]>([]);
   const [draftQuarters, setDraftQuarters] = useState<IssueQuarterlyCompletion[]>([]);
   const [draftRisks, setDraftRisks] = useState<IssueRisk[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -209,6 +212,10 @@ export function IssueForm({
     };
     const extras: IssueCreateChildRows = {
       notes: draftNotes.map((row) => ({ date: row.date, note: row.note })),
+      tasks: draftTasks.map((row) => ({
+        description: row.description,
+        module: row.module?.trim() || undefined,
+      })),
       quarterlyCompletions: draftQuarters.map((row) => ({
         year: row.year,
         quarter: row.quarter,
@@ -459,6 +466,12 @@ export function IssueForm({
         mode="edit"
         localRows={draftNotes}
         onLocalRowsChange={setDraftNotes}
+      />
+
+      <IssueTasksSection
+        mode="edit"
+        localRows={draftTasks}
+        onLocalRowsChange={setDraftTasks}
       />
 
       <IssueQuarterlyCompletionSection

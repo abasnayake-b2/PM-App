@@ -12,7 +12,7 @@ import {
   barSpanInRange,
   dayIndex,
   weekIndex,
-  allocationIssueTooltip,
+  allocationTargetLabel,
   formatAllocationDateRange,
   timelineBarLabel,
   packAllocationLanes,
@@ -56,9 +56,9 @@ interface AllocationTimelineProps {
 }
 
 function allocationTooltip(allocation: Allocation, showDates: boolean): string {
-  const issue = allocationIssueTooltip(allocation);
+  const item = allocationTargetLabel(allocation);
   const dates = formatAllocationDateRange(allocation);
-  return `${issue} · ${dates}`;
+  return `${item} · ${allocation.projectName} · ${dates}`;
 }
 
 function clamp(n: number, min: number, max: number) {

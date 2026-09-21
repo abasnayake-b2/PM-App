@@ -201,8 +201,7 @@ public class SoftDeleteService {
     private void softDeleteAllocationsByRegion(UUID regionId) {
         nativeUpdate("""
                 UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                INNER JOIN project p ON p.id = i.project_id
+                INNER JOIN project p ON p.id = a.project_id
                 INNER JOIN client cl ON cl.id = p.client_id
                 INNER JOIN country co ON co.id = cl.country_id
                 SET a.deleted = 1
@@ -284,8 +283,7 @@ public class SoftDeleteService {
     private void restoreAllocationsByRegion(UUID regionId) {
         nativeUpdate("""
                 UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                INNER JOIN project p ON p.id = i.project_id
+                INNER JOIN project p ON p.id = a.project_id
                 INNER JOIN client cl ON cl.id = p.client_id
                 INNER JOIN country co ON co.id = cl.country_id
                 SET a.deleted = 0
@@ -296,8 +294,7 @@ public class SoftDeleteService {
     private void softDeleteAllocationsByCountry(UUID countryId) {
         nativeUpdate("""
                 UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                INNER JOIN project p ON p.id = i.project_id
+                INNER JOIN project p ON p.id = a.project_id
                 INNER JOIN client cl ON cl.id = p.client_id
                 SET a.deleted = 1
                 WHERE a.deleted = 0 AND cl.country_id = ?
@@ -359,8 +356,7 @@ public class SoftDeleteService {
     private void restoreAllocationsByCountry(UUID countryId) {
         nativeUpdate("""
                 UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                INNER JOIN project p ON p.id = i.project_id
+                INNER JOIN project p ON p.id = a.project_id
                 INNER JOIN client cl ON cl.id = p.client_id
                 SET a.deleted = 0
                 WHERE cl.country_id = ?
@@ -370,8 +366,7 @@ public class SoftDeleteService {
     private void softDeleteAllocationsByClient(UUID clientId) {
         nativeUpdate("""
                 UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                INNER JOIN project p ON p.id = i.project_id
+                INNER JOIN project p ON p.id = a.project_id
                 SET a.deleted = 1
                 WHERE a.deleted = 0 AND p.client_id = ?
                 """, clientId);
@@ -412,8 +407,7 @@ public class SoftDeleteService {
     private void restoreAllocationsByClient(UUID clientId) {
         nativeUpdate("""
                 UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                INNER JOIN project p ON p.id = i.project_id
+                INNER JOIN project p ON p.id = a.project_id
                 SET a.deleted = 0
                 WHERE p.client_id = ?
                 """, clientId);
@@ -421,10 +415,8 @@ public class SoftDeleteService {
 
     private void softDeleteAllocationsByProject(UUID projectId) {
         nativeUpdate("""
-                UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                SET a.deleted = 1
-                WHERE a.deleted = 0 AND i.project_id = ?
+                UPDATE allocation SET deleted = 1
+                WHERE deleted = 0 AND project_id = ?
                 """, projectId);
     }
 
@@ -441,10 +433,8 @@ public class SoftDeleteService {
 
     private void restoreAllocationsByProject(UUID projectId) {
         nativeUpdate("""
-                UPDATE allocation a
-                INNER JOIN rd_issue i ON i.id = a.issue_id
-                SET a.deleted = 0
-                WHERE i.project_id = ?
+                UPDATE allocation SET deleted = 0
+                WHERE project_id = ?
                 """, projectId);
     }
 

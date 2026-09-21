@@ -9,6 +9,7 @@ import { ReleaseForm } from '@/components/ReleaseForm';
 import { ProjectBacklogTab } from '@/components/ProjectBacklogTab';
 import { ReleaseBoard } from '@/components/ReleaseBoard';
 import { ProjectRisksSection } from '@/components/ProjectRisksSection';
+import { ProjectTasksSection } from '@/components/ProjectTasksSection';
 import {
   useProject,
   useProjectHealthLog,
@@ -252,6 +253,7 @@ export function ProjectDetailPage() {
             />
           </div>
           {id && <ProjectRisksSection projectId={id} />}
+          {id && <ProjectTasksSection projectId={id} projectKey={project.name} />}
         </div>
       )}
 
@@ -330,6 +332,7 @@ export function ProjectDetailPage() {
           </section>
         </div>
         {id && <ProjectRisksSection projectId={id} />}
+        {id && <ProjectTasksSection projectId={id} projectKey={project.name} />}
         </div>
       )}
 
