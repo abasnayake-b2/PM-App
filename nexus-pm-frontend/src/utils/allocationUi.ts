@@ -206,7 +206,7 @@ const PALETTE = [
   '#ec4899', // pink
 ];
 
-export function projectColor(projectId: string, projectName: string): string {
+export function projectColor(projectId: string | undefined, projectName: string): string {
   let hash = 0;
   const key = projectId || projectName;
   for (let i = 0; i < key.length; i++) {
@@ -286,9 +286,10 @@ export function allocationItemKey(allocation: Allocation): string {
   return allocation.projectName;
 }
 
-export function allocationTargetHref(allocation: Allocation): string {
+export function allocationTargetHref(allocation: Allocation): string | null {
   if (allocation.issueId) return `/issues/${allocation.issueId}`;
-  return `/projects/${allocation.projectId}`;
+  if (allocation.projectId) return `/projects/${allocation.projectId}`;
+  return null;
 }
 
 export function allocationIssueTooltip(allocation: Allocation): string {
@@ -296,9 +297,8 @@ export function allocationIssueTooltip(allocation: Allocation): string {
 }
 
 export function defaultDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  const from = new Date(year, 5, 26);
-  const to = new Date(year, 11, 31);
+  const from = new Date();
+  const to = new Date(from.getFullYear() + 1, from.getMonth(), from.getDate());
   return { from: toIso(from), to: toIso(to) };
 }
 

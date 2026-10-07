@@ -23,6 +23,16 @@ public class CreateAllocationRequest {
     /** RD-level task on the selected issue. */
     private UUID rdIssueTaskId;
 
+    /** Optional on older allocations; required from the resource allocation form. */
+    private UUID taskTypeId;
+
+    private UUID taskCategoryId;
+
+    /** Description for a non-project task created with this allocation. */
+    private String nonProjectTaskDescription;
+
+    private String nonProjectTaskModule;
+
     private String roleOnProject;
 
     @NotNull

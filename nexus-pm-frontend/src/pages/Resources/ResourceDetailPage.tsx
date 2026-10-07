@@ -14,15 +14,23 @@ function AllocationListItem({ allocation }: { allocation: Allocation }) {
   return (
     <li>
       <div className="flex justify-between gap-3 text-sm">
-        <Link to={allocationTargetHref(allocation)} className="font-medium hover:text-accent">
-          {allocationTargetLabel(allocation)}
-        </Link>
+        {allocationTargetHref(allocation) ? (
+          <Link to={allocationTargetHref(allocation)!} className="font-medium hover:text-accent">
+            {allocationTargetLabel(allocation)}
+          </Link>
+        ) : (
+          <span className="font-medium">{allocationTargetLabel(allocation)}</span>
+        )}
         <span>{allocation.percentage}%</span>
       </div>
       <p className="text-xs text-text2">
-        <Link to={`/projects/${allocation.projectId}`} className="hover:text-accent">
-          {allocation.projectName}
-        </Link>
+        {allocation.projectId ? (
+          <Link to={`/projects/${allocation.projectId}`} className="hover:text-accent">
+            {allocation.projectName}
+          </Link>
+        ) : (
+          allocation.projectName
+        )}
       </p>
       <p className="text-xs text-text2">{allocation.roleOnProject ?? 'Team member'}</p>
       <p className="text-xs text-text2">

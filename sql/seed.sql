@@ -241,6 +241,20 @@ INSERT INTO issue_type (id, name, workflow_code, description) VALUES
 ('66666666-6666-6666-6666-666666666603', 'Change Request', 'CHANGE',  'Modification to existing agreed scope'),
 ('66666666-6666-6666-6666-666666666601', 'Bugs',           'BUG',     'A defect or unexpected behaviour');
 
+INSERT INTO task_type (id, name, description, sort_order) VALUES
+('a1000001-0000-0000-0000-000000000001', 'Roadmap / new features', NULL, 1),
+('a1000001-0000-0000-0000-000000000002', 'Maintenance', NULL, 2),
+('a1000001-0000-0000-0000-000000000006', 'Upgrades', NULL, 3),
+('a1000001-0000-0000-0000-000000000007', 'Bugs', NULL, 4),
+('a1000001-0000-0000-0000-000000000003', 'Tech debt', NULL, 5),
+('a1000001-0000-0000-0000-000000000008', 'Platform improvement', NULL, 6),
+('a1000001-0000-0000-0000-000000000004', 'Support', NULL, 7),
+('a1000001-0000-0000-0000-000000000005', 'Other', NULL, 8);
+
+INSERT INTO task_category (id, name, description, sort_order) VALUES
+('b1000001-0000-0000-0000-000000000001', 'Project related', NULL, 1),
+('b1000001-0000-0000-0000-000000000002', 'Non-Project Related', NULL, 2);
+
 INSERT INTO notification_template (id, code, subject, body_template) VALUES
 ('03000001-0000-0000-0000-000000000002', 'ALLOCATION_NEW', 'New project allocation', 'You have been allocated {{percentage}}% to {{projectName}}.'),
 ('03000001-0000-0000-0000-000000000003', 'PASSWORD_RESET', 'DFN-PlanX password reset', 'Use this link to reset your password: {{resetUrl}}');

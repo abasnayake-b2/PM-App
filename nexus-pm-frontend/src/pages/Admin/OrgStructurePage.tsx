@@ -55,7 +55,7 @@ export function OrgStructurePage() {
         </nav>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 min-w-0">
         {section === 'people' ? (
           <section>
             <p className="mb-3 text-sm text-text2">Click a name to view their profile.</p>
@@ -82,7 +82,8 @@ export function OrgStructurePage() {
         ) : section === 'managers' ? (
           <section className="min-w-0">
             <p className="mb-4 text-sm text-text2">
-              Leadership roster for viewing and download (Excel / PDF).
+              Leadership roster grouped by C-level, VP, Engineering Managers, Delivery Managers, and
+              COE Managers. View and download (Excel / PDF).
             </p>
             <OrgStructureManagersTab />
           </section>
@@ -96,7 +97,7 @@ export function OrgStructurePage() {
         ) : section === 'stats' ? (
           <section className="min-w-0">
             <p className="mb-4 text-sm text-text2">
-              Designation code headcount by category (org-wide) and by VP.
+              Designation code headcount by department (org-wide) and by VP.
             </p>
             <OrgStructureStats />
           </section>

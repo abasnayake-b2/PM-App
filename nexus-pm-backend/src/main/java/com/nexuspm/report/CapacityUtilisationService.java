@@ -14,6 +14,8 @@ import com.nexuspm.resource.dto.AllocationResponse;
 import com.nexuspm.resource.dto.CapacityResponse;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.shared.security.SecurityUtils;
+import com.nexuspm.teamroster.entity.TeamManagement;
+import com.nexuspm.teamroster.repository.TeamManagementRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,11 +27,13 @@ import java.time.format.TextStyle;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,6 +46,7 @@ public class CapacityUtilisationService {
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final AllocationService allocationService;
+    private final TeamManagementRepository managementRepository;
 
     @Transactional(readOnly = true)
     public CapacityUtilisationDashboard getDashboard(Integer weeksParam) {
@@ -54,14 +59,22 @@ public class CapacityUtilisationService {
                 weekStart, heatmapEnd, today, null, null, null, null);
 
         List<WeekWindow> weeks = buildWeeks(weekStart, heatmapWeeks);
+        ManagerNameSets names = loadManagerNames();
+        List<CapacityResponse> emCapacity = filterByManagerBucket(capacity, ManagerBucket.ENGINEERING, names);
+        List<CapacityResponse> dmCapacity = filterByManagerBucket(capacity, ManagerBucket.DELIVERY, names);
+        List<CapacityResponse> coeCapacity = filterByManagerBucket(capacity, ManagerBucket.COE, names);
 
         return CapacityUtilisationDashboard.builder()
                 .bands(buildBands(capacity, weeks))
                 .overAllocated(buildOverAllocated(capacity))
                 .available(buildAvailable(capacity))
-                .byEngineeringManager(buildGroupBars(capacity, true, weeks))
+                .byEngineeringManager(buildGroupBars(emCapacity, true, weeks))
+                .byDeliveryManager(buildGroupBars(dmCapacity, true, weeks))
+                .byCoeManager(buildGroupBars(coeCapacity, true, weeks))
                 .byTeam(buildGroupBars(capacity, false, weeks))
-                .heatmap(buildHeatmap(capacity, weeks))
+                .heatmap(buildHeatmap(emCapacity, weeks, "Unassigned EM"))
+                .heatmapDeliveryManagers(buildHeatmap(dmCapacity, weeks, "Unassigned DM"))
+                .heatmapCoeManagers(buildHeatmap(coeCapacity, weeks, "Unassigned COE"))
                 .peopleCount(capacity.size())
                 .asOf(ISO.format(today))
                 .heatmapFrom(ISO.format(weekStart))
@@ -229,12 +242,13 @@ public class CapacityUtilisationService {
                 .build();
     }
 
-    private AllocationHeatmap buildHeatmap(List<CapacityResponse> capacity, List<WeekWindow> weeks) {
+    private AllocationHeatmap buildHeatmap(
+            List<CapacityResponse> capacity, List<WeekWindow> weeks, String unassignedLabel) {
         Map<String, List<CapacityResponse>> byEm = capacity.stream()
                 .collect(Collectors.groupingBy(
                         row -> {
                             String em = row.getEngineeringManagerName();
-                            return em == null || em.isBlank() ? "Unassigned EM" : em.trim();
+                            return em == null || em.isBlank() ? unassignedLabel : em.trim();
                         },
                         LinkedHashMap::new,
                         Collectors.toList()));
@@ -339,6 +353,66 @@ public class CapacityUtilisationService {
             return row.getPeriodAllocations();
         }
         return snapshotAllocations(row);
+    }
+
+    private enum ManagerBucket {
+        ENGINEERING,
+        DELIVERY,
+        COE
+    }
+
+    private record ManagerNameSets(Set<String> engineering, Set<String> delivery, Set<String> coe) {
+    }
+
+    private ManagerNameSets loadManagerNames() {
+        Set<String> engineering = new HashSet<>();
+        Set<String> delivery = new HashSet<>();
+        Set<String> coe = new HashSet<>();
+        for (TeamManagement person : managementRepository.findAll()) {
+            if (!"ACTIVE".equalsIgnoreCase(person.getStatus()) || person.getFullName() == null) {
+                continue;
+            }
+            String name = normalizeManagerName(person.getFullName());
+            if (name.isEmpty()) {
+                continue;
+            }
+            if (ManagementHierarchyUtils.isCoeManagerRole(person.getRoleTitle())) {
+                coe.add(name);
+            } else if (ManagementHierarchyUtils.isDeliveryManagerRole(person.getRoleTitle())) {
+                delivery.add(name);
+            } else if (ManagementHierarchyUtils.isEngineeringManagerRole(person.getRoleTitle())) {
+                engineering.add(name);
+            }
+        }
+        return new ManagerNameSets(engineering, delivery, coe);
+    }
+
+    private List<CapacityResponse> filterByManagerBucket(
+            List<CapacityResponse> capacity, ManagerBucket bucket, ManagerNameSets names) {
+        return capacity.stream()
+                .filter(row -> bucketOf(row, names) == bucket)
+                .toList();
+    }
+
+    private static ManagerBucket bucketOf(CapacityResponse row, ManagerNameSets names) {
+        String name = normalizeManagerName(row.getEngineeringManagerName());
+        if (name.isEmpty()) {
+            return ManagerBucket.ENGINEERING;
+        }
+        if (names.coe().contains(name)) {
+            return ManagerBucket.COE;
+        }
+        if (names.delivery().contains(name)) {
+            return ManagerBucket.DELIVERY;
+        }
+        return ManagerBucket.ENGINEERING;
+    }
+
+    private static String normalizeManagerName(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 
     private record WeekWindow(LocalDate start, LocalDate end, String label) {

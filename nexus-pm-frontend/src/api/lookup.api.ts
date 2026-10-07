@@ -13,6 +13,18 @@ export interface IssueType {
   workflowCode: string;
 }
 
+export interface TaskType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface TaskCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface IssueStatus {
   id: string;
   name: string;
@@ -28,6 +40,16 @@ export async function fetchPriorities(): Promise<Priority[]> {
 
 export async function fetchIssueTypes(): Promise<IssueType[]> {
   const { data } = await api.get<IssueType[]>('/lookup/issue-types');
+  return data;
+}
+
+export async function fetchTaskTypes(): Promise<TaskType[]> {
+  const { data } = await api.get<TaskType[]>('/lookup/task-types');
+  return data;
+}
+
+export async function fetchTaskCategories(): Promise<TaskCategory[]> {
+  const { data } = await api.get<TaskCategory[]>('/lookup/task-categories');
   return data;
 }
 

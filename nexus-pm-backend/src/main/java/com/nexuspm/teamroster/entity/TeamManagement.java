@@ -1,6 +1,7 @@
 package com.nexuspm.teamroster.entity;
 
 import com.nexuspm.shared.entity.AuditableEntity;
+import com.nexuspm.user.entity.Department;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -36,6 +37,10 @@ public class TeamManagement extends AuditableEntity {
     /** e.g. Permanent, Contract, Intern, Consultant */
     @Column(name = "employment_type", length = 40)
     private String employmentType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
 
     /** Filename under the configured Pic/ directory (e.g. mgmt-{uuid}.jpg). */
     @Column(name = "profile_picture", length = 255)

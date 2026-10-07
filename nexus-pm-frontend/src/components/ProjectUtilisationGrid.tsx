@@ -59,9 +59,13 @@ export function ProjectUtilisationGrid({
                   {row.allocations.map((allocation) => (
                     <li key={allocation.id} className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <Link to={allocationTargetHref(allocation)} className="text-accent hover:underline">
-                          {allocationTargetLabel(allocation)}
-                        </Link>
+                        {allocationTargetHref(allocation) ? (
+                          <Link to={allocationTargetHref(allocation)!} className="text-accent hover:underline">
+                            {allocationTargetLabel(allocation)}
+                          </Link>
+                        ) : (
+                          <span>{allocationTargetLabel(allocation)}</span>
+                        )}
                         <p className="text-xs text-text2">
                           {allocation.fromDate}
                           {allocation.toDate ? ` → ${allocation.toDate}` : ' → ongoing'}

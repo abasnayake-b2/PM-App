@@ -88,7 +88,9 @@ export function TeamPage() {
   const updateEmployee = useUpdateEmployee(editing?.id ?? '');
   const deleteEmployee = useDeleteEmployee();
 
-  const employees = teamResult?.employees ?? [];
+  const employees = (teamResult?.employees ?? []).filter(
+    (emp) => (emp.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE',
+  );
 
   const supervisors = useMemo(
     () =>

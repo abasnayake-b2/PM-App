@@ -33,6 +33,10 @@ export interface CreateAllocationPayload {
   issueId?: string;
   projectTaskId?: string;
   rdIssueTaskId?: string;
+  taskTypeId?: string;
+  taskCategoryId?: string;
+  nonProjectTaskDescription?: string;
+  nonProjectTaskModule?: string;
   roleOnProject?: string;
   percentage: number;
   fromDate: string;
@@ -49,7 +53,7 @@ export interface OverAllocationError {
     allocationId: string;
     issueId?: string;
     issueTitle?: string;
-    projectId: string;
+    projectId?: string;
     projectName: string;
     percentage: number;
     fromDate: string;
@@ -63,6 +67,8 @@ export interface UpdateAllocationPayload {
   fromDate: string;
   toDate: string;
   billable?: boolean;
+  taskTypeId?: string;
+  taskCategoryId?: string;
 }
 
 export async function createAllocation(payload: CreateAllocationPayload): Promise<Allocation> {

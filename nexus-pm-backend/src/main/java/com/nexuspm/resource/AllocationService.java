@@ -4,23 +4,31 @@ import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.entity.RdIssueTask;
 import com.nexuspm.issue.repository.RdIssueRepository;
 import com.nexuspm.issue.repository.RdIssueTaskRepository;
+import com.nexuspm.lookup.TaskCategoryKind;
+import com.nexuspm.lookup.entity.TaskCategory;
+import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.repository.TaskCategoryRepository;
+import com.nexuspm.lookup.repository.TaskTypeRepository;
 import com.nexuspm.project.ProjectService;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.entity.ProjectTask;
 import com.nexuspm.project.repository.ProjectTaskRepository;
 import com.nexuspm.resource.dto.*;
 import com.nexuspm.resource.entity.Allocation;
+import com.nexuspm.resource.entity.NonProjectTask;
 import com.nexuspm.resource.exception.OverAllocationException;
 import com.nexuspm.resource.mapper.ResourceMapper;
 import com.nexuspm.resource.repository.AllocationRepository;
+import com.nexuspm.resource.repository.NonProjectTaskRepository;
 import com.nexuspm.notification.NotificationService;
 import com.nexuspm.shared.audit.AuditLogService;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.shared.security.SecurityUtils;
 import com.nexuspm.shared.storage.ProfilePictureStorageService;
 import com.nexuspm.auth.repository.UserAuthRepository;
-import com.nexuspm.user.ManagerTeamService;
+import com.nexuspm.user.ActiveRosterStatus;
 import com.nexuspm.user.EmployeeRosterRefs;
+import com.nexuspm.user.ManagerTeamService;
 import com.nexuspm.user.entity.Employee;
 import com.nexuspm.user.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +55,9 @@ public class AllocationService {
     private final RdIssueRepository issueRepository;
     private final RdIssueTaskRepository rdIssueTaskRepository;
     private final ProjectTaskRepository projectTaskRepository;
+    private final TaskTypeRepository taskTypeRepository;
+    private final TaskCategoryRepository taskCategoryRepository;
+    private final NonProjectTaskRepository nonProjectTaskRepository;
     private final ProjectService projectService;
     private final ResourceMapper resourceMapper;
     private final AuditLogService auditLogService;
@@ -70,7 +81,8 @@ public class AllocationService {
             LocalDate rangeEnd = to != null ? to : OPEN_ENDED_RANGE_END;
             return mapAndScope(
                     allocationRepository.findOverlapping(employeeId, from, rangeEnd).stream()
-                            .filter(a -> projectId == null || a.getProject().getId().equals(projectId))
+                            .filter(a -> projectId == null
+                                    || (a.getProject() != null && a.getProject().getId().equals(projectId)))
                             .toList(),
                     scopedProjectIds);
         }
@@ -127,39 +139,17 @@ public class AllocationService {
                 ? allocationRepository.findActive(null, null, null, snapshotAsOf)
                 : allocationRepository.findActiveForProjects(scopedProjectIds, null, null, snapshotAsOf);
 
-        // Keep inactive employees visible when they still have allocations in range (read-only / gray in UI).
-        Set<UUID> activeIds = rosterEmployees.stream().map(Employee::getId).collect(Collectors.toSet());
-        Set<UUID> allocatedIds = new HashSet<>();
-        inRange.forEach(a -> allocatedIds.add(a.getEmployee().getId()));
-        activeAtAsOf.forEach(a -> allocatedIds.add(a.getEmployee().getId()));
-        List<UUID> inactiveAllocatedIds = allocatedIds.stream()
-                .filter(id -> !activeIds.contains(id))
-                .toList();
-        if (!inactiveAllocatedIds.isEmpty()) {
-            List<Employee> inactiveAllocated = employeeRepository.findRosterByIds(inactiveAllocatedIds).stream()
-                    .filter(employee -> !"ACTIVE".equalsIgnoreCase(employee.getStatus()))
-                    .filter(employee -> matchesRosterFilters(
-                            employee, nameFilter, teamFilter, designationFilter, engineeringManagerFilter))
-                    .toList();
-            if (!inactiveAllocated.isEmpty()) {
-                List<Employee> merged = new ArrayList<>(rosterEmployees);
-                merged.addAll(inactiveAllocated);
-                rosterEmployees = merged;
-            }
-        }
-
         if (scopedProjectIds != null) {
             UUID viewerId = SecurityUtils.currentUserId();
             Map<UUID, Employee> teamById = new LinkedHashMap<>();
             managerTeamService.resolveTeam(viewerId).forEach(member -> teamById.put(member.getId(), member));
 
-            Set<UUID> allocatedEmployeeIds = new HashSet<>(allocatedIds);
             rosterEmployees.stream()
-                    .filter(employee -> allocatedEmployeeIds.contains(employee.getId())
-                            || "ACTIVE".equalsIgnoreCase(employee.getStatus()))
+                    .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                     .forEach(employee -> teamById.putIfAbsent(employee.getId(), employee));
 
             rosterEmployees = teamById.values().stream()
+                    .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                     .filter(employee -> matchesRosterFilters(
                             employee, nameFilter, teamFilter, designationFilter, engineeringManagerFilter))
                     .sorted(Comparator.comparing(Employee::getLastName).thenComparing(Employee::getFirstName))
@@ -174,6 +164,7 @@ public class AllocationService {
         Map<UUID, String> vpNameByEmId = new HashMap<>();
 
         return rosterEmployees.stream()
+                .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                 .map(employee -> {
                     UUID employeeId = employee.getId();
                     List<Allocation> periodEntities = periodByEmployee.getOrDefault(employeeId, List.of());
@@ -273,7 +264,7 @@ public class AllocationService {
     public List<RosterAllocationResourceResponse> listRosterAllocationResources() {
         if (SecurityUtils.isAdmin() || SecurityUtils.hasOrgWideVisibility()) {
             return employeeRepository.searchRosterMembers(null).stream()
-                    .filter(employee -> "ACTIVE".equalsIgnoreCase(employee.getStatus()))
+                    .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                     .map(this::toRosterAllocationResource)
                     .toList();
         }
@@ -336,8 +327,14 @@ public class AllocationService {
             throw new BusinessException("ACCESS_DENIED", "Only managers can create allocations", 403);
         }
 
-        ResolvedTarget target = resolveTarget(request.getIssueId(), request.getProjectTaskId(), request.getRdIssueTaskId());
-        projectService.getProject(target.project().getId());
+        TaskCategory category = resolveTaskCategory(request.getTaskCategoryId());
+        boolean nonProject = TaskCategoryKind.isNonProjectRelated(category);
+        ResolvedTarget target = nonProject
+                ? resolveNonProjectTarget(request)
+                : resolveTarget(request.getIssueId(), request.getProjectTaskId(), request.getRdIssueTaskId());
+        if (target.project() != null) {
+            projectService.getProject(target.project().getId());
+        }
 
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
@@ -366,6 +363,9 @@ public class AllocationService {
         allocation.setIssue(target.issue());
         allocation.setProjectTask(target.projectTask());
         allocation.setRdIssueTask(target.rdIssueTask());
+        allocation.setNonProjectTask(target.nonProjectTask());
+        allocation.setTaskType(resolveTaskType(request.getTaskTypeId()));
+        allocation.setTaskCategory(category);
         allocation.setRoleOnProject(request.getRoleOnProject());
         allocation.setPercentage(request.getPercentage());
         allocation.setFromDate(request.getFromDate());
@@ -374,7 +374,7 @@ public class AllocationService {
 
         allocationRepository.save(allocation);
         String targetTitle = ResourceMapper.targetTitle(allocation);
-        var projectName = target.project().getName();
+        var projectName = target.project() != null ? target.project().getName() : targetTitle;
         auditLogService.log(SecurityUtils.currentUserId(), "CREATE", "ALLOCATION", allocation.getId(),
                 employee.getFirstName() + " → " + targetTitle, null);
         notificationService.notifyEmployee(
@@ -394,7 +394,9 @@ public class AllocationService {
 
         Allocation allocation = allocationRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Allocation not found", 404));
-        projectService.getProject(allocation.getProject().getId());
+        if (allocation.getProject() != null) {
+            projectService.getProject(allocation.getProject().getId());
+        }
 
         Employee employee = allocation.getEmployee();
         if (employee == null || !"ACTIVE".equalsIgnoreCase(employee.getStatus())) {
@@ -419,6 +421,12 @@ public class AllocationService {
         if (request.getBillable() != null) {
             allocation.setBillable(request.getBillable());
         }
+        if (request.getTaskTypeId() != null) {
+            allocation.setTaskType(resolveTaskType(request.getTaskTypeId()));
+        }
+        if (request.getTaskCategoryId() != null) {
+            allocation.setTaskCategory(resolveTaskCategory(request.getTaskCategoryId()));
+        }
 
         allocationRepository.save(allocation);
         auditLogService.log(SecurityUtils.currentUserId(), "UPDATE", "ALLOCATION", id,
@@ -435,6 +443,22 @@ public class AllocationService {
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Allocation not found", 404));
         allocationRepository.delete(allocation);
         auditLogService.log(SecurityUtils.currentUserId(), "DELETE", "ALLOCATION", id, null, null);
+    }
+
+    private TaskType resolveTaskType(UUID taskTypeId) {
+        if (taskTypeId == null) {
+            return null;
+        }
+        return taskTypeRepository.findById(taskTypeId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Task type not found", 404));
+    }
+
+    private TaskCategory resolveTaskCategory(UUID taskCategoryId) {
+        if (taskCategoryId == null) {
+            return null;
+        }
+        return taskCategoryRepository.findById(taskCategoryId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Task category not found", 404));
     }
 
     private List<String> roleCodesForFilter(String roleFilter) {
@@ -488,7 +512,7 @@ public class AllocationService {
         Stream<Allocation> stream = allocations.stream();
         if (scopedProjectIds != null) {
             Set<UUID> allowed = new HashSet<>(scopedProjectIds);
-            stream = stream.filter(a -> allowed.contains(a.getProject().getId()));
+            stream = stream.filter(a -> a.getProject() == null || allowed.contains(a.getProject().getId()));
         }
         return stream.map(resourceMapper::toResponse).toList();
     }
@@ -514,8 +538,8 @@ public class AllocationService {
                                 .allocationId(a.getId())
                                 .issueId(issue != null ? issue.getId() : null)
                                 .issueTitle(ResourceMapper.targetTitle(a))
-                                .projectId(project.getId())
-                                .projectName(project.getName())
+                                .projectId(project != null ? project.getId() : null)
+                                .projectName(project != null ? project.getName() : ResourceMapper.targetTitle(a))
                                 .percentage(a.getPercentage())
                                 .fromDate(a.getFromDate())
                                 .toDate(a.getToDate())
@@ -546,7 +570,7 @@ public class AllocationService {
         if (hasProjectTask) {
             ProjectTask projectTask = projectTaskRepository.findActiveDetailedById(projectTaskId)
                     .orElseThrow(() -> new BusinessException("NOT_FOUND", "Project task not found", 404));
-            return new ResolvedTarget(projectTask.getProject(), null, projectTask, null);
+            return new ResolvedTarget(projectTask.getProject(), null, projectTask, null, null);
         }
 
         RdIssueTask rdTask = null;
@@ -565,13 +589,35 @@ public class AllocationService {
         } else {
             issue = rdTask.getIssue();
         }
-        return new ResolvedTarget(issue.getProject(), issue, null, rdTask);
+        return new ResolvedTarget(issue.getProject(), issue, null, rdTask, null);
+    }
+
+    private ResolvedTarget resolveNonProjectTarget(CreateAllocationRequest request) {
+        if (request.getIssueId() != null || request.getProjectTaskId() != null || request.getRdIssueTaskId() != null) {
+            throw new BusinessException(
+                    "VALIDATION",
+                    "Non-project allocations cannot be linked to a project, RD, or project task",
+                    400);
+        }
+        String description = request.getNonProjectTaskDescription() != null
+                ? request.getNonProjectTaskDescription().trim()
+                : "";
+        if (description.isEmpty()) {
+            throw new BusinessException("VALIDATION", "Task description is required for non-project allocations", 400);
+        }
+        NonProjectTask task = new NonProjectTask();
+        task.setId(UUID.randomUUID());
+        task.setDescription(description);
+        String module = request.getNonProjectTaskModule() != null ? request.getNonProjectTaskModule().trim() : "";
+        task.setModule(module.isEmpty() ? null : module);
+        return new ResolvedTarget(null, null, null, null, nonProjectTaskRepository.save(task));
     }
 
     private record ResolvedTarget(
             Project project,
             RdIssue issue,
             ProjectTask projectTask,
-            RdIssueTask rdIssueTask) {
+            RdIssueTask rdIssueTask,
+            NonProjectTask nonProjectTask) {
     }
 }

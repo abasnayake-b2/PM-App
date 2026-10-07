@@ -13,6 +13,7 @@ import { IssuesPage } from '@/pages/Issues/IssuesPage';
 import { IssueCreatePage } from '@/pages/Issues/IssueCreatePage';
 import { IssueDetailPage } from '@/pages/IssueDetail/IssueDetailPage';
 import { ResourcesPage } from '@/pages/Resources/ResourcesPage';
+import { UtilizationSummaryPage } from '@/pages/Resources/UtilizationSummaryPage';
 import { TeamPage } from '@/pages/Team/TeamPage';
 import { TeamLayout } from '@/pages/Team/TeamLayout';
 import { ManagementPage } from '@/pages/Team/ManagementPage';
@@ -51,6 +52,7 @@ export function AppRouter() {
             <Route path="/issues/new" element={<IssueCreatePage />} />
             <Route path="/issues/:id" element={<IssueDetailPage />} />
             <Route path="/resources" element={<ResourcesPage />} />
+            <Route path="/resources/summary" element={<UtilizationSummaryPage />} />
             <Route path="/reports" element={<Navigate to="/" replace />} />
             <Route path="/resources/:id" element={<ResourceDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />

@@ -17,5 +17,7 @@ public class DashboardOverviewResponse {
     private OrgWorkforceSummary orgWorkforce;
     private List<VpOrgBreakdownRow> vpBreakdown;
     private List<EmOrgBreakdownRow> emBreakdown;
+    private List<EmOrgBreakdownRow> dmBreakdown;
+    private List<EmOrgBreakdownRow> coeBreakdown;
     private Instant generatedAt;
 }

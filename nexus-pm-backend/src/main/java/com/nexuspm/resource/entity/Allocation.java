@@ -2,6 +2,8 @@ package com.nexuspm.resource.entity;
 
 import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.entity.RdIssueTask;
+import com.nexuspm.lookup.entity.TaskCategory;
+import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.entity.ProjectTask;
 import com.nexuspm.shared.entity.AuditableEntity;
@@ -27,8 +29,8 @@ public class Allocation extends AuditableEntity {
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "project_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
     private Project project;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -42,6 +44,18 @@ public class Allocation extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rd_issue_task_id")
     private RdIssueTask rdIssueTask;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_type_id")
+    private TaskType taskType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_category_id")
+    private TaskCategory taskCategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "non_project_task_id")
+    private NonProjectTask nonProjectTask;
 
     @Column(name = "role_on_project", length = 50)
     private String roleOnProject;

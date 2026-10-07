@@ -24,6 +24,8 @@ public class TeamRosterMemberResponse {
     private String managementRoleTitle;
     private UUID workTypeId;
     private String workType;
+    private UUID departmentId;
+    private String departmentName;
     private UUID countryId;
     private String country;
     private String product;

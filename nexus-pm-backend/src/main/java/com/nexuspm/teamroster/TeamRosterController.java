@@ -24,8 +24,10 @@ public class TeamRosterController {
 
     @GetMapping("/management")
     @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
-    public List<TeamManagementResponse> listManagement(@RequestParam(required = false) String search) {
-        return teamRosterService.listManagement(search);
+    public List<TeamManagementResponse> listManagement(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return teamRosterService.listManagement(search, includeInactive);
     }
 
     @PostMapping("/management")
@@ -100,8 +102,10 @@ public class TeamRosterController {
 
     @GetMapping("/members")
     @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
-    public List<TeamRosterMemberResponse> listMembers(@RequestParam(required = false) String search) {
-        return teamRosterService.listMembers(search);
+    public List<TeamRosterMemberResponse> listMembers(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return teamRosterService.listMembers(search, includeInactive);
     }
 
     @GetMapping("/members/engineering-managers")

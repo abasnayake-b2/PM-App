@@ -147,6 +147,9 @@ export function CombinedEmUtilisationTable({
   onBodyScroll,
   compactHeader = false,
   weeksLabel = '12 weeks',
+  title = 'By Engineering Manager',
+  nameColumn = 'EM',
+  emptyMessage = 'No engineering manager data.',
 }: {
   utilRows: GroupUtilisationBar[];
   emBreakdown?: EmOrgBreakdownRow[];
@@ -155,6 +158,9 @@ export function CombinedEmUtilisationTable({
   onBodyScroll?: (event: UIEvent<HTMLDivElement>) => void;
   compactHeader?: boolean;
   weeksLabel?: string;
+  title?: string;
+  nameColumn?: string;
+  emptyMessage?: string;
 }) {
   const [selected, setSelected] = useState<GroupUtilisationBar | null>(null);
 
@@ -259,7 +265,7 @@ export function CombinedEmUtilisationTable({
         <div
           className={`flex shrink-0 flex-col justify-center border-b border-border px-5 ${ALIGNED_HEADER}`}
         >
-          <h3 className="font-semibold">By Engineering Manager</h3>
+          <h3 className="font-semibold">{title}</h3>
           {!compactHeader && (
             <p className="mt-1 text-sm text-text2">
               Engineers, projects, and avg utilisation over the next {weeksLabel} — click a bar for
@@ -273,7 +279,7 @@ export function CombinedEmUtilisationTable({
           )}
         </div>
         {combined.length <= 1 && !combined[0]?.util && combined[0]?.engineerCount === 0 ? (
-          <p className="px-5 py-6 text-sm text-text2">No engineering manager data.</p>
+          <p className="px-5 py-6 text-sm text-text2">{emptyMessage}</p>
         ) : (
           <div
             ref={scrollRef}
@@ -291,7 +297,7 @@ export function CombinedEmUtilisationTable({
               <thead className="sticky top-0 z-[1] bg-bg2 text-xs font-semibold uppercase tracking-wide text-text2">
                 <tr className={ALIGNED_THEAD}>
                   <th className="px-2">#</th>
-                  <th className="px-2">EM</th>
+                  <th className="px-2">{nameColumn}</th>
                   <th className="px-1.5 text-right">Eng</th>
                   <th className="px-1.5 text-right">Proj</th>
                   <th className="px-2">Utilisation</th>
@@ -503,6 +509,7 @@ export function AllocationHeatmapGrid({
   hideGroupColumn = false,
   scrollRef,
   onBodyScroll,
+  groupColumn = 'EM',
 }: {
   heatmap: AllocationHeatmap;
   /** When set, rows follow this order (e.g. All + EM names matching the left table). */
@@ -510,6 +517,7 @@ export function AllocationHeatmapGrid({
   hideGroupColumn?: boolean;
   scrollRef?: RefObject<HTMLDivElement | null>;
   onBodyScroll?: (event: UIEvent<HTMLDivElement>) => void;
+  groupColumn?: string;
 }) {
   const rows = useMemo(() => {
     const weekCount = heatmap.weekLabels.length;
@@ -542,7 +550,7 @@ export function AllocationHeatmapGrid({
         <div>
           <h3 className="font-semibold">Allocation heatmap</h3>
           <p className="mt-1 text-sm text-text2">
-            Avg utilisation by EM · next {heatmap.weekLabels.length} weeks
+            Avg utilisation by {groupColumn} · next {heatmap.weekLabels.length} weeks
           </p>
         </div>
         <div className="hidden flex-wrap gap-1.5 text-[10px] text-text2 sm:flex">
@@ -558,7 +566,7 @@ export function AllocationHeatmapGrid({
           <thead className="sticky top-0 z-[1] bg-bg2">
             <tr className={ALIGNED_THEAD}>
               {!hideGroupColumn && (
-                <th className="sticky left-0 z-[1] bg-bg2 px-2 font-medium text-text2">EM</th>
+                <th className="sticky left-0 z-[1] bg-bg2 px-2 font-medium text-text2">{groupColumn}</th>
               )}
               {heatmap.weekLabels.map((label, index) => (
                 <th
@@ -613,12 +621,18 @@ export function EmUtilisationWithHeatmap({
   heatmap,
   onOpenBreakdown,
   weeksLabel = '12 weeks',
+  title = 'By Engineering Manager',
+  nameColumn = 'EM',
+  emptyMessage = 'No engineering manager data.',
 }: {
   utilRows: GroupUtilisationBar[];
   emBreakdown?: EmOrgBreakdownRow[];
   heatmap?: AllocationHeatmap;
   onOpenBreakdown?: (panel: BreakdownPanel) => void;
   weeksLabel?: string;
+  title?: string;
+  nameColumn?: string;
+  emptyMessage?: string;
 }) {
   const emScrollRef = useRef<HTMLDivElement>(null);
   const heatScrollRef = useRef<HTMLDivElement>(null);
@@ -655,6 +669,9 @@ export function EmUtilisationWithHeatmap({
         onBodyScroll={syncScroll('em')}
         compactHeader
         weeksLabel={weeksLabel}
+        title={title}
+        nameColumn={nameColumn}
+        emptyMessage={emptyMessage}
       />
       {heatmap && (
         <AllocationHeatmapGrid
@@ -662,6 +679,7 @@ export function EmUtilisationWithHeatmap({
           orderedLabels={orderedLabels}
           scrollRef={heatScrollRef}
           onBodyScroll={syncScroll('heat')}
+          groupColumn={nameColumn}
         />
       )}
     </div>

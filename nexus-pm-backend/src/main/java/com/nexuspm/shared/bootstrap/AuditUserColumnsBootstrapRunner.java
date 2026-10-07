@@ -25,6 +25,8 @@ public class AuditUserColumnsBootstrapRunner implements ApplicationRunner {
             "stream",
             "work_type",
             "skill",
+            "task_type",
+            "task_category",
             "designation",
             "org_level",
             "role",

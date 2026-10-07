@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.nexuspm.report.ManagementHierarchyUtils.*;
+import static com.nexuspm.report.ManagementHierarchyUtils.OrgPillar;
 
 @Service
 @RequiredArgsConstructor
@@ -35,39 +36,88 @@ public class OrgWorkforceService {
     @Transactional(readOnly = true)
     public OrgWorkforceSummary buildSummary() {
         List<TeamManagement> management = activeManagement();
-        List<EmOrgEngineerItem> cxos = management.stream()
-                .filter(person -> isCxoRole(person.getRoleTitle()))
-                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
-                .map(this::toManagementItem)
-                .toList();
-        List<EmOrgEngineerItem> vps = management.stream()
-                .filter(person -> isVpRole(person.getRoleTitle()))
-                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
-                .map(this::toManagementItem)
-                .toList();
         List<EmOrgEngineerItem> engineeringManagers = management.stream()
                 .filter(person -> isEngineeringManagerRole(person.getRoleTitle()))
                 .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
                 .map(this::toManagementItem)
                 .toList();
-        List<EmOrgEngineerItem> employees = employeeRepository.findActiveRosterEmployees().stream()
-                .map(employee -> EmOrgEngineerItem.builder()
-                        .name(employee.getFullName())
-                        .designation(designationLabel(employee))
-                        .build())
+        List<EmOrgEngineerItem> deliveryManagers = management.stream()
+                .filter(person -> isDeliveryManagerRole(person.getRoleTitle()))
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toManagementItem)
                 .toList();
+        List<EmOrgEngineerItem> coeManagers = management.stream()
+                .filter(person -> isCoeManagerRole(person.getRoleTitle()))
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toManagementItem)
+                .toList();
+
+        List<EmOrgEngineerItem> cxoPeople = new ArrayList<>();
+        List<EmOrgEngineerItem> vpPeople = new ArrayList<>();
+        List<EmOrgEngineerItem> engineeringPeople = new ArrayList<>();
+        List<EmOrgEngineerItem> deliveryPeople = new ArrayList<>();
+        List<EmOrgEngineerItem> coePeople = new ArrayList<>();
+        for (TeamManagement person : management) {
+            EmOrgEngineerItem item = toManagementItem(person);
+            switch (pillarFromRoleTitle(person.getRoleTitle())) {
+                case CXO -> cxoPeople.add(item);
+                case VP -> vpPeople.add(item);
+                case DELIVERY -> deliveryPeople.add(item);
+                case COE -> coePeople.add(item);
+                case ENGINEERING -> engineeringPeople.add(item);
+            }
+        }
+
+        for (Employee employee : employeeRepository.findActiveRosterEmployees()) {
+            EmOrgEngineerItem item = EmOrgEngineerItem.builder()
+                    .name(employee.getFullName())
+                    .designation(designationLabel(employee))
+                    .build();
+            switch (pillarForEmployee(employee)) {
+                case CXO -> cxoPeople.add(item);
+                case VP -> vpPeople.add(item);
+                case DELIVERY -> deliveryPeople.add(item);
+                case COE -> coePeople.add(item);
+                case ENGINEERING -> engineeringPeople.add(item);
+            }
+        }
+
+        cxoPeople = sortPeople(cxoPeople);
+        vpPeople = sortPeople(vpPeople);
+        engineeringPeople = sortPeople(engineeringPeople);
+        deliveryPeople = sortPeople(deliveryPeople);
+        coePeople = sortPeople(coePeople);
+
+        List<EmOrgEngineerItem> employees = new ArrayList<>();
+        employees.addAll(cxoPeople);
+        employees.addAll(vpPeople);
+        employees.addAll(engineeringPeople);
+        employees.addAll(deliveryPeople);
+        employees.addAll(coePeople);
+        employees = sortPeople(employees);
+
         List<OrgBreakdownProjectItem> projects = projectRepository.findAllBreakdownProjectsNonArchived();
 
         return OrgWorkforceSummary.builder()
                 .employeeCount(employees.size())
-                .cxoCount(cxos.size())
-                .vpCount(vps.size())
+                .cxoCount(cxoPeople.size())
+                .vpCount(vpPeople.size())
+                .engineeringCount(engineeringPeople.size())
+                .deliveryCount(deliveryPeople.size())
+                .coeCount(coePeople.size())
                 .engineeringManagerCount(engineeringManagers.size())
+                .deliveryManagerCount(deliveryManagers.size())
+                .coeManagerCount(coeManagers.size())
                 .projectCount(projects.size())
                 .employees(employees)
-                .cxos(cxos)
-                .vps(vps)
+                .cxos(cxoPeople)
+                .vps(vpPeople)
+                .engineering(engineeringPeople)
+                .delivery(deliveryPeople)
+                .coe(coePeople)
                 .engineeringManagers(engineeringManagers)
+                .deliveryManagers(deliveryManagers)
+                .coeManagers(coeManagers)
                 .projects(projects)
                 .build();
     }
@@ -97,6 +147,21 @@ public class OrgWorkforceService {
 
     @Transactional(readOnly = true)
     public List<EmOrgBreakdownRow> buildEmBreakdown() {
+        return buildManagerBreakdown(ManagementHierarchyUtils::isEngineeringManagerRole);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EmOrgBreakdownRow> buildDmBreakdown() {
+        return buildManagerBreakdown(ManagementHierarchyUtils::isDeliveryManagerRole);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EmOrgBreakdownRow> buildCoeBreakdown() {
+        return buildManagerBreakdown(ManagementHierarchyUtils::isCoeManagerRole);
+    }
+
+    private List<EmOrgBreakdownRow> buildManagerBreakdown(
+            java.util.function.Predicate<String> roleMatch) {
         List<TeamManagement> management = activeManagement();
         if (management.isEmpty()) {
             return List.of();
@@ -104,9 +169,9 @@ public class OrgWorkforceService {
 
         List<Employee> engineers = employeeRepository.findActiveEngineersWithManager();
         return management.stream()
-                .filter(person -> isEngineeringManagerRole(person.getRoleTitle()))
+                .filter(person -> roleMatch.test(person.getRoleTitle()))
                 .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
-                .map(em -> toEmRow(em, engineers))
+                .map(manager -> toEmRow(manager, engineers))
                 .toList();
     }
 
@@ -128,14 +193,35 @@ public class OrgWorkforceService {
                 .filter(person -> isEngineeringManagerRole(person.getRoleTitle()))
                 .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+        List<TeamManagement> dmsUnderVp = management.stream()
+                .filter(person -> descendantIds.contains(person.getId()))
+                .filter(person -> isDeliveryManagerRole(person.getRoleTitle()))
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        List<TeamManagement> coesUnderVp = management.stream()
+                .filter(person -> descendantIds.contains(person.getId()))
+                .filter(person -> isCoeManagerRole(person.getRoleTitle()))
+                .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
 
         List<EmOrgEngineerItem> engineeringManagers = emsUnderVp.stream()
                 .map(this::toManagementItem)
                 .toList();
+        List<EmOrgEngineerItem> deliveryManagers = dmsUnderVp.stream()
+                .map(this::toManagementItem)
+                .toList();
+        List<EmOrgEngineerItem> coeManagers = coesUnderVp.stream()
+                .map(this::toManagementItem)
+                .toList();
+
+        List<TeamManagement> managersUnderVp = new ArrayList<>();
+        managersUnderVp.addAll(emsUnderVp);
+        managersUnderVp.addAll(dmsUnderVp);
+        managersUnderVp.addAll(coesUnderVp);
 
         List<EmOrgEngineerItem> engineerItems = new ArrayList<>();
-        for (TeamManagement em : emsUnderVp) {
-            for (Employee employee : engineersForManager(em, engineers)) {
+        for (TeamManagement manager : managersUnderVp) {
+            for (Employee employee : engineersForManager(manager, engineers)) {
                 engineerItems.add(EmOrgEngineerItem.builder()
                         .name(employee.getFullName())
                         .designation(designationLabel(employee))
@@ -144,18 +230,22 @@ public class OrgWorkforceService {
         }
         engineerItems.sort(Comparator.comparing(EmOrgEngineerItem::getName, String.CASE_INSENSITIVE_ORDER));
 
-        List<UUID> emIds = emsUnderVp.stream().map(TeamManagement::getId).toList();
-        List<OrgBreakdownProjectItem> projects = emIds.isEmpty()
+        List<UUID> managerIds = managersUnderVp.stream().map(TeamManagement::getId).toList();
+        List<OrgBreakdownProjectItem> projects = managerIds.isEmpty()
                 ? List.of()
-                : projectRepository.findBreakdownProjectsByEngineeringManagerIds(emIds);
+                : projectRepository.findBreakdownProjectsByEngineeringManagerIds(managerIds);
 
         return VpOrgBreakdownRow.builder()
                 .vpId(vp.getId())
                 .vpName(vp.getFullName())
                 .engineeringManagerCount(emsUnderVp.size())
+                .deliveryManagerCount(dmsUnderVp.size())
+                .coeManagerCount(coesUnderVp.size())
                 .engineerCount(engineerItems.size())
                 .projectCount(projects.size())
                 .engineeringManagers(engineeringManagers)
+                .deliveryManagers(deliveryManagers)
+                .coeManagers(coeManagers)
                 .engineers(engineerItems)
                 .projects(projects)
                 .build();
@@ -204,5 +294,40 @@ public class OrgWorkforceService {
     private String designationLabel(Employee employee) {
         String label = EmployeeRosterRefs.designationName(employee);
         return label != null ? label : "—";
+    }
+
+    private OrgPillar pillarForEmployee(Employee employee) {
+        OrgPillar own = pillarFromOwnTitle(employee);
+        if (own != OrgPillar.ENGINEERING) {
+            return own;
+        }
+        TeamManagement manager = employee.getEngineeringManagerManagement();
+        if (manager == null) {
+            return OrgPillar.ENGINEERING;
+        }
+        OrgPillar managerPillar = pillarFromRoleTitle(manager.getRoleTitle());
+        // ICs reporting to a VP still sit in Engineering, not the VP row.
+        return managerPillar == OrgPillar.VP ? OrgPillar.ENGINEERING : managerPillar;
+    }
+
+    private OrgPillar pillarFromOwnTitle(Employee employee) {
+        String name = EmployeeRosterRefs.designationName(employee);
+        if (name != null && !name.isBlank()) {
+            OrgPillar fromName = pillarFromRoleTitle(name);
+            if (fromName != OrgPillar.ENGINEERING) {
+                return fromName;
+            }
+        }
+        String code = EmployeeRosterRefs.designationCode(employee);
+        if (code != null && !code.isBlank()) {
+            return pillarFromRoleTitle(code);
+        }
+        return OrgPillar.ENGINEERING;
+    }
+
+    private List<EmOrgEngineerItem> sortPeople(List<EmOrgEngineerItem> people) {
+        return people.stream()
+                .sorted(Comparator.comparing(EmOrgEngineerItem::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 }

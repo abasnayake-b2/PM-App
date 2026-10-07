@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllocations, type OverAllocationError } from '@/api/resources.api';
 import { fetchEngineeringManagers } from '@/api/teamRoster.api';
+import { fetchTaskTypes, fetchTaskCategories } from '@/api/lookup.api';
 import type { CreateAllocationPayload, UpdateAllocationPayload } from '@/hooks/useResources';
 import type { Allocation } from '@/types';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -90,6 +91,8 @@ export function AllocationForm({
   const [percentage, setPercentage] = useState(editingAllocation?.percentage ?? 50);
   const [roleOnProject, setRoleOnProject] = useState(editingAllocation?.roleOnProject ?? '');
   const [billable, setBillable] = useState(editingAllocation?.billable ?? true);
+  const [taskTypeId, setTaskTypeId] = useState(editingAllocation?.taskTypeId ?? '');
+  const [taskCategoryId, setTaskCategoryId] = useState(editingAllocation?.taskCategoryId ?? '');
 
   const formTitle = title ?? (isEdit ? 'Edit allocation' : 'Allocate resource');
   const excludeAllocationId = editingAllocation?.id;
@@ -98,6 +101,16 @@ export function AllocationForm({
     queryKey: ['engineering-managers'],
     queryFn: fetchEngineeringManagers,
     enabled: showEngineeringManagerFilter,
+  });
+
+  const { data: taskTypes = [], isLoading: taskTypesLoading } = useQuery({
+    queryKey: ['task-types'],
+    queryFn: fetchTaskTypes,
+  });
+
+  const { data: taskCategories = [], isLoading: taskCategoriesLoading } = useQuery({
+    queryKey: ['task-categories'],
+    queryFn: fetchTaskCategories,
   });
 
   const filteredEmployees = useMemo(() => {
@@ -187,8 +200,10 @@ export function AllocationForm({
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (
-      !resolvedIssueId ||
+      (!isEdit && !resolvedIssueId) ||
       !employeeId ||
+      !taskTypeId ||
+      !taskCategoryId ||
       !toDate ||
       datesInvalid ||
       percentage < 1 ||
@@ -206,6 +221,8 @@ export function AllocationForm({
         fromDate,
         toDate,
         billable,
+        taskTypeId: taskTypeId || undefined,
+        taskCategoryId: taskCategoryId || undefined,
       });
       return;
     }
@@ -213,6 +230,8 @@ export function AllocationForm({
     onSubmit({
       employeeId,
       issueId: resolvedIssueId,
+      taskTypeId: taskTypeId || undefined,
+      taskCategoryId: taskCategoryId || undefined,
       roleOnProject: roleOnProject.trim() || undefined,
       percentage,
       fromDate,
@@ -222,8 +241,10 @@ export function AllocationForm({
   };
 
   const canSubmit =
-    !!resolvedIssueId &&
+    (isEdit || !!resolvedIssueId) &&
     !!employeeId &&
+    !!taskTypeId &&
+    !!taskCategoryId &&
     !!toDate &&
     !datesInvalid &&
     percentage >= 1 &&
@@ -343,6 +364,54 @@ export function AllocationForm({
           </label>
         </>
       )}
+
+      <label className="block text-sm">
+        <span className="text-text2">Task category</span>
+        <select
+          className={inputClass}
+          value={taskCategoryId}
+          disabled={taskCategoriesLoading}
+          onChange={(e) => setTaskCategoryId(e.target.value)}
+          required
+        >
+          <option value="" disabled>
+            {taskCategoriesLoading
+              ? 'Loading task categories…'
+              : taskCategories.length === 0
+                ? 'No task categories configured…'
+                : 'Select task category…'}
+          </option>
+          {taskCategories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="block text-sm">
+        <span className="text-text2">Task type</span>
+        <select
+          className={inputClass}
+          value={taskTypeId}
+          disabled={taskTypesLoading}
+          onChange={(e) => setTaskTypeId(e.target.value)}
+          required
+        >
+          <option value="" disabled>
+            {taskTypesLoading
+              ? 'Loading task types…'
+              : taskTypes.length === 0
+                ? 'No task types configured…'
+                : 'Select task type…'}
+          </option>
+          {taskTypes.map((type) => (
+            <option key={type.id} value={type.id}>
+              {type.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="block text-sm">
         <span className="text-text2">Designation</span>

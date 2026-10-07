@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, UserCircle, Users } from 'lucide-react';
 import { useTeamManagement, useTeamRosterMembers } from '@/hooks/useTeamRoster';
 import type { TeamManagement, TeamRosterMember } from '@/api/teamRoster.api';
+import { isActiveRosterStatus } from '@/utils/rosterStatus';
 
 type NodeKind = 'manager' | 'employee';
 
@@ -116,8 +117,16 @@ export function ManagementOrgTree({
   onSelectManager,
   onSelectMember,
 }: ManagementOrgTreeProps) {
-  const { data: management = [], isLoading: managementLoading } = useTeamManagement();
-  const { data: members = [], isLoading: membersLoading } = useTeamRosterMembers();
+  const { data: managementRows = [], isLoading: managementLoading } = useTeamManagement();
+  const { data: memberRows = [], isLoading: membersLoading } = useTeamRosterMembers();
+  const management = useMemo(
+    () => managementRows.filter((person) => isActiveRosterStatus(person.status)),
+    [managementRows],
+  );
+  const members = useMemo(
+    () => memberRows.filter((member) => isActiveRosterStatus(member.status)),
+    [memberRows],
+  );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   const { byId, byName } = useMemo(() => buildManagementIndex(management), [management]);

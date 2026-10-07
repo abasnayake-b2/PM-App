@@ -127,7 +127,11 @@ export function TeamMemberPanel({
         type="button"
         aria-label="Close panel"
         className="fixed inset-0 z-40 bg-black/50"
-        onClick={requestClose}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            requestClose();
+          }
+        }}
       />
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l glass-panel">
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
@@ -222,9 +226,13 @@ export function TeamMemberPanel({
                   editingAllocation?.id === allocation.id ? null : (
                     <li key={allocation.id}>
                       <div className="flex items-start justify-between gap-3 text-sm">
-                        <Link to={allocationTargetHref(allocation)} className="font-medium hover:text-accent">
-                          {allocationTargetLabel(allocation)}
-                        </Link>
+                        {allocationTargetHref(allocation) ? (
+                          <Link to={allocationTargetHref(allocation)!} className="font-medium hover:text-accent">
+                            {allocationTargetLabel(allocation)}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{allocationTargetLabel(allocation)}</span>
+                        )}
                         <div className="flex shrink-0 items-center gap-1.5">
                           <span className="text-text2">{allocation.percentage}%</span>
                           {canMutateAllocations && (
@@ -256,6 +264,12 @@ export function TeamMemberPanel({
                         </div>
                       </div>
                       <p className="text-xs text-text2">{allocation.projectName}</p>
+                      {allocation.taskCategoryName && (
+                        <p className="text-xs text-text2">{allocation.taskCategoryName}</p>
+                      )}
+                      {allocation.taskTypeName && (
+                        <p className="text-xs text-text2">{allocation.taskTypeName}</p>
+                      )}
                       {allocation.roleOnProject && (
                         <p className="text-xs text-text2">{allocation.roleOnProject}</p>
                       )}

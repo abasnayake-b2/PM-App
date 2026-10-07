@@ -17,6 +17,7 @@ import {
   Sparkles,
   UserCircle,
   Users,
+  ClipboardList,
   X,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -179,10 +180,16 @@ export function AppShell() {
             </NavLink>
             )}
             {can(P.ALLOCATIONS_VIEW) && (
-            <NavLink to="/resources" className={linkClass}>
+            <>
+            <NavLink to="/resources" end className={linkClass}>
               <Users size={18} />
               Resource Utilization
             </NavLink>
+            <NavLink to="/resources/summary" className={linkClass}>
+              <ClipboardList size={18} />
+              Utilization summary
+            </NavLink>
+            </>
             )}
           </NavCollapsibleGroup>
           )}

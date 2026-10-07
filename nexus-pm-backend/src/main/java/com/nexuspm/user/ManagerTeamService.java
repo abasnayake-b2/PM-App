@@ -56,6 +56,8 @@ public class ManagerTeamService {
             employeeRepository.findByEngineeringManagerManagementId(managementId)
                     .forEach(member -> teamById.putIfAbsent(member.getId(), member));
         }
-        return List.copyOf(teamById.values());
+        return teamById.values().stream()
+                .filter(member -> ActiveRosterStatus.isActive(member.getStatus()))
+                .toList();
     }
 }

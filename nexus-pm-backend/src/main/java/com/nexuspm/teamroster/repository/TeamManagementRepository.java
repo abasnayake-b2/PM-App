@@ -14,11 +14,13 @@ public interface TeamManagementRepository extends JpaRepository<TeamManagement, 
     @Query("""
             SELECT m FROM TeamManagement m
             LEFT JOIN FETCH m.supervisor s
+            LEFT JOIN FETCH m.department d
             WHERE (:search IS NULL OR :search = '' OR
                    LOWER(CONCAT(m.firstName, ' ', m.lastName)) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(m.roleTitle) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(CONCAT(COALESCE(s.firstName, ''), ' ', COALESCE(s.lastName, '')))
-                       LIKE LOWER(CONCAT('%', :search, '%')))
+                       LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(d.name, '')) LIKE LOWER(CONCAT('%', :search, '%')))
             ORDER BY m.roleTitle, m.lastName, m.firstName
             """)
     List<TeamManagement> search(String search);
@@ -26,6 +28,7 @@ public interface TeamManagementRepository extends JpaRepository<TeamManagement, 
     @Query("""
             SELECT m FROM TeamManagement m
             LEFT JOIN FETCH m.supervisor
+            LEFT JOIN FETCH m.department
             WHERE m.status = 'ACTIVE'
               AND NOT EXISTS (
                   SELECT 1 FROM Employee e WHERE e.teamManagement.id = m.id)

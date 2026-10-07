@@ -75,10 +75,9 @@ public class RdTaskTableInitializer {
                 SET a.project_id = i.project_id
                 WHERE a.project_id IS NULL
                 """);
-        Integer nullProjects = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM allocation WHERE project_id IS NULL", Integer.class);
-        if (nullProjects != null && nullProjects == 0 && isNullable(jdbc, "allocation", "project_id")) {
-            jdbc.execute("ALTER TABLE allocation MODIFY project_id CHAR(36) NOT NULL");
+        if (!isNullable(jdbc, "allocation", "project_id")) {
+            log.info("Making allocation.project_id nullable for non-project allocations");
+            jdbc.execute("ALTER TABLE allocation MODIFY project_id CHAR(36) NULL");
         }
         addFkIfMissing(jdbc, "fk_alloc_project",
                 "ALTER TABLE allocation ADD CONSTRAINT fk_alloc_project FOREIGN KEY (project_id) REFERENCES project(id)");

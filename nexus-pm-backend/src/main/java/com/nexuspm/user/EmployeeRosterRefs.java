@@ -94,6 +94,29 @@ public final class EmployeeRosterRefs {
         return null;
     }
 
+    public static String departmentName(Employee employee) {
+        if (employee.getDepartment() != null
+                && employee.getDepartment().getName() != null
+                && !employee.getDepartment().getName().isBlank()) {
+            return employee.getDepartment().getName().trim();
+        }
+        Designation designation = employee.getDesignation();
+        if (designation != null
+                && designation.getDepartment() != null
+                && designation.getDepartment().getName() != null
+                && !designation.getDepartment().getName().isBlank()) {
+            return designation.getDepartment().getName().trim();
+        }
+        Stream stream = employee.getStream();
+        if (stream != null
+                && stream.getDepartment() != null
+                && stream.getDepartment().getName() != null
+                && !stream.getDepartment().getName().isBlank()) {
+            return stream.getDepartment().getName().trim();
+        }
+        return null;
+    }
+
     public static String countryLabel(Employee employee) {
         Country country = employee.getCountry();
         if (country == null) {

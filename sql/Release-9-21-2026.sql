@@ -81,11 +81,7 @@ SET a.project_id = i.project_id
 WHERE a.id IS NOT NULL
   AND a.project_id IS NULL;
 
-SET @nulls := (SELECT COUNT(*) FROM allocation WHERE project_id IS NULL);
-SET @sql := IF(@nulls = 0,
-    'ALTER TABLE allocation MODIFY project_id CHAR(36) NOT NULL',
-    'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- project_id stays nullable so non-project allocations can omit a project.
 
 SET @fk := (
     SELECT COUNT(*) FROM information_schema.table_constraints

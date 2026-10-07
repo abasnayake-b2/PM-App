@@ -232,6 +232,52 @@ export async function deleteAdminIssueType(id: string): Promise<void> {
   await api.delete(`${base}/issue-types/${id}`);
 }
 
+export async function fetchAdminTaskTypes(): Promise<ReferenceItem[]> {
+  const { data } = await api.get<ReferenceItem[]>(`${base}/task-types`);
+  return data;
+}
+
+export async function createAdminTaskType(name: string, description?: string): Promise<ReferenceItem> {
+  const { data } = await api.post<ReferenceItem>(`${base}/task-types`, { name, description });
+  return data;
+}
+
+export async function updateAdminTaskType(
+  id: string,
+  name: string,
+  description?: string,
+): Promise<ReferenceItem> {
+  const { data } = await api.put<ReferenceItem>(`${base}/task-types/${id}`, { name, description });
+  return data;
+}
+
+export async function deleteAdminTaskType(id: string): Promise<void> {
+  await api.delete(`${base}/task-types/${id}`);
+}
+
+export async function fetchAdminTaskCategories(): Promise<ReferenceItem[]> {
+  const { data } = await api.get<ReferenceItem[]>(`${base}/task-categories`);
+  return data;
+}
+
+export async function createAdminTaskCategory(name: string, description?: string): Promise<ReferenceItem> {
+  const { data } = await api.post<ReferenceItem>(`${base}/task-categories`, { name, description });
+  return data;
+}
+
+export async function updateAdminTaskCategory(
+  id: string,
+  name: string,
+  description?: string,
+): Promise<ReferenceItem> {
+  const { data } = await api.put<ReferenceItem>(`${base}/task-categories/${id}`, { name, description });
+  return data;
+}
+
+export async function deleteAdminTaskCategory(id: string): Promise<void> {
+  await api.delete(`${base}/task-categories/${id}`);
+}
+
 export async function fetchAdminStatuses(): Promise<ReferenceItem[]> {
   const { data } = await api.get<ReferenceItem[]>(`${base}/statuses`);
   return data;

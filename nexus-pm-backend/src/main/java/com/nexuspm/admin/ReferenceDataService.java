@@ -4,9 +4,13 @@ import com.nexuspm.lookup.IssueTypeCatalog;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.TaskCategory;
+import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
+import com.nexuspm.lookup.repository.TaskCategoryRepository;
+import com.nexuspm.lookup.repository.TaskTypeRepository;
 import com.nexuspm.admin.dto.ReferenceRoleResponse;
 import com.nexuspm.shared.audit.AuditNameEnricher;
 import com.nexuspm.shared.exception.BusinessException;
@@ -47,6 +51,8 @@ public class ReferenceDataService {
     private final DesignationRepository designationRepository;
     private final RoleRepository roleRepository;
     private final IssueTypeRepository issueTypeRepository;
+    private final TaskTypeRepository taskTypeRepository;
+    private final TaskCategoryRepository taskCategoryRepository;
     private final IssueStatusRepository issueStatusRepository;
     private final PriorityRepository priorityRepository;
     private final EmployeeRepository employeeRepository;
@@ -290,6 +296,116 @@ public class ReferenceDataService {
     @Transactional
     public void deleteIssueType(UUID id) {
         issueTypeRepository.deleteById(id);
+    }
+
+    @Cacheable(cacheNames = CacheNames.TASK_TYPES, key = "'admin-all'")
+    @Transactional(readOnly = true)
+    public List<TaskType> listTaskTypes() {
+        return auditNameEnricher.enrichAll(taskTypeRepository.findAllByOrderBySortOrderAscNameAsc());
+    }
+
+    @CacheEvict(cacheNames = CacheNames.TASK_TYPES, allEntries = true)
+    @Transactional
+    public TaskType createTaskType(String name, String description) {
+        String trimmed = name.trim();
+        if (taskTypeRepository.findByNameIgnoreCase(trimmed).isPresent()) {
+            throw new BusinessException("DUPLICATE", "Task type already exists", 400);
+        }
+        TaskType taskType = new TaskType();
+        taskType.setId(UUID.randomUUID());
+        taskType.setName(trimmed);
+        taskType.setDescription(trimToNull(description));
+        taskType.setSortOrder(nextTaskTypeSortOrder());
+        return auditNameEnricher.enrich(taskTypeRepository.save(taskType));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.TASK_TYPES, allEntries = true)
+    @Transactional
+    public TaskType updateTaskType(UUID id, String name, String description) {
+        TaskType taskType = taskTypeRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Task type not found", 404));
+        String trimmed = name.trim();
+        taskTypeRepository.findByNameIgnoreCase(trimmed)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BusinessException("DUPLICATE", "Task type already exists", 400);
+                });
+        taskType.setName(trimmed);
+        taskType.setDescription(trimToNull(description));
+        return auditNameEnricher.enrich(taskTypeRepository.save(taskType));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.TASK_TYPES, allEntries = true)
+    @Transactional
+    public void deleteTaskType(UUID id) {
+        if (!taskTypeRepository.existsById(id)) {
+            throw new BusinessException("NOT_FOUND", "Task type not found", 404);
+        }
+        taskTypeRepository.deleteById(id);
+    }
+
+    private int nextTaskTypeSortOrder() {
+        return taskTypeRepository.findAll().stream()
+                .map(TaskType::getSortOrder)
+                .filter(order -> order != null)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(0) + 1;
+    }
+
+    @Cacheable(cacheNames = CacheNames.TASK_CATEGORIES, key = "'admin-all'")
+    @Transactional(readOnly = true)
+    public List<TaskCategory> listTaskCategories() {
+        return auditNameEnricher.enrichAll(taskCategoryRepository.findAllByOrderBySortOrderAscNameAsc());
+    }
+
+    @CacheEvict(cacheNames = CacheNames.TASK_CATEGORIES, allEntries = true)
+    @Transactional
+    public TaskCategory createTaskCategory(String name, String description) {
+        String trimmed = name.trim();
+        if (taskCategoryRepository.findByNameIgnoreCase(trimmed).isPresent()) {
+            throw new BusinessException("DUPLICATE", "Task category already exists", 400);
+        }
+        TaskCategory category = new TaskCategory();
+        category.setId(UUID.randomUUID());
+        category.setName(trimmed);
+        category.setDescription(trimToNull(description));
+        category.setSortOrder(nextTaskCategorySortOrder());
+        return auditNameEnricher.enrich(taskCategoryRepository.save(category));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.TASK_CATEGORIES, allEntries = true)
+    @Transactional
+    public TaskCategory updateTaskCategory(UUID id, String name, String description) {
+        TaskCategory category = taskCategoryRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Task category not found", 404));
+        String trimmed = name.trim();
+        taskCategoryRepository.findByNameIgnoreCase(trimmed)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BusinessException("DUPLICATE", "Task category already exists", 400);
+                });
+        category.setName(trimmed);
+        category.setDescription(trimToNull(description));
+        return auditNameEnricher.enrich(taskCategoryRepository.save(category));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.TASK_CATEGORIES, allEntries = true)
+    @Transactional
+    public void deleteTaskCategory(UUID id) {
+        if (!taskCategoryRepository.existsById(id)) {
+            throw new BusinessException("NOT_FOUND", "Task category not found", 404);
+        }
+        taskCategoryRepository.deleteById(id);
+    }
+
+    private int nextTaskCategorySortOrder() {
+        return taskCategoryRepository.findAll().stream()
+                .map(TaskCategory::getSortOrder)
+                .filter(order -> order != null)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(0) + 1;
     }
 
     @Cacheable(cacheNames = CacheNames.ISSUE_STATUSES, key = "'admin-all'")

@@ -181,8 +181,8 @@ export function TeamEmployeesPage() {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const { data: rows, isLoading, error } = useTeamRosterMembers(search);
-  const { data: exportRows = [] } = useTeamRosterMembers('');
+  const { data: rows, isLoading, error } = useTeamRosterMembers(search, true, true);
+  const { data: exportRows = [] } = useTeamRosterMembers('', true, true);
   const filters = useRosterMemberFilters(rows);
   const { data: management = [] } = useTeamManagement('', canPromote && dialog === 'promote');
   const createRow = useCreateTeamRosterMember();
@@ -319,7 +319,7 @@ export function TeamEmployeesPage() {
                   <th className="px-4 py-2">Code</th>
                   <th className="px-4 py-2">Designation</th>
                   <th className="px-4 py-2">Team</th>
-                  <th className="px-4 py-2">EM</th>
+                  <th className="px-4 py-2">Manager</th>
                   <th className="px-4 py-2">NTP/GBL</th>
                   <th className="px-4 py-2">Country</th>
                   <th className="px-4 py-2">Product</th>

@@ -5,8 +5,8 @@
 --   mysql -u root -p < build.sql
 --   mysql -u root -p < seed.sql
 --
--- Existing databases (do not rebuild): run sql/Release-9-21-2026.sql instead
--- (RD / project tasks + allocation project_id / task links).
+-- Existing databases (do not rebuild): run sql/Release-9-21-2026.sql then sql/Release-9-28-2026.sql
+-- (or restart the API — bootstrap migrators apply the same changes).
 --
 -- Sources: JPA entities, Liquibase 001–011, bootstrap runners, live schema,
 -- Release-9-21-2026 (027 rd_issue_task / project_task, 028 allocation tasks).
@@ -32,6 +32,7 @@ DROP TABLE IF EXISTS workflow_rule;
 DROP TABLE IF EXISTS holiday_calendar;
 DROP TABLE IF EXISTS time_log;
 DROP TABLE IF EXISTS allocation;
+DROP TABLE IF EXISTS non_project_task;
 DROP TABLE IF EXISTS task;
 DROP TABLE IF EXISTS rd_issue_task;
 DROP TABLE IF EXISTS project_task;
@@ -48,6 +49,8 @@ DROP TABLE IF EXISTS `release`;
 DROP TABLE IF EXISTS project;
 DROP TABLE IF EXISTS issue_status;
 DROP TABLE IF EXISTS issue_type;
+DROP TABLE IF EXISTS task_category;
+DROP TABLE IF EXISTS task_type;
 DROP TABLE IF EXISTS priority;
 DROP TABLE IF EXISTS user_auth;
 DROP TABLE IF EXISTS employee_skill;
@@ -241,6 +244,7 @@ CREATE TABLE team_management (
     supervisor_id   CHAR(36)     NULL,
     status          VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     employment_type VARCHAR(40)  NULL,
+    department_id   CHAR(36)     NULL,
     profile_picture VARCHAR(255) NULL,
     import_batch_id CHAR(36)     NULL,
     created_by      CHAR(36)     NULL,
@@ -248,6 +252,7 @@ CREATE TABLE team_management (
     created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_tm_supervisor   FOREIGN KEY (supervisor_id)   REFERENCES team_management(id),
+    CONSTRAINT fk_tm_department   FOREIGN KEY (department_id)   REFERENCES department(id),
     CONSTRAINT fk_tm_import_batch FOREIGN KEY (import_batch_id) REFERENCES team_import_batch(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -347,6 +352,28 @@ CREATE TABLE issue_type (
     description   VARCHAR(255) NULL,
     created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE task_type (
+    id          CHAR(36)     NOT NULL PRIMARY KEY,
+    name        VARCHAR(150) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order  INT          NOT NULL DEFAULT 0,
+    created_by  CHAR(36)     NULL,
+    updated_by  CHAR(36)     NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE task_category (
+    id          CHAR(36)     NOT NULL PRIMARY KEY,
+    name        VARCHAR(150) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order  INT          NOT NULL DEFAULT 0,
+    created_by  CHAR(36)     NULL,
+    updated_by  CHAR(36)     NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE issue_status (
@@ -675,14 +702,29 @@ CREATE TABLE task (
     CONSTRAINT fk_task_status   FOREIGN KEY (status_id)   REFERENCES issue_status(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Allocations: required project; optional RD, project task, or RD task (Release-9-21-2026 / 028)
+CREATE TABLE non_project_task (
+    id              CHAR(36)     NOT NULL PRIMARY KEY,
+    description     TEXT         NOT NULL,
+    module          VARCHAR(120) NULL,
+    deleted         TINYINT(1)   NOT NULL DEFAULT 0,
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_by      CHAR(36)     NULL,
+    updated_by      CHAR(36)     NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Allocations: optional project (non-project tasks) or project / RD / project task
 CREATE TABLE allocation (
     id              CHAR(36)    NOT NULL PRIMARY KEY,
     employee_id     CHAR(36)    NOT NULL,
-    project_id      CHAR(36)    NOT NULL,
+    project_id      CHAR(36)    NULL,
     issue_id        CHAR(36)    NULL,
     project_task_id CHAR(36)    NULL,
     rd_issue_task_id CHAR(36)   NULL,
+    task_type_id    CHAR(36)    NULL,
+    task_category_id CHAR(36)   NULL,
+    non_project_task_id CHAR(36) NULL,
     role_on_project VARCHAR(50) NULL,
     percentage      INT         NOT NULL,
     from_date       DATE        NOT NULL,
@@ -698,7 +740,10 @@ CREATE TABLE allocation (
     CONSTRAINT fk_alloc_project  FOREIGN KEY (project_id)  REFERENCES project(id),
     CONSTRAINT fk_alloc_issue    FOREIGN KEY (issue_id)    REFERENCES rd_issue(id),
     CONSTRAINT fk_alloc_project_task FOREIGN KEY (project_task_id) REFERENCES project_task(id),
-    CONSTRAINT fk_alloc_rd_issue_task FOREIGN KEY (rd_issue_task_id) REFERENCES rd_issue_task(id)
+    CONSTRAINT fk_alloc_rd_issue_task FOREIGN KEY (rd_issue_task_id) REFERENCES rd_issue_task(id),
+    CONSTRAINT fk_alloc_task_type FOREIGN KEY (task_type_id) REFERENCES task_type(id),
+    CONSTRAINT fk_alloc_task_category FOREIGN KEY (task_category_id) REFERENCES task_category(id),
+    CONSTRAINT fk_alloc_non_project_task FOREIGN KEY (non_project_task_id) REFERENCES non_project_task(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE time_log (

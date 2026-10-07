@@ -17,6 +17,7 @@ import com.nexuspm.teamroster.entity.TeamImportBatch;
 import com.nexuspm.teamroster.entity.TeamManagement;
 import com.nexuspm.teamroster.repository.TeamImportBatchRepository;
 import com.nexuspm.teamroster.repository.TeamManagementRepository;
+import com.nexuspm.user.ActiveRosterStatus;
 import com.nexuspm.user.EmployeeCleanupService;
 import com.nexuspm.user.ManagementUserProvisioningService;
 import com.nexuspm.user.ManagerTeamService;
@@ -33,6 +34,7 @@ import com.nexuspm.user.repository.RoleRepository;
 import com.nexuspm.user.repository.SkillRepository;
 import com.nexuspm.user.repository.StreamRepository;
 import com.nexuspm.user.repository.WorkTypeRepository;
+import com.nexuspm.user.repository.DepartmentRepository;
 import com.nexuspm.user.entity.Role;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +66,7 @@ public class TeamRosterService {
     private final WorkTypeRepository workTypeRepository;
     private final SkillRepository skillRepository;
     private final CountryRepository countryRepository;
+    private final DepartmentRepository departmentRepository;
     private final RoleRepository roleRepository;
     private final EmployeeCleanupService employeeCleanupService;
     private final ManagementUserProvisioningService managementUserProvisioningService;
@@ -75,10 +78,10 @@ public class TeamRosterService {
     private final ManagerTeamService managerTeamService;
 
     @Transactional(readOnly = true)
-    public List<TeamManagementResponse> listManagement(String search) {
+    public List<TeamManagementResponse> listManagement(String search, boolean includeInactive) {
         String term = normalizeSearch(search);
         if (canReadFullOrgRoster()) {
-            List<TeamManagement> rows = managementRepository.search(term);
+            List<TeamManagement> rows = restrictManagementStatus(managementRepository.search(term), includeInactive);
             auditNameEnricher.enrichAll(rows);
             return rows.stream().map(this::toManagementResponse).toList();
         }
@@ -91,6 +94,9 @@ public class TeamRosterService {
             return List.of();
         }
         TeamManagement own = self.getTeamManagement();
+        if (!includeInactive && !ActiveRosterStatus.isActive(own.getStatus())) {
+            return List.of();
+        }
         if (term != null) {
             String haystack = (own.getFullName() + " " + Optional.ofNullable(own.getRoleTitle()).orElse(""))
                     .toLowerCase(Locale.ROOT);
@@ -103,16 +109,17 @@ public class TeamRosterService {
     }
 
     @Transactional(readOnly = true)
-    public List<TeamRosterMemberResponse> listMembers(String search) {
+    public List<TeamRosterMemberResponse> listMembers(String search, boolean includeInactive) {
         String term = normalizeSearch(search);
         if (canReadFullOrgRoster()) {
-            List<Employee> rows = employeeRepository.searchRosterMembers(term);
+            List<Employee> rows = restrictEmployeeStatus(employeeRepository.searchRosterMembers(term), includeInactive);
             auditNameEnricher.enrichAll(rows);
             return rows.stream().map(this::toMemberResponse).toList();
         }
         if (!SecurityUtils.isManagerOrAbove()) {
             return employeeRepository.findDetailedById(SecurityUtils.currentUserId())
                     .filter(employee -> employee.getTeamManagement() == null)
+                    .filter(employee -> includeInactive || ActiveRosterStatus.isActive(employee.getStatus()))
                     .filter(employee -> matchesMemberSearch(employee, term))
                     .map(employee -> {
                         auditNameEnricher.enrichAll(List.of(employee));
@@ -120,10 +127,12 @@ public class TeamRosterService {
                     })
                     .orElseGet(List::of);
         }
-        List<Employee> team = managerTeamService.resolveTeam(SecurityUtils.currentUserId()).stream()
-                .filter(employee -> employee.getTeamManagement() == null)
-                .filter(employee -> matchesMemberSearch(employee, term))
-                .toList();
+        List<Employee> team = restrictEmployeeStatus(
+                managerTeamService.resolveTeam(SecurityUtils.currentUserId()).stream()
+                        .filter(employee -> employee.getTeamManagement() == null)
+                        .filter(employee -> matchesMemberSearch(employee, term))
+                        .toList(),
+                includeInactive);
         auditNameEnricher.enrichAll(team);
         return team.stream().map(this::toMemberResponse).toList();
     }
@@ -147,6 +156,20 @@ public class TeamRosterService {
         }
         String haystack = (employee.getFullName() + " " + employee.getEmail()).toLowerCase(Locale.ROOT);
         return haystack.contains(term.toLowerCase(Locale.ROOT));
+    }
+
+    private static List<Employee> restrictEmployeeStatus(List<Employee> rows, boolean includeInactive) {
+        if (includeInactive) {
+            return rows;
+        }
+        return rows.stream().filter(employee -> ActiveRosterStatus.isActive(employee.getStatus())).toList();
+    }
+
+    private static List<TeamManagement> restrictManagementStatus(List<TeamManagement> rows, boolean includeInactive) {
+        if (includeInactive) {
+            return rows;
+        }
+        return rows.stream().filter(person -> ActiveRosterStatus.isActive(person.getStatus())).toList();
     }
 
     @Transactional(readOnly = true)
@@ -396,6 +419,7 @@ public class TeamRosterService {
             }
             entity.setSupervisor(supervisor);
         }
+        entity.setDepartment(employee.getDepartment());
 
         managementRepository.saveAndFlush(entity);
         employee.setTeamManagement(entity);
@@ -427,6 +451,9 @@ public class TeamRosterService {
         }
 
         employee.setTeamManagement(null);
+        if (employee.getDepartment() == null && entity.getDepartment() != null) {
+            employee.setDepartment(entity.getDepartment());
+        }
 
         if (request != null && request.getEngineeringManagerManagementId() != null) {
             UUID emId = request.getEngineeringManagerManagementId();
@@ -504,7 +531,12 @@ public class TeamRosterService {
         TeamManagement entity = managementRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Management record not found", 404));
         applyManagementRequest(entity, request);
-        return toManagementResponse(auditNameEnricher.enrich(managementRepository.save(entity)));
+        TeamManagement saved = managementRepository.save(entity);
+        employeeRepository.findByTeamManagementId(saved.getId()).ifPresent(employee -> {
+            employee.setDepartment(saved.getDepartment());
+            employeeRepository.save(employee);
+        });
+        return toManagementResponse(auditNameEnricher.enrich(saved));
     }
 
     @Transactional
@@ -1128,6 +1160,17 @@ public class TeamRosterService {
             entity.setStatus(request.getStatus().trim().toUpperCase());
         }
         entity.setEmploymentType(trimOrNull(request.getEmploymentType()));
+        applyManagementDepartment(entity, request.getDepartmentId());
+    }
+
+    private void applyManagementDepartment(TeamManagement entity, UUID departmentId) {
+        if (departmentId == null) {
+            entity.setDepartment(null);
+            return;
+        }
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Department not found", 400));
+        entity.setDepartment(department);
     }
 
     private void applyMemberRequest(Employee entity, TeamRosterMemberRequest request) {
@@ -1254,6 +1297,8 @@ public class TeamRosterService {
                         m.getId(), m.getProfilePicture(), m.getUpdatedAt()))
                 .status(m.getStatus())
                 .employmentType(m.getEmploymentType())
+                .departmentId(m.getDepartment() != null ? m.getDepartment().getId() : null)
+                .departmentName(m.getDepartment() != null ? m.getDepartment().getName() : null)
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
                 .createdBy(m.getCreatedBy())
@@ -1287,6 +1332,8 @@ public class TeamRosterService {
                         : null)
                 .workTypeId(employee.getWorkType() != null ? employee.getWorkType().getId() : null)
                 .workType(EmployeeRosterRefs.workTypeName(employee))
+                .departmentId(employee.getDepartment() != null ? employee.getDepartment().getId() : null)
+                .departmentName(EmployeeRosterRefs.departmentName(employee))
                 .countryId(employee.getCountry() != null ? employee.getCountry().getId() : null)
                 .country(EmployeeRosterRefs.countryLabel(employee))
                 .product(employee.getProduct())

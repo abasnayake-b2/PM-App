@@ -184,7 +184,7 @@ export interface Allocation {
   issueId?: string;
   issueTitle?: string;
   issueDisplayKey?: string;
-  projectId: string;
+  projectId?: string;
   projectName: string;
   projectTaskId?: string;
   projectTaskKey?: string;
@@ -192,6 +192,12 @@ export interface Allocation {
   rdIssueTaskId?: string;
   rdIssueTaskKey?: string;
   rdIssueTaskDescription?: string;
+  taskTypeId?: string;
+  taskTypeName?: string;
+  taskCategoryId?: string;
+  taskCategoryName?: string;
+  nonProjectTaskId?: string;
+  nonProjectTaskDescription?: string;
   roleOnProject?: string;
   percentage: number;
   fromDate: string;
@@ -288,13 +294,23 @@ export interface UtilisationSnapshot {
 export interface OrgWorkforceSummary {
   employeeCount: number;
   cxoCount: number;
+  engineeringCount?: number;
+  deliveryCount?: number;
+  coeCount?: number;
   vpCount: number;
   engineeringManagerCount: number;
+  deliveryManagerCount?: number;
+  coeManagerCount?: number;
   projectCount: number;
   employees?: EmOrgEngineerItem[];
   cxos?: EmOrgEngineerItem[];
+  engineering?: EmOrgEngineerItem[];
+  delivery?: EmOrgEngineerItem[];
+  coe?: EmOrgEngineerItem[];
   vps?: EmOrgEngineerItem[];
   engineeringManagers?: EmOrgEngineerItem[];
+  deliveryManagers?: EmOrgEngineerItem[];
+  coeManagers?: EmOrgEngineerItem[];
   projects?: OrgBreakdownProject[];
 }
 
@@ -308,9 +324,13 @@ export interface VpOrgBreakdownRow {
   vpId: string;
   vpName: string;
   engineeringManagerCount: number;
+  deliveryManagerCount?: number;
+  coeManagerCount?: number;
   engineerCount: number;
   projectCount: number;
   engineeringManagers?: EmOrgEngineerItem[];
+  deliveryManagers?: EmOrgEngineerItem[];
+  coeManagers?: EmOrgEngineerItem[];
   engineers?: EmOrgEngineerItem[];
   projects?: OrgBreakdownProject[];
 }
@@ -337,6 +357,8 @@ export interface DashboardOverview {
   orgWorkforce?: OrgWorkforceSummary;
   vpBreakdown?: VpOrgBreakdownRow[];
   emBreakdown?: EmOrgBreakdownRow[];
+  dmBreakdown?: EmOrgBreakdownRow[];
+  coeBreakdown?: EmOrgBreakdownRow[];
   generatedAt: string;
 }
 
@@ -408,8 +430,12 @@ export interface CapacityUtilisationDashboard {
   overAllocated: OverAllocatedPerson[];
   available: AvailablePerson[];
   byEngineeringManager: GroupUtilisationBar[];
+  byDeliveryManager?: GroupUtilisationBar[];
+  byCoeManager?: GroupUtilisationBar[];
   byTeam: GroupUtilisationBar[];
   heatmap: AllocationHeatmap;
+  heatmapDeliveryManagers?: AllocationHeatmap;
+  heatmapCoeManagers?: AllocationHeatmap;
   peopleCount: number;
   asOf: string;
   heatmapFrom: string;

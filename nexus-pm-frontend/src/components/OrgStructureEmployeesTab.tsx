@@ -15,6 +15,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import type { TeamRosterMember } from '@/api/teamRoster.api';
 import { downloadRosterExcel, downloadRosterPdf } from '@/utils/orgStructureRosterExport';
+import { isActiveRosterStatus } from '@/utils/rosterStatus';
 
 const HEADERS = [
   '#',
@@ -22,7 +23,7 @@ const HEADERS = [
   'Code',
   'Designation',
   'Team',
-  'EM',
+  'Manager',
   'NTP/GBL',
   'Country',
   'Product',
@@ -43,7 +44,11 @@ export function OrgStructureEmployeesTab() {
   const [editing, setEditing] = useState<TeamRosterMember | null>(null);
   const [selected, setSelected] = useState<TeamRosterMember | null>(null);
 
-  const { data: rows = [], isLoading, error } = useTeamRosterMembers(search);
+  const { data: memberRows = [], isLoading, error } = useTeamRosterMembers(search);
+  const rows = useMemo(
+    () => memberRows.filter((row) => isActiveRosterStatus(row.status)),
+    [memberRows],
+  );
   const filters = useRosterMemberFilters(rows);
   const visibleRows = filters.filteredRows;
   const updateRow = useUpdateTeamRosterMember(editing?.id ?? '');

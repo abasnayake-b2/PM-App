@@ -57,6 +57,8 @@ public class CacheWarmupRunner {
         try {
             lookupService.listPriorities();
             lookupService.listIssueTypes();
+            lookupService.listTaskTypes();
+            lookupService.listTaskCategories();
             lookupService.listStatuses();
             referenceDataService.listDepartments();
             referenceDataService.listStreams();
@@ -65,6 +67,8 @@ public class CacheWarmupRunner {
             referenceDataService.listWorkTypes();
             referenceDataService.listRoles();
             referenceDataService.listIssueTypes();
+            referenceDataService.listTaskTypes();
+            referenceDataService.listTaskCategories();
             referenceDataService.listIssueStatuses();
             referenceDataService.listPriorities();
             orgHierarchyService.listOrgLevels();

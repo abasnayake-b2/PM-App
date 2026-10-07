@@ -5,6 +5,8 @@ public final class CacheNames {
 
     public static final String PRIORITIES = "priorities";
     public static final String ISSUE_TYPES = "issue-types";
+    public static final String TASK_TYPES = "task-types";
+    public static final String TASK_CATEGORIES = "task-categories";
     public static final String ISSUE_STATUSES = "issue-statuses";
     public static final String DEPARTMENTS = "departments";
     public static final String STREAMS = "streams";
@@ -24,6 +26,8 @@ public final class CacheNames {
     public static final String[] ALL = {
             PRIORITIES,
             ISSUE_TYPES,
+            TASK_TYPES,
+            TASK_CATEGORIES,
             ISSUE_STATUSES,
             DEPARTMENTS,
             STREAMS,

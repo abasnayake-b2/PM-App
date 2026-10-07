@@ -9,13 +9,16 @@ import { TeamMemberPanel } from '@/components/TeamMemberPanel';
 import { useCapacity, useAllocations, useUpdateAllocation } from '@/hooks/useResources';
 import { exportCapacityTimeline } from '@/api/resources.api';
 import { fetchRosterDesignations, fetchRosterStreams } from '@/api/rosterLookups.api';
-import { fetchEngineeringManagers } from '@/api/teamRoster.api';
+import { fetchEngineeringManagers, fetchTeamManagement } from '@/api/teamRoster.api';
 import { useIssues } from '@/hooks/useIssues';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { isManagerOrAboveRole, hasOrgWideVisibility, isScopedEngineeringManagerRole, isDeliveryManagerRole } from '@/utils/orgRoles';
 import { defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
+import { groupedManagerNames } from '@/utils/managementRoles';
+import { isActiveRosterStatus } from '@/utils/rosterStatus';
+import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
 import type { Capacity } from '@/types';
 
 type ViewMode = 'cards' | 'grid' | 'timeline';
@@ -90,6 +93,15 @@ export function ResourcesPage() {
     queryFn: fetchEngineeringManagers,
     enabled: showTeamCapacity,
   });
+  const { data: management = [] } = useQuery({
+    queryKey: ['team-management'],
+    queryFn: () => fetchTeamManagement(),
+    enabled: showTeamCapacity,
+  });
+  const managerGroups = useMemo(
+    () => groupedManagerNames(management, engineeringManagers),
+    [management, engineeringManagers],
+  );
   const linkedEmployeeId = selectedRow?.employeeId;
   const { data: assignedIssues, isLoading: assignedIssuesLoading } = useIssues(
     { assignedToId: linkedEmployeeId },
@@ -103,12 +115,14 @@ export function ResourcesPage() {
   const filteredCapacity = useMemo(() => {
     if (!capacity) return [];
     const sortKey = (value?: string) => (value?.trim() ? value.trim().toLowerCase() : '\uffff');
-    return [...capacity].sort(
-      (a, b) =>
-        sortKey(a.vpName).localeCompare(sortKey(b.vpName)) ||
-        sortKey(a.engineeringManagerName).localeCompare(sortKey(b.engineeringManagerName)) ||
-        a.employeeName.localeCompare(b.employeeName),
-    );
+    return capacity
+      .filter((row) => isActiveRosterStatus(row.status))
+      .sort(
+        (a, b) =>
+          sortKey(a.vpName).localeCompare(sortKey(b.vpName)) ||
+          sortKey(a.engineeringManagerName).localeCompare(sortKey(b.engineeringManagerName)) ||
+          a.employeeName.localeCompare(b.employeeName),
+      );
   }, [capacity]);
 
   const selectedEmployeeCapacity = useMemo(() => {
@@ -254,21 +268,17 @@ export function ResourcesPage() {
         </label>
 
         <label className="text-sm">
-          <span className="text-text2">Engineering manager</span>
+          <span className="text-text2">Manager</span>
           <select
             value={engineeringManagerFilter}
             onChange={(e) => setEngineeringManagerFilter(e.target.value)}
             disabled={locksEmFilter}
-            className="mt-1 block min-w-[10rem] max-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm disabled:opacity-70"
+            className="mt-1 block min-w-[12rem] max-w-[18rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm disabled:opacity-70"
           >
             <option value="">
               {isScopedManager && !locksEmFilter ? 'Your EM team' : 'All managers'}
             </option>
-            {engineeringManagers.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
+            <ManagerNameOptGroups groups={managerGroups} />
           </select>
         </label>
 

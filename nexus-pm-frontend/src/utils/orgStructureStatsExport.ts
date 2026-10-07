@@ -7,6 +7,7 @@ export type OrgStatsExportRow = {
   subLabel?: string;
   vpName?: string;
   counts: Record<string, number>;
+  groupCounts?: Record<string, Record<string, number>>;
   total: number;
 };
 
@@ -20,6 +21,10 @@ export type OrgStatsExportTable = {
   rows: OrgStatsExportRow[];
   /** EM grid: col A = VP, col B = EM. Org/VP: col A = name, col B blank. */
   includeVpColumn?: boolean;
+  /** When set, designation codes are repeated under each department heading. */
+  columnGroups?: string[];
+  /** Designation codes that actually appear in each department. */
+  codesByGroup?: Record<string, string[]>;
 };
 
 /** Spreadsheet-style skill blocks: VP | EM | skill→codes… | Total headcount */
@@ -58,14 +63,36 @@ function cellCount(value: number | undefined) {
  *   Org/VP: [Name] [ ] [Details] [codes…] [Total]
  *   EM:     [VP]   [EM] [Details] [codes…] [Total]
  */
+function groupCodes(table: OrgStatsExportTable, group: string): string[] {
+  return table.codesByGroup?.[group] ?? [];
+}
+
+function countKeys(table: OrgStatsExportTable): string[] {
+  if (table.columnGroups?.length) {
+    return table.columnGroups.flatMap((group) =>
+      groupCodes(table, group).map((code) => `${group} · ${code}`),
+    );
+  }
+  return table.codes;
+}
+
+function rowCountValues(table: OrgStatsExportTable, row: OrgStatsExportRow): (string | number)[] {
+  if (table.columnGroups?.length) {
+    return table.columnGroups.flatMap((group) =>
+      groupCodes(table, group).map((code) => cellCount(row.groupCounts?.[group]?.[code])),
+    );
+  }
+  return table.codes.map((code) => cellCount(row.counts[code]));
+}
+
 function headerRow(table: OrgStatsExportTable): string[] {
-  return [table.primaryLabel, table.secondaryLabel, 'Details', ...table.codes, 'Total'];
+  return [table.primaryLabel, table.secondaryLabel, 'Details', ...countKeys(table), 'Total'];
 }
 
 function bodyRows(table: OrgStatsExportTable): (string | number)[][] {
-  const { codes, rows, includeVpColumn } = table;
+  const { rows, includeVpColumn } = table;
   return rows.map((row) => {
-    const counts = codes.map((code) => cellCount(row.counts[code]));
+    const counts = rowCountValues(table, row);
     if (includeVpColumn) {
       return [row.vpName ?? '', row.label, row.subLabel ?? '', ...counts, row.total];
     }
@@ -74,11 +101,15 @@ function bodyRows(table: OrgStatsExportTable): (string | number)[][] {
 }
 
 function totalRow(table: OrgStatsExportTable): (string | number)[] {
-  const { codes, rows } = table;
-  const columnTotals = codes.map((code) =>
-    rows.reduce((sum, row) => sum + (row.counts[code] ?? 0), 0),
+  const keys = countKeys(table);
+  const columnTotals = keys.map((_, index) =>
+    table.rows.reduce((sum, row) => {
+      const values = rowCountValues(table, row);
+      const value = values[index];
+      return sum + (typeof value === 'number' ? value : 0);
+    }, 0),
   );
-  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
+  const grandTotal = table.rows.reduce((sum, row) => sum + row.total, 0);
   return [
     'Total',
     '',
@@ -134,7 +165,13 @@ export async function downloadOrgStatsExcel(
 ) {
   if (tables.length === 0 && !skillMatrix?.skills.length) return;
 
-  const codes = tables[0]?.codes ?? skillMatrix?.codes ?? [];
+  const firstTable = tables[0];
+  const valueCols = firstTable?.columnGroups?.length
+    ? firstTable.columnGroups.reduce(
+        (sum, group) => sum + (firstTable.codesByGroup?.[group]?.length ?? 0),
+        0,
+      )
+    : (firstTable?.codes ?? skillMatrix?.codes ?? []).length;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'DFN-PlanX';
   const sheet = workbook.addWorksheet('Org structure stats', {
@@ -144,10 +181,10 @@ export async function downloadOrgStatsExcel(
   sheet.getColumn(1).width = 26;
   sheet.getColumn(2).width = 26;
   sheet.getColumn(3).width = 58;
-  codes.forEach((_, i) => {
+  for (let i = 0; i < valueCols; i++) {
     sheet.getColumn(4 + i).width = 8;
-  });
-  sheet.getColumn(4 + codes.length).width = 9;
+  }
+  sheet.getColumn(4 + valueCols).width = 9;
 
   let rowNum = 1;
   const titleRow = sheet.getRow(rowNum);

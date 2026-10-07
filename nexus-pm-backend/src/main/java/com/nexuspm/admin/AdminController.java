@@ -8,6 +8,8 @@ import com.nexuspm.issue.field.dto.UpdateIssueFieldDefinitionRequest;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.TaskCategory;
+import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.user.entity.Department;
 import com.nexuspm.user.dto.DesignationResponse;
 import com.nexuspm.user.dto.StreamResponse;
@@ -346,6 +348,58 @@ public class AdminController {
     @PreAuthorize("@perm.can('REFERENCE_DELETE')")
     public void deleteIssueType(@PathVariable UUID id) {
         referenceDataService.deleteIssueType(id);
+    }
+
+    @GetMapping("/reference/task-types")
+    @PreAuthorize("@perm.can('REFERENCE_VIEW')")
+    public List<TaskType> listReferenceTaskTypes() {
+        return referenceDataService.listTaskTypes();
+    }
+
+    @PostMapping("/reference/task-types")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perm.can('REFERENCE_CREATE')")
+    public TaskType createTaskType(@Valid @RequestBody TaskTypeRequest request) {
+        return referenceDataService.createTaskType(request.getName(), request.getDescription());
+    }
+
+    @PutMapping("/reference/task-types/{id}")
+    @PreAuthorize("@perm.can('REFERENCE_UPDATE')")
+    public TaskType updateTaskType(@PathVariable UUID id, @Valid @RequestBody TaskTypeRequest request) {
+        return referenceDataService.updateTaskType(id, request.getName(), request.getDescription());
+    }
+
+    @DeleteMapping("/reference/task-types/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perm.can('REFERENCE_DELETE')")
+    public void deleteTaskType(@PathVariable UUID id) {
+        referenceDataService.deleteTaskType(id);
+    }
+
+    @GetMapping("/reference/task-categories")
+    @PreAuthorize("@perm.can('REFERENCE_VIEW')")
+    public List<TaskCategory> listReferenceTaskCategories() {
+        return referenceDataService.listTaskCategories();
+    }
+
+    @PostMapping("/reference/task-categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perm.can('REFERENCE_CREATE')")
+    public TaskCategory createTaskCategory(@Valid @RequestBody TaskCategoryRequest request) {
+        return referenceDataService.createTaskCategory(request.getName(), request.getDescription());
+    }
+
+    @PutMapping("/reference/task-categories/{id}")
+    @PreAuthorize("@perm.can('REFERENCE_UPDATE')")
+    public TaskCategory updateTaskCategory(@PathVariable UUID id, @Valid @RequestBody TaskCategoryRequest request) {
+        return referenceDataService.updateTaskCategory(id, request.getName(), request.getDescription());
+    }
+
+    @DeleteMapping("/reference/task-categories/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perm.can('REFERENCE_DELETE')")
+    public void deleteTaskCategory(@PathVariable UUID id) {
+        referenceDataService.deleteTaskCategory(id);
     }
 
     @GetMapping("/reference/statuses")

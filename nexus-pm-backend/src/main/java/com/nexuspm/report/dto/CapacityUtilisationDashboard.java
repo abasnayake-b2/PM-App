@@ -14,8 +14,12 @@ public class CapacityUtilisationDashboard {
     private List<OverAllocatedPerson> overAllocated;
     private List<AvailablePerson> available;
     private List<GroupUtilisationBar> byEngineeringManager;
+    private List<GroupUtilisationBar> byDeliveryManager;
+    private List<GroupUtilisationBar> byCoeManager;
     private List<GroupUtilisationBar> byTeam;
     private AllocationHeatmap heatmap;
+    private AllocationHeatmap heatmapDeliveryManagers;
+    private AllocationHeatmap heatmapCoeManagers;
     private int peopleCount;
     private String asOf;
     private String heatmapFrom;

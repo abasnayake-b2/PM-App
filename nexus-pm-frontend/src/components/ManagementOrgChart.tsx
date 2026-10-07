@@ -4,10 +4,13 @@ import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useTeamManagement, useTeamRosterMembers } from '@/hooks/useTeamRoster';
 import type { TeamManagement, TeamRosterMember } from '@/api/teamRoster.api';
+import { isActiveRosterStatus } from '@/utils/rosterStatus';
 import { TeamManagementPanel } from '@/components/TeamManagementPanel';
 import { TeamRosterMemberPanel } from '@/components/TeamRosterMemberPanel';
 import {
+  isCoeManagerTitle,
   isCxoRole,
+  isDeliveryManagerTitle,
   isEngineeringManagerRole,
   isVpRole,
   resolveSupervisorId,
@@ -49,7 +52,13 @@ type Band = 'cxo' | 'vp' | 'manager' | 'engineer' | 'other';
 function roleBand(roleTitle: string): Band {
   if (isCxoRole(roleTitle)) return 'cxo';
   if (isVpRole(roleTitle)) return 'vp';
-  if (isEngineeringManagerRole(roleTitle)) return 'manager';
+  if (
+    isCoeManagerTitle(roleTitle) ||
+    isDeliveryManagerTitle(roleTitle) ||
+    isEngineeringManagerRole(roleTitle)
+  ) {
+    return 'manager';
+  }
   return 'other';
 }
 
@@ -76,6 +85,9 @@ function shortManagementLabel(roleTitle: string): string {
   if (isVpRole(title)) {
     const compact = title.replace(/vice\s*president/i, 'VP').replace(/\s+/g, ' ').trim();
     return /^vp$/i.test(compact) ? 'VP' : compact;
+  }
+  if (isCoeManagerTitle(title)) {
+    return 'COE';
   }
   if (/senior\s*delivery\s*manager|software\s*delivery\s*manager/i.test(title)) {
     return 'SDM';
@@ -320,8 +332,16 @@ function ChartBranch({
 }
 
 export function ManagementOrgChart() {
-  const { data: management = [], isLoading: managementLoading } = useTeamManagement();
-  const { data: members = [], isLoading: membersLoading } = useTeamRosterMembers();
+  const { data: managementRows = [], isLoading: managementLoading } = useTeamManagement();
+  const { data: memberRows = [], isLoading: membersLoading } = useTeamRosterMembers();
+  const management = useMemo(
+    () => managementRows.filter((person) => isActiveRosterStatus(person.status)),
+    [managementRows],
+  );
+  const members = useMemo(
+    () => memberRows.filter((member) => isActiveRosterStatus(member.status)),
+    [memberRows],
+  );
   const [showEmployees, setShowEmployees] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState<'jpeg' | 'pdf' | null>(null);

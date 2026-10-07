@@ -106,6 +106,16 @@ public class GlobalExceptionHandler {
                     || message.contains("vp_management_id") || message.contains("engineering_manager_management_id")) {
                 detail = "This management person is assigned as VP or Engineering Manager on one or more projects. "
                         + "Remove or reassign them on those projects before deleting.";
+            } else if (message.contains("cannot be null")) {
+                detail = "A required field is missing";
+                int colStart = message.indexOf("Column '");
+                if (colStart >= 0) {
+                    int nameStart = colStart + 8;
+                    int nameEnd = message.indexOf('\'', nameStart);
+                    if (nameEnd > nameStart) {
+                        detail = "Required field is missing: " + message.substring(nameStart, nameEnd);
+                    }
+                }
             } else if (message.contains("Duplicate entry")) {
                 int start = message.indexOf('\'');
                 int end = message.indexOf('\'', start + 1);

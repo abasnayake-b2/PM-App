@@ -13,6 +13,8 @@ export interface TeamManagement {
   profilePictureUrl?: string | null;
   status: string;
   employmentType?: string | null;
+  departmentId?: string | null;
+  departmentName?: string | null;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -35,6 +37,8 @@ export interface TeamRosterMember {
   managementRoleTitle?: string;
   workTypeId?: string;
   workType?: string;
+  departmentId?: string;
+  departmentName?: string;
   countryId?: string;
   country?: string;
   product?: string;
@@ -83,6 +87,7 @@ export interface TeamManagementPayload {
   supervisorId?: string;
   status?: string;
   employmentType?: string;
+  departmentId?: string;
 }
 
 export interface TeamRosterMemberPayload {
@@ -109,9 +114,15 @@ export interface TeamRosterMemberPayload {
   experienceInDfn?: number | null;
 }
 
-export async function fetchTeamManagement(search?: string): Promise<TeamManagement[]> {
+export async function fetchTeamManagement(
+  search?: string,
+  includeInactive = false,
+): Promise<TeamManagement[]> {
   const { data } = await api.get<TeamManagement[]>('/team-roster/management', {
-    params: { search: search || undefined },
+    params: {
+      search: search || undefined,
+      includeInactive: includeInactive || undefined,
+    },
   });
   return data;
 }
@@ -150,9 +161,15 @@ export async function deleteTeamManagementPhoto(id: string): Promise<TeamManagem
   return data;
 }
 
-export async function fetchTeamRosterMembers(search?: string): Promise<TeamRosterMember[]> {
+export async function fetchTeamRosterMembers(
+  search?: string,
+  includeInactive = false,
+): Promise<TeamRosterMember[]> {
   const { data } = await api.get<TeamRosterMember[]>('/team-roster/members', {
-    params: { search: search || undefined },
+    params: {
+      search: search || undefined,
+      includeInactive: includeInactive || undefined,
+    },
   });
   return data;
 }

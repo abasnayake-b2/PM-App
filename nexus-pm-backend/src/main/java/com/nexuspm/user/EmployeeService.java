@@ -54,6 +54,7 @@ public class EmployeeService {
         if (!SecurityUtils.hasOrgWideVisibility()) {
             List<Employee> team = managerTeamService.resolveTeam(SecurityUtils.currentUserId());
             List<EmployeeResponse> filtered = team.stream()
+                    .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                     .filter(employee -> term == null
                             || employee.getFullName().toLowerCase().contains(term.toLowerCase())
                             || employee.getEmail().toLowerCase().contains(term.toLowerCase()))

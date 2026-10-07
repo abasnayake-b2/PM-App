@@ -3,9 +3,13 @@ package com.nexuspm.lookup;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.TaskCategory;
+import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
+import com.nexuspm.lookup.repository.TaskCategoryRepository;
+import com.nexuspm.lookup.repository.TaskTypeRepository;
 import com.nexuspm.shared.cache.CacheNames;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -21,6 +25,8 @@ public class LookupService {
     private final PriorityRepository priorityRepository;
     private final IssueTypeRepository issueTypeRepository;
     private final IssueStatusRepository issueStatusRepository;
+    private final TaskTypeRepository taskTypeRepository;
+    private final TaskCategoryRepository taskCategoryRepository;
 
     @Cacheable(cacheNames = CacheNames.PRIORITIES, key = "'all'")
     @Transactional(readOnly = true)
@@ -32,6 +38,18 @@ public class LookupService {
     @Transactional(readOnly = true)
     public List<IssueType> listIssueTypes() {
         return IssueTypeCatalog.filterAndSort(issueTypeRepository.findAll());
+    }
+
+    @Cacheable(cacheNames = CacheNames.TASK_TYPES, key = "'all'")
+    @Transactional(readOnly = true)
+    public List<TaskType> listTaskTypes() {
+        return taskTypeRepository.findAllByOrderBySortOrderAscNameAsc();
+    }
+
+    @Cacheable(cacheNames = CacheNames.TASK_CATEGORIES, key = "'all'")
+    @Transactional(readOnly = true)
+    public List<TaskCategory> listTaskCategories() {
+        return taskCategoryRepository.findAllByOrderBySortOrderAscNameAsc();
     }
 
     @Cacheable(cacheNames = CacheNames.ISSUE_STATUSES, key = "'all'")

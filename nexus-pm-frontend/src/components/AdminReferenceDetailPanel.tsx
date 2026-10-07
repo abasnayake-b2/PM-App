@@ -8,6 +8,8 @@ export type RefTab =
   | 'work-types'
   | 'skills'
   | 'issue-types'
+  | 'task-types'
+  | 'task-categories'
   | 'statuses'
   | 'priorities';
 
@@ -52,6 +54,16 @@ function detailFields(tab: RefTab, item: ReferenceItem): { label: string; value?
       return [
         { label: 'Name', value: item.name },
         { label: 'Workflow code', value: item.workflowCode },
+        { label: 'Description', value: item.description },
+      ];
+    case 'task-types':
+      return [
+        { label: 'Name', value: item.name },
+        { label: 'Description', value: item.description },
+      ];
+    case 'task-categories':
+      return [
+        { label: 'Name', value: item.name },
         { label: 'Description', value: item.description },
       ];
     case 'statuses':

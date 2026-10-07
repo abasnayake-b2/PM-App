@@ -21,6 +21,8 @@ public class TeamManagementResponse {
     private String profilePictureUrl;
     private String status;
     private String employmentType;
+    private UUID departmentId;
+    private String departmentName;
     private Instant createdAt;
     private Instant updatedAt;
     private UUID createdBy;

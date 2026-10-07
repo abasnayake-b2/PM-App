@@ -17,6 +17,7 @@ import {
   useUploadTeamRosterMemberPhoto,
 } from '@/hooks/useTeamRoster';
 import { EMPLOYMENT_TYPE_OPTIONS } from '@/utils/employmentType';
+import { partitionManagersByType } from '@/utils/managementRoles';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -156,22 +157,33 @@ export function TeamRosterMemberForm({
     queryFn: fetchRosterSkills,
   });
 
-  const emOptions = useMemo(() => {
-    const options = [...managers].sort((a, b) => a.fullName.localeCompare(b.fullName));
+  const managerGroups = useMemo(() => {
+    const active = managers.filter((m) => (m.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE');
+    const groups = partitionManagersByType(active);
+    const byName = <T extends { fullName: string }>(a: T, b: T) =>
+      a.fullName.localeCompare(b.fullName);
+    const engineering = [...groups.engineering].sort(byName);
+    const delivery = [...groups.delivery].sort(byName);
+    const coe = [...groups.coe].sort(byName);
+    const listedIds = new Set([...engineering, ...delivery, ...coe].map((m) => m.id));
+    const other: typeof managers = [];
     if (
       initial?.engineeringManagerManagementId &&
-      !options.some((m) => m.id === initial.engineeringManagerManagementId)
+      !listedIds.has(initial.engineeringManagerManagementId)
     ) {
-      options.unshift({
-        id: initial.engineeringManagerManagementId,
-        fullName: initial.engineeringManagerName ?? 'Imported manager',
-        roleTitle: '',
-        firstName: '',
-        lastName: '',
-        status: 'ACTIVE',
-      });
+      const existing =
+        managers.find((m) => m.id === initial.engineeringManagerManagementId) ??
+        ({
+          id: initial.engineeringManagerManagementId,
+          fullName: initial.engineeringManagerName ?? 'Imported manager',
+          roleTitle: '',
+          firstName: '',
+          lastName: '',
+          status: 'ACTIVE',
+        } as (typeof managers)[number]);
+      other.push(existing);
     }
-    return options;
+    return { engineering, delivery, coe, other };
   }, [managers, initial]);
 
   const designationOptions = useMemo(() => {
@@ -267,7 +279,11 @@ export function TeamRosterMemberForm({
     const workType = workTypes.find((w) => w.id === workTypeId);
     const country = countryOptions.find((c) => c.id === countryId);
     const rawCountry = parseRawCountryId(countryId);
-    const emManager = emOptions.find((m) => m.id === emManagementId);
+    const emManager =
+      managerGroups.engineering.find((m) => m.id === emManagementId) ??
+      managerGroups.delivery.find((m) => m.id === emManagementId) ??
+      managerGroups.coe.find((m) => m.id === emManagementId) ??
+      managerGroups.other.find((m) => m.id === emManagementId);
     const totalYearsOfExperience = parseYears(fd.get('totalYearsOfExperience'));
     const experienceInDfn = parseYears(fd.get('experienceInDfn'));
     if (totalYearsOfExperience === undefined || experienceInDfn === undefined) {
@@ -439,14 +455,45 @@ export function TeamRosterMemberForm({
         </select>
       </label>
       <label className="block text-sm">
-        <span className="text-text2">Engineering manager (EM)</span>
+        <span className="text-text2">Manager</span>
         <select value={emManagementId} onChange={(e) => setEmManagementId(e.target.value)} className={selectClass}>
           <option value="">Select manager…</option>
-          {emOptions.map((manager) => (
-            <option key={manager.id} value={manager.id}>
-              {manager.fullName}
-            </option>
-          ))}
+          {managerGroups.engineering.length > 0 && (
+            <optgroup label="Engineering Managers">
+              {managerGroups.engineering.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.fullName}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {managerGroups.delivery.length > 0 && (
+            <optgroup label="Delivery Managers">
+              {managerGroups.delivery.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.fullName}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {managerGroups.coe.length > 0 && (
+            <optgroup label="COE Managers">
+              {managerGroups.coe.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.fullName}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {managerGroups.other.length > 0 && (
+            <optgroup label="Other">
+              {managerGroups.other.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.fullName}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </label>
       <div className="grid gap-3 sm:grid-cols-2">

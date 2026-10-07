@@ -3,11 +3,14 @@ package com.nexuspm.resource.mapper;
 import com.nexuspm.issue.IssueDisplayKeys;
 import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.entity.RdIssueTask;
+import com.nexuspm.lookup.entity.TaskCategory;
+import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.entity.ProjectTask;
 import com.nexuspm.resource.dto.AllocationResponse;
 import com.nexuspm.resource.dto.TimeLogResponse;
 import com.nexuspm.resource.entity.Allocation;
+import com.nexuspm.resource.entity.NonProjectTask;
 import com.nexuspm.resource.entity.TimeLog;
 import com.nexuspm.user.entity.Employee;
 import org.springframework.stereotype.Component;
@@ -21,8 +24,11 @@ public class ResourceMapper {
         RdIssue issue = allocation.getIssue();
         ProjectTask projectTask = allocation.getProjectTask();
         RdIssueTask rdTask = allocation.getRdIssueTask();
+        TaskType taskType = allocation.getTaskType();
+        TaskCategory taskCategory = allocation.getTaskCategory();
+        NonProjectTask nonProjectTask = allocation.getNonProjectTask();
 
-        String projectTaskKey = projectTask != null
+        String projectTaskKey = projectTask != null && project != null
                 ? IssueDisplayKeys.projectTaskKey(project, projectTask.getTaskNumber())
                 : null;
         String rdTaskKey = rdTask != null
@@ -34,16 +40,22 @@ public class ResourceMapper {
                 .employeeId(employee.getId())
                 .employeeName(employee.getFirstName() + " " + employee.getLastName())
                 .issueId(issue != null ? issue.getId() : null)
-                .issueTitle(targetTitle(allocation, project, issue, projectTask, rdTask, projectTaskKey, rdTaskKey))
+                .issueTitle(targetTitle(allocation, project, issue, projectTask, rdTask, nonProjectTask, projectTaskKey, rdTaskKey))
                 .issueDisplayKey(issue != null ? issue.getDisplayKey() : null)
-                .projectId(project.getId())
-                .projectName(project.getName())
+                .projectId(project != null ? project.getId() : null)
+                .projectName(project != null ? project.getName() : (taskCategory != null ? taskCategory.getName() : "Non-project"))
                 .projectTaskId(projectTask != null ? projectTask.getId() : null)
                 .projectTaskKey(projectTaskKey)
                 .projectTaskDescription(projectTask != null ? projectTask.getDescription() : null)
                 .rdIssueTaskId(rdTask != null ? rdTask.getId() : null)
                 .rdIssueTaskKey(rdTaskKey)
                 .rdIssueTaskDescription(rdTask != null ? rdTask.getDescription() : null)
+                .taskTypeId(taskType != null ? taskType.getId() : null)
+                .taskTypeName(taskType != null ? taskType.getName() : null)
+                .taskCategoryId(taskCategory != null ? taskCategory.getId() : null)
+                .taskCategoryName(taskCategory != null ? taskCategory.getName() : null)
+                .nonProjectTaskId(nonProjectTask != null ? nonProjectTask.getId() : null)
+                .nonProjectTaskDescription(nonProjectTask != null ? nonProjectTask.getDescription() : null)
                 .roleOnProject(allocation.getRoleOnProject())
                 .percentage(allocation.getPercentage())
                 .fromDate(allocation.getFromDate())
@@ -77,13 +89,14 @@ public class ResourceMapper {
         RdIssue issue = allocation.getIssue();
         ProjectTask projectTask = allocation.getProjectTask();
         RdIssueTask rdTask = allocation.getRdIssueTask();
+        NonProjectTask nonProjectTask = allocation.getNonProjectTask();
         String projectTaskKey = projectTask != null && project != null
                 ? IssueDisplayKeys.projectTaskKey(project, projectTask.getTaskNumber())
                 : null;
         String rdTaskKey = rdTask != null
                 ? IssueDisplayKeys.rdTaskKey(issue != null ? issue.getDisplayKey() : null, rdTask.getTaskNumber())
                 : null;
-        return targetTitle(allocation, project, issue, projectTask, rdTask, projectTaskKey, rdTaskKey);
+        return targetTitle(allocation, project, issue, projectTask, rdTask, nonProjectTask, projectTaskKey, rdTaskKey);
     }
 
     private static String targetTitle(
@@ -92,8 +105,15 @@ public class ResourceMapper {
             RdIssue issue,
             ProjectTask projectTask,
             RdIssueTask rdTask,
+            NonProjectTask nonProjectTask,
             String projectTaskKey,
             String rdTaskKey) {
+        if (nonProjectTask != null) {
+            String desc = nonProjectTask.getDescription() != null ? nonProjectTask.getDescription().trim() : "";
+            if (!desc.isEmpty()) {
+                return desc;
+            }
+        }
         if (rdTask != null) {
             String desc = rdTask.getDescription() != null ? rdTask.getDescription().trim() : "";
             return desc.isEmpty() ? rdTaskKey : rdTaskKey + " — " + desc;

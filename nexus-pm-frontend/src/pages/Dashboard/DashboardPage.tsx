@@ -215,11 +215,11 @@ export function DashboardPage() {
             <section className="card flex h-full min-h-0 flex-col overflow-hidden p-0">
               <div className="shrink-0 border-b border-border px-5 py-4">
                 <h2 className="font-semibold">Organisation overview</h2>
-                <p className="mt-1 text-sm text-text2">Workforce and project totals</p>
+                <p className="mt-1 text-sm text-text2">Headcount by organisation</p>
               </div>
-              <dl className="flex min-h-0 flex-1 flex-col justify-start gap-3 px-5 py-5">
-                <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
-                  <dt className="text-sm text-text2"># Engineers</dt>
+              <dl className="flex min-h-0 flex-1 flex-col justify-start px-5 py-2">
+                <div className="flex items-center justify-between gap-4 border-b border-border py-1.5">
+                  <dt className="text-sm text-text2"># Employees</dt>
                   <dd className="text-xl tabular-nums">
                     {isLoading ? (
                       '…'
@@ -227,14 +227,14 @@ export function DashboardPage() {
                       <CountPanelTrigger
                         count={data?.orgWorkforce?.employeeCount ?? 0}
                         groups={groupEngineersByDesignation(data?.orgWorkforce?.employees ?? [])}
-                        label="Engineers"
+                        label="Employees"
                         subtitle="Organisation overview"
                         onOpen={setBreakdownPanel}
                       />
                     )}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
+                <div className="flex items-center justify-between gap-4 border-b border-border py-1.5">
                   <dt className="text-sm text-text2"># CXO</dt>
                   <dd className="text-xl tabular-nums">
                     {isLoading ? (
@@ -250,7 +250,7 @@ export function DashboardPage() {
                     )}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
+                <div className="flex items-center justify-between gap-4 border-b border-border py-1.5">
                   <dt className="text-sm text-text2"># VP</dt>
                   <dd className="text-xl tabular-nums">
                     {isLoading ? (
@@ -266,25 +266,55 @@ export function DashboardPage() {
                     )}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-b border-border pb-2.5">
-                  <dt className="text-sm text-text2"># of Engineering Manager</dt>
+                <div className="flex items-center justify-between gap-4 border-b border-border py-1.5">
+                  <dt className="text-sm text-text2"># Engineering</dt>
                   <dd className="text-xl tabular-nums">
                     {isLoading ? (
                       '…'
                     ) : (
                       <CountPanelTrigger
-                        count={data?.orgWorkforce?.engineeringManagerCount ?? 0}
-                        groups={groupEngineersByDesignation(
-                          data?.orgWorkforce?.engineeringManagers ?? [],
-                        )}
-                        label="Engineering managers"
+                        count={data?.orgWorkforce?.engineeringCount ?? 0}
+                        groups={groupEngineersByDesignation(data?.orgWorkforce?.engineering ?? [])}
+                        label="Engineering"
                         subtitle="Organisation overview"
                         onOpen={setBreakdownPanel}
                       />
                     )}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4 border-b border-border py-1.5">
+                  <dt className="text-sm text-text2"># Delivery</dt>
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.deliveryCount ?? 0}
+                        groups={groupEngineersByDesignation(data?.orgWorkforce?.delivery ?? [])}
+                        label="Delivery"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-b border-border py-1.5">
+                  <dt className="text-sm text-text2"># COE</dt>
+                  <dd className="text-xl tabular-nums">
+                    {isLoading ? (
+                      '…'
+                    ) : (
+                      <CountPanelTrigger
+                        count={data?.orgWorkforce?.coeCount ?? 0}
+                        groups={groupEngineersByDesignation(data?.orgWorkforce?.coe ?? [])}
+                        label="COE"
+                        subtitle="Organisation overview"
+                        onOpen={setBreakdownPanel}
+                      />
+                    )}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 py-1.5">
                   <dt className="text-sm text-text2"># Projects</dt>
                   <dd className="text-xl tabular-nums">
                     {isLoading ? (
@@ -306,22 +336,26 @@ export function DashboardPage() {
             <section className="card flex h-full min-h-0 flex-col overflow-hidden p-0">
               <div className="shrink-0 border-b border-border px-5 py-4">
                 <h2 className="font-semibold">By VP</h2>
-                <p className="mt-1 text-sm text-text2">EMs, engineers, and projects by VP</p>
+                <p className="mt-1 text-sm text-text2">EMs, DMs, COE, engineers, and projects by VP</p>
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
                 <table className="w-full table-fixed text-left text-sm">
                   <colgroup>
                     <col className="w-9" />
                     <col />
-                    <col className="w-14" />
-                    <col className="w-14" />
-                    <col className="w-14" />
+                    <col className="w-12" />
+                    <col className="w-12" />
+                    <col className="w-12" />
+                    <col className="w-12" />
+                    <col className="w-12" />
                   </colgroup>
                   <thead className="sticky top-0 z-[1] bg-bg2 text-xs font-semibold uppercase tracking-wide text-text2">
                     <tr>
                       <th className="px-2 py-3">#</th>
                       <th className="px-2 py-3">VP</th>
                       <th className="px-2 py-3 text-right">EMs</th>
+                      <th className="px-2 py-3 text-right">DMs</th>
+                      <th className="px-2 py-3 text-right">COE</th>
                       <th className="px-2 py-3 text-right">Eng</th>
                       <th className="px-2 py-3 text-right">Proj</th>
                     </tr>
@@ -329,14 +363,14 @@ export function DashboardPage() {
                   <tbody>
                     {isLoading && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-6 text-text2">
+                        <td colSpan={7} className="px-4 py-6 text-text2">
                           Loading organisation data…
                         </td>
                       </tr>
                     )}
                     {!isLoading && (data?.vpBreakdown?.length ?? 0) === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-6 text-text2">
+                        <td colSpan={7} className="px-4 py-6 text-text2">
                           No VPs found. Import management roster with VP roles under Admin →
                           Management.
                         </td>
@@ -353,6 +387,24 @@ export function DashboardPage() {
                             count={row.engineeringManagerCount}
                             groups={groupEngineersByDesignation(row.engineeringManagers ?? [])}
                             label="Engineering managers"
+                            subtitle={row.vpName}
+                            onOpen={setBreakdownPanel}
+                          />
+                        </td>
+                        <td className="px-2 py-2.5 text-right tabular-nums">
+                          <CountPanelTrigger
+                            count={row.deliveryManagerCount ?? 0}
+                            groups={groupEngineersByDesignation(row.deliveryManagers ?? [])}
+                            label="Delivery managers"
+                            subtitle={row.vpName}
+                            onOpen={setBreakdownPanel}
+                          />
+                        </td>
+                        <td className="px-2 py-2.5 text-right tabular-nums">
+                          <CountPanelTrigger
+                            count={row.coeManagerCount ?? 0}
+                            groups={groupEngineersByDesignation(row.coeManagers ?? [])}
+                            label="COE managers"
                             subtitle={row.vpName}
                             onOpen={setBreakdownPanel}
                           />
@@ -393,6 +445,32 @@ export function DashboardPage() {
             />
           )}
 
+          {showCapacityUtilisation && (
+            <EmUtilisationWithHeatmap
+              title="By Delivery Manager"
+              nameColumn="DM"
+              emptyMessage="No delivery manager data."
+              utilRows={capacityQuery.data?.byDeliveryManager ?? []}
+              emBreakdown={data?.dmBreakdown}
+              heatmap={capacityQuery.data?.heatmapDeliveryManagers}
+              onOpenBreakdown={setBreakdownPanel}
+              weeksLabel={capacityRangeLabel}
+            />
+          )}
+
+          {showCapacityUtilisation && (
+            <EmUtilisationWithHeatmap
+              title="By COE Manager"
+              nameColumn="COE"
+              emptyMessage="No COE manager data."
+              utilRows={capacityQuery.data?.byCoeManager ?? []}
+              emBreakdown={data?.coeBreakdown}
+              heatmap={capacityQuery.data?.heatmapCoeManagers}
+              onOpenBreakdown={setBreakdownPanel}
+              weeksLabel={capacityRangeLabel}
+            />
+          )}
+
           {showCapacityUtilisation ? (
             <GroupBarsChart
               title="Utilisation by team"
@@ -418,6 +496,26 @@ export function DashboardPage() {
             utilRows={capacityQuery.data?.byEngineeringManager ?? []}
             emBreakdown={data?.emBreakdown}
             heatmap={capacityQuery.data?.heatmap}
+            onOpenBreakdown={setBreakdownPanel}
+            weeksLabel={capacityRangeLabel}
+          />
+          <EmUtilisationWithHeatmap
+            title="By Delivery Manager"
+            nameColumn="DM"
+            emptyMessage="No delivery manager data."
+            utilRows={capacityQuery.data?.byDeliveryManager ?? []}
+            emBreakdown={data?.dmBreakdown}
+            heatmap={capacityQuery.data?.heatmapDeliveryManagers}
+            onOpenBreakdown={setBreakdownPanel}
+            weeksLabel={capacityRangeLabel}
+          />
+          <EmUtilisationWithHeatmap
+            title="By COE Manager"
+            nameColumn="COE"
+            emptyMessage="No COE manager data."
+            utilRows={capacityQuery.data?.byCoeManager ?? []}
+            emBreakdown={data?.coeBreakdown}
+            heatmap={capacityQuery.data?.heatmapCoeManagers}
             onOpenBreakdown={setBreakdownPanel}
             weeksLabel={capacityRangeLabel}
           />

@@ -25,18 +25,18 @@ import {
   type DemoteManagementToEmployeePayload,
 } from '@/api/teamRoster.api';
 
-export function useTeamManagement(search = '', enabled = true) {
+export function useTeamManagement(search = '', enabled = true, includeInactive = false) {
   return useQuery({
-    queryKey: ['team-management', search],
-    queryFn: () => fetchTeamManagement(search),
+    queryKey: ['team-management', search, includeInactive],
+    queryFn: () => fetchTeamManagement(search, includeInactive),
     enabled,
   });
 }
 
-export function useTeamRosterMembers(search = '', enabled = true) {
+export function useTeamRosterMembers(search = '', enabled = true, includeInactive = false) {
   return useQuery({
-    queryKey: ['team-roster-members', search],
-    queryFn: () => fetchTeamRosterMembers(search),
+    queryKey: ['team-roster-members', search, includeInactive],
+    queryFn: () => fetchTeamRosterMembers(search, includeInactive),
     enabled,
   });
 }

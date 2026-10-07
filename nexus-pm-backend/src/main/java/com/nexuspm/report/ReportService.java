@@ -140,10 +140,14 @@ public class ReportService {
         OrgWorkforceSummary orgWorkforce = null;
         List<VpOrgBreakdownRow> vpBreakdown = List.of();
         List<EmOrgBreakdownRow> emBreakdown = List.of();
+        List<EmOrgBreakdownRow> dmBreakdown = List.of();
+        List<EmOrgBreakdownRow> coeBreakdown = List.of();
         if (scope.admin() || scope.engineeringPortfolioWide()) {
             orgWorkforce = orgWorkforceService.buildSummary();
             vpBreakdown = orgWorkforceService.buildVpBreakdown();
             emBreakdown = orgWorkforceService.buildEmBreakdown();
+            dmBreakdown = orgWorkforceService.buildDmBreakdown();
+            coeBreakdown = orgWorkforceService.buildCoeBreakdown();
         }
 
         return DashboardOverviewResponse.builder()
@@ -154,6 +158,8 @@ public class ReportService {
                 .orgWorkforce(orgWorkforce)
                 .vpBreakdown(vpBreakdown)
                 .emBreakdown(emBreakdown)
+                .dmBreakdown(dmBreakdown)
+                .coeBreakdown(coeBreakdown)
                 .generatedAt(Instant.now())
                 .build();
     }

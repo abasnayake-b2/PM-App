@@ -24,6 +24,12 @@ public class AllocationResponse {
     private UUID rdIssueTaskId;
     private String rdIssueTaskKey;
     private String rdIssueTaskDescription;
+    private UUID taskTypeId;
+    private String taskTypeName;
+    private UUID taskCategoryId;
+    private String taskCategoryName;
+    private UUID nonProjectTaskId;
+    private String nonProjectTaskDescription;
     private String roleOnProject;
     private Integer percentage;
     private LocalDate fromDate;

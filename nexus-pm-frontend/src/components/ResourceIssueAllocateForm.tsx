@@ -6,11 +6,13 @@ import { fetchAllocations, type OverAllocationError } from '@/api/resources.api'
 import { fetchProjects } from '@/api/projects.api';
 import { fetchIssues } from '@/api/issues.api';
 import { fetchEngineeringManagers, fetchTeamManagement } from '@/api/teamRoster.api';
+import { fetchTaskTypes, fetchTaskCategories } from '@/api/lookup.api';
 import type { CreateAllocationPayload } from '@/hooks/useResources';
 import type { Capacity, Issue } from '@/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { hasOrgWideVisibility } from '@/utils/orgRoles';
 import { todayLocalIso } from '@/utils/allocationUi';
+import { isNonProjectCategory } from '@/utils/taskCategory';
 import { isOpenIssueStatus } from '@/utils/issueLifecycle';
 import { issueDisplayKey, formatProjectTaskDisplayKey, formatTaskDisplayKey, projectTaskKeyPrefix } from '@/utils/issueUi';
 import {
@@ -22,6 +24,7 @@ import {
 import type { TaskRecord } from '@/api/scopedTasks.api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
+import { MenuSelect } from '@/components/MenuSelect';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -193,6 +196,8 @@ export function ResourceIssueAllocateForm({
   const [engineeringManager, setEngineeringManager] = useState(
     isScopedManager && userName ? userName : defaultEm,
   );
+  const [taskTypeId, setTaskTypeId] = useState('');
+  const [taskCategoryId, setTaskCategoryId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [issueId, setIssueId] = useState('');
   const [issueSearch, setIssueSearch] = useState('');
@@ -200,6 +205,8 @@ export function ResourceIssueAllocateForm({
   const [rdTaskId, setRdTaskId] = useState('');
   const [addingProjectTask, setAddingProjectTask] = useState(false);
   const [addingRdTask, setAddingRdTask] = useState(false);
+  const [nonProjectTaskDescription, setNonProjectTaskDescription] = useState('');
+  const [nonProjectTaskModule, setNonProjectTaskModule] = useState('');
   const [fromDate, setFromDate] = useState(todayLocalIso());
   const [toDate, setToDate] = useState('');
   const [percentage, setPercentage] = useState(50);
@@ -208,6 +215,16 @@ export function ResourceIssueAllocateForm({
   const { data: engineeringManagers = [] } = useQuery({
     queryKey: ['engineering-managers'],
     queryFn: fetchEngineeringManagers,
+  });
+
+  const { data: taskTypes = [], isLoading: taskTypesLoading } = useQuery({
+    queryKey: ['task-types'],
+    queryFn: fetchTaskTypes,
+  });
+
+  const { data: taskCategories = [], isLoading: taskCategoriesLoading } = useQuery({
+    queryKey: ['task-categories'],
+    queryFn: fetchTaskCategories,
   });
 
   const { data: management = [] } = useQuery({
@@ -228,6 +245,12 @@ export function ResourceIssueAllocateForm({
     return management.find((m) => m.fullName.trim().toLowerCase() === selected)?.id;
   }, [management, engineeringManager]);
 
+  const selectedCategory = useMemo(
+    () => taskCategories.find((category) => category.id === taskCategoryId) ?? null,
+    [taskCategories, taskCategoryId],
+  );
+  const nonProject = isNonProjectCategory(selectedCategory?.name);
+
   const { data: projectsPage, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects', 'allocate', selectedEmManagementId ?? engineeringManager],
     queryFn: () =>
@@ -235,7 +258,7 @@ export function ResourceIssueAllocateForm({
         size: 200,
         engineeringManagerManagementId: selectedEmManagementId,
       }),
-    enabled: !!engineeringManager,
+    enabled: !!engineeringManager && !nonProject,
   });
 
   const projects = useMemo(() => {
@@ -317,6 +340,18 @@ export function ResourceIssueAllocateForm({
     setRdTaskId('');
     setAddingProjectTask(false);
     setAddingRdTask(false);
+    setNonProjectTaskDescription('');
+    setNonProjectTaskModule('');
+  }, [taskCategoryId]);
+
+  useEffect(() => {
+    setProjectId('');
+    setIssueId('');
+    setIssueSearch('');
+    setProjectTaskId('');
+    setRdTaskId('');
+    setAddingProjectTask(false);
+    setAddingRdTask(false);
   }, [engineeringManager]);
 
   useEffect(() => {
@@ -355,9 +390,13 @@ export function ResourceIssueAllocateForm({
 
   const projectLevelReady = !!projectId && !issueId && !!projectTaskId;
   const rdLevelReady = !!projectId && !!issueId;
+  const nonProjectReady = nonProject && !!nonProjectTaskDescription.trim();
+  const projectRelatedReady = !nonProject && (projectLevelReady || rdLevelReady);
 
   const canSubmit =
-    (projectLevelReady || rdLevelReady) &&
+    !!taskTypeId &&
+    !!taskCategoryId &&
+    (nonProjectReady || projectRelatedReady) &&
     !!toDate &&
     !datesInvalid &&
     percentage >= 1 &&
@@ -369,17 +408,34 @@ export function ResourceIssueAllocateForm({
     e.preventDefault();
     if (!canSubmit) return;
     setDismissedError(false);
-    onSubmit({
-      employeeId: row.employeeId,
-      ...(issueId
-        ? { issueId, ...(rdTaskId ? { rdIssueTaskId: rdTaskId } : {}) }
-        : { projectTaskId }),
-      roleOnProject: row.designationName || undefined,
-      percentage,
-      fromDate,
-      toDate,
-      billable: true,
-    });
+    onSubmit(
+      nonProject
+        ? {
+            employeeId: row.employeeId,
+            taskTypeId,
+            taskCategoryId,
+            nonProjectTaskDescription: nonProjectTaskDescription.trim(),
+            nonProjectTaskModule: nonProjectTaskModule.trim() || undefined,
+            roleOnProject: row.designationName || undefined,
+            percentage,
+            fromDate,
+            toDate,
+            billable: true,
+          }
+        : {
+            employeeId: row.employeeId,
+            ...(issueId
+              ? { issueId, ...(rdTaskId ? { rdIssueTaskId: rdTaskId } : {}) }
+              : { projectTaskId }),
+            taskTypeId,
+            taskCategoryId,
+            roleOnProject: row.designationName || undefined,
+            percentage,
+            fromDate,
+            toDate,
+            billable: true,
+          },
+    );
   };
 
   return (
@@ -412,48 +468,107 @@ export function ResourceIssueAllocateForm({
 
       <label className="block text-sm">
         <span className="text-text2">Engineering manager</span>
-        <select
+        <MenuSelect
           className={inputClass}
           value={engineeringManager}
           disabled={isScopedManager}
-          onChange={(e) => setEngineeringManager(e.target.value)}
           required
-        >
-          <option value="" disabled>
-            Select engineering manager…
-          </option>
-          {emOptions.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+          placeholder="Select engineering manager…"
+          options={emOptions.map((name) => ({ value: name, label: name }))}
+          onChange={setEngineeringManager}
+        />
       </label>
 
       <label className="block text-sm">
+        <span className="text-text2">Task category</span>
+        <MenuSelect
+          className={inputClass}
+          value={taskCategoryId}
+          disabled={taskCategoriesLoading}
+          required
+          placeholder={
+            taskCategoriesLoading
+              ? 'Loading task categories…'
+              : taskCategories.length === 0
+                ? 'No task categories configured…'
+                : 'Select task category…'
+          }
+          options={taskCategories.map((category) => ({
+            value: category.id,
+            label: category.name,
+          }))}
+          onChange={setTaskCategoryId}
+        />
+      </label>
+
+      <label className="block text-sm">
+        <span className="text-text2">Task type</span>
+        <MenuSelect
+          className={inputClass}
+          value={taskTypeId}
+          disabled={taskTypesLoading}
+          required
+          placeholder={
+            taskTypesLoading
+              ? 'Loading task types…'
+              : taskTypes.length === 0
+                ? 'No task types configured…'
+                : 'Select task type…'
+          }
+          options={taskTypes.map((type) => ({ value: type.id, label: type.name }))}
+          onChange={setTaskTypeId}
+        />
+      </label>
+
+      {nonProject ? (
+        <div className="space-y-3">
+          <label className="block text-sm">
+            <span className="text-text2">
+              Task <span className="text-danger">*</span>
+            </span>
+            <textarea
+              rows={3}
+              required
+              maxLength={4000}
+              className={inputClass}
+              value={nonProjectTaskDescription}
+              placeholder="Describe the non-project task…"
+              onChange={(e) => setNonProjectTaskDescription(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-text2">Module</span>
+            <input
+              type="text"
+              maxLength={120}
+              className={inputClass}
+              value={nonProjectTaskModule}
+              placeholder="Optional"
+              onChange={(e) => setNonProjectTaskModule(e.target.value)}
+            />
+          </label>
+        </div>
+      ) : (
+        <>
+      <label className="block text-sm">
         <span className="text-text2">Project</span>
-        <select
+        <MenuSelect
           className={inputClass}
           value={projectId}
           disabled={!engineeringManager || projectsLoading}
-          onChange={(e) => setProjectId(e.target.value)}
           required
-        >
-          <option value="" disabled>
-            {!engineeringManager
+          placeholder={
+            !engineeringManager
               ? 'Select an engineering manager first…'
               : projectsLoading
                 ? 'Loading projects…'
                 : projects.length === 0
                   ? 'No projects for this manager…'
-                  : 'Select project…'}
-          </option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
+                  : 'Select project…'
+          }
+          options={projects.map((project) => ({ value: project.id, label: project.name }))}
+          onChange={setProjectId}
+        />
       </label>
 
       <div className="space-y-2">
@@ -470,14 +585,12 @@ export function ResourceIssueAllocateForm({
         </label>
         <label className="block text-sm">
           <span className="text-text2">RD</span>
-          <select
+          <MenuSelect
             className={inputClass}
             value={issueId}
             disabled={!projectId || issuesLoading}
-            onChange={(e) => setIssueId(e.target.value)}
-          >
-            <option value="">
-              {!projectId
+            placeholder={
+              !projectId
                 ? 'Select a project first…'
                 : issuesLoading
                   ? 'Loading RDs…'
@@ -485,14 +598,29 @@ export function ResourceIssueAllocateForm({
                     ? issueSearch.trim()
                       ? 'No matching RDs…'
                       : 'No open RDs on this project…'
-                    : 'None — use a project-level task'}
-            </option>
-            {availableIssues.map((issue) => (
-              <option key={issue.id} value={issue.id}>
-                {issueDisplayKey(issue)} — {issue.title}
-              </option>
-            ))}
-          </select>
+                    : 'None — use a project-level task'
+            }
+            options={[
+              {
+                value: '',
+                label:
+                  !projectId
+                    ? 'Select a project first…'
+                    : issuesLoading
+                      ? 'Loading RDs…'
+                      : availableIssues.length === 0
+                        ? issueSearch.trim()
+                          ? 'No matching RDs…'
+                          : 'No open RDs on this project…'
+                        : 'None — use a project-level task',
+              },
+              ...availableIssues.map((issue) => ({
+                value: issue.id,
+                label: `${issueDisplayKey(issue)} — ${issue.title}`,
+              })),
+            ]}
+            onChange={setIssueId}
+          />
         </label>
         {selectedIssue?.description && (
           <p className="line-clamp-3 text-xs text-text2">{selectedIssue.description}</p>
@@ -504,28 +632,26 @@ export function ResourceIssueAllocateForm({
           <div className="flex items-end gap-2">
             <label className="min-w-0 flex-1 text-sm">
               <span className="text-text2">Project task</span>
-              <select
+              <MenuSelect
                 className={inputClass}
                 value={projectTaskId}
                 disabled={!projectId || projectTasksLoading}
-                onChange={(e) => setProjectTaskId(e.target.value)}
                 required={!issueId && !addingProjectTask}
-              >
-                <option value="" disabled>
-                  {!projectId
+                placeholder={
+                  !projectId
                     ? 'Select a project first…'
                     : projectTasksLoading
                       ? 'Loading project tasks…'
                       : projectTasks.length === 0
                         ? 'No project-level tasks…'
-                        : 'Select project task…'}
-                </option>
-                {projectTasks.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {taskOptionLabel(task, 'project', projectTaskPrefix)}
-                  </option>
-                ))}
-              </select>
+                        : 'Select project task…'
+                }
+                options={projectTasks.map((task) => ({
+                  value: task.id,
+                  label: taskOptionLabel(task, 'project', projectTaskPrefix),
+                }))}
+                onChange={setProjectTaskId}
+              />
             </label>
             {!!projectId && canAddProjectTask && !addingProjectTask && (
               <button
@@ -573,25 +699,33 @@ export function ResourceIssueAllocateForm({
           <div className="flex items-end gap-2">
             <label className="min-w-0 flex-1 text-sm">
               <span className="text-text2">RD task</span>
-              <select
+              <MenuSelect
                 className={inputClass}
                 value={rdTaskId}
                 disabled={rdTasksLoading}
-                onChange={(e) => setRdTaskId(e.target.value)}
-              >
-                <option value="">
-                  {rdTasksLoading
+                placeholder={
+                  rdTasksLoading
                     ? 'Loading RD tasks…'
                     : rdTasks.length === 0
                       ? 'None — allocate to this RD'
-                      : 'Optional — or allocate to this RD'}
-                </option>
-                {rdTasks.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {taskOptionLabel(task, 'rd', rdTaskPrefix)}
-                  </option>
-                ))}
-              </select>
+                      : 'Optional — or allocate to this RD'
+                }
+                options={[
+                  {
+                    value: '',
+                    label: rdTasksLoading
+                      ? 'Loading RD tasks…'
+                      : rdTasks.length === 0
+                        ? 'None — allocate to this RD'
+                        : 'Optional — or allocate to this RD',
+                  },
+                  ...rdTasks.map((task) => ({
+                    value: task.id,
+                    label: taskOptionLabel(task, 'rd', rdTaskPrefix),
+                  })),
+                ]}
+                onChange={setRdTaskId}
+              />
             </label>
             {canAddRdTask && !addingRdTask && (
               <button
@@ -629,6 +763,8 @@ export function ResourceIssueAllocateForm({
             />
           )}
         </div>
+      )}
+        </>
       )}
 
       <div className="grid grid-cols-2 gap-3">

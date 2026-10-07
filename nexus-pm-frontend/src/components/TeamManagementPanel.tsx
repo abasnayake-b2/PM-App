@@ -53,6 +53,7 @@ export function TeamManagementPanel({ member, canEdit, onClose, onEdit }: TeamMa
         <div className="flex-1 overflow-y-auto p-5">
           <dl className="rounded-xl border border-border bg-bg3 px-4">
             <DetailRow label="Role" value={member.roleTitle} />
+            <DetailRow label="Department" value={member.departmentName} />
             <DetailRow label="First name" value={member.firstName} />
             <DetailRow label="Last name" value={member.lastName} />
             <DetailRow label="Supervisor" value={member.supervisorFullName ?? member.supervisorName} />

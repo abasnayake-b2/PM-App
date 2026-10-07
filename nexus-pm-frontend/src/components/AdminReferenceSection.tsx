@@ -28,6 +28,14 @@ import {
   createAdminIssueType,
   updateAdminIssueType,
   deleteAdminIssueType,
+  fetchAdminTaskTypes,
+  createAdminTaskType,
+  updateAdminTaskType,
+  deleteAdminTaskType,
+  fetchAdminTaskCategories,
+  createAdminTaskCategory,
+  updateAdminTaskCategory,
+  deleteAdminTaskCategory,
   fetchAdminStatuses,
   createAdminStatus,
   updateAdminStatus,
@@ -50,13 +58,15 @@ import { ReferenceDataExcelUpload } from '@/components/ReferenceDataExcelUpload'
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 
-const REF_TABS: { key: RefTab; label: string }[] = [
+const REF_TABS: { key: RefTab; label: string; addLabel?: string }[] = [
   { key: 'departments', label: 'Departments' },
   { key: 'streams', label: 'Stream' },
   { key: 'designations', label: 'Designations' },
   { key: 'work-types', label: 'NTP/GBL' },
   { key: 'skills', label: 'Skills' },
   { key: 'issue-types', label: 'Issue types' },
+  { key: 'task-types', label: 'Task types' },
+  { key: 'task-categories', label: 'Task categories', addLabel: 'Task category' },
   { key: 'statuses', label: 'Statuses' },
   { key: 'priorities', label: 'Priorities' },
 ];
@@ -109,6 +119,16 @@ function gridColumns(tab: RefTab): GridColumn[] {
       return [
         { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
         { key: 'workflow', header: 'Workflow', render: (i) => i.workflowCode ?? '—' },
+        { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
+      ];
+    case 'task-types':
+      return [
+        { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
+        { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
+      ];
+    case 'task-categories':
+      return [
+        { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
         { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
       ];
     case 'statuses':
@@ -198,6 +218,8 @@ function useRefQuery(tab: RefTab) {
     'work-types': fetchAdminWorkTypes,
     skills: fetchAdminSkills,
     'issue-types': fetchAdminIssueTypes,
+    'task-types': fetchAdminTaskTypes,
+    'task-categories': fetchAdminTaskCategories,
     statuses: fetchAdminStatuses,
     priorities: fetchAdminPriorities,
   };
@@ -224,13 +246,15 @@ function ReferenceFormFields({
         tab === 'streams' ||
         tab === 'work-types' ||
         tab === 'skills' ||
+        tab === 'task-types' ||
+        tab === 'task-categories' ||
         tab === 'statuses') && (
         <label className="block text-sm">
           <span className="text-text2">Name</span>
           <input name="name" required defaultValue={initial?.name ?? ''} className={inputClass} />
         </label>
       )}
-      {tab === 'skills' && (
+      {(tab === 'skills' || tab === 'task-types' || tab === 'task-categories') && (
         <label className="block text-sm">
           <span className="text-text2">Description</span>
           <input
@@ -372,6 +396,8 @@ export function AdminReferenceSection() {
     qc.invalidateQueries({ queryKey: ['streams'] });
     qc.invalidateQueries({ queryKey: ['designations'] });
     qc.invalidateQueries({ queryKey: ['roster-designations'] });
+    qc.invalidateQueries({ queryKey: ['task-types'] });
+    qc.invalidateQueries({ queryKey: ['task-categories'] });
   };
 
   const saveFromForm = async (fd: FormData, itemId?: string) => {
@@ -405,6 +431,18 @@ export function AdminReferenceSection() {
         return itemId
           ? updateAdminSkill(itemId, name, description)
           : createAdminSkill(name, description);
+      }
+      case 'task-types': {
+        const description = ((fd.get('description') as string) || '').trim() || undefined;
+        return itemId
+          ? updateAdminTaskType(itemId, name, description)
+          : createAdminTaskType(name, description);
+      }
+      case 'task-categories': {
+        const description = ((fd.get('description') as string) || '').trim() || undefined;
+        return itemId
+          ? updateAdminTaskCategory(itemId, name, description)
+          : createAdminTaskCategory(name, description);
       }
       case 'issue-types':
         return itemId
@@ -465,6 +503,10 @@ export function AdminReferenceSection() {
           return deleteAdminSkill(id);
         case 'issue-types':
           return deleteAdminIssueType(id);
+        case 'task-types':
+          return deleteAdminTaskType(id);
+        case 'task-categories':
+          return deleteAdminTaskCategory(id);
         case 'statuses':
           return deleteAdminStatus(id);
         case 'priorities':
@@ -507,7 +549,7 @@ export function AdminReferenceSection() {
         Manage lookup values used across the application. Changes apply immediately.
       </p>
 
-      {canImportReference && tab !== 'skills' && (
+      {canImportReference && tab !== 'skills' && tab !== 'task-types' && tab !== 'task-categories' && (
         <ReferenceDataExcelUpload onImported={invalidate} />
       )}
       {canImportReference && tab === 'skills' && (
@@ -557,7 +599,9 @@ export function AdminReferenceSection() {
           className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-bg3"
         >
           <Plus size={16} />
-          Add {REF_TABS.find((t) => t.key === tab)?.label?.replace(/s$/, '') ?? 'item'}
+          Add {REF_TABS.find((t) => t.key === tab)?.addLabel
+            ?? REF_TABS.find((t) => t.key === tab)?.label?.replace(/s$/, '')
+            ?? 'item'}
         </button>
       </div>
 

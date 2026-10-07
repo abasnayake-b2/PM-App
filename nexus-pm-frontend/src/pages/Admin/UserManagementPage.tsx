@@ -16,7 +16,7 @@ import {
 } from '@/hooks/useUserManagement';
 import type { UserAccount } from '@/api/userManagement.api';
 import type { CreateUserAccountPayload, UpdateUserAccountPayload } from '@/api/userManagement.api';
-import { isAdminRole, isDeliveryManagerRole, hasEmployeeAppRole, isPmAppRole } from '@/utils/orgRoles';
+import { isAdminRole, hasEmployeeAppRole, isPmAppRole } from '@/utils/orgRoles';
 
 function isCxoRole(role?: string | null): boolean {
   return role === 'CXO' || role === 'CTO';
@@ -26,14 +26,40 @@ function isVpRole(role?: string | null): boolean {
   return role === 'VP' || role === 'VP_ENG';
 }
 
-function isManagerGridRole(role?: string | null): boolean {
+function isEngineeringManagerAppRole(role?: string | null): boolean {
   return (
     role === 'MANAGER' ||
     role === 'SEM' ||
     role === 'SR_SEM' ||
-    role === 'TECH_LEAD' ||
-    isDeliveryManagerRole(role)
+    role === 'TECH_LEAD'
   );
+}
+
+function isDeliveryManagerAppRole(role?: string | null): boolean {
+  const code = (role ?? '').toUpperCase();
+  return code === 'DM' || code === 'DELIVERY_MANAGER';
+}
+
+function isCoeManagerAppRole(role?: string | null): boolean {
+  const code = (role ?? '').toUpperCase();
+  return code === 'COE' || code === 'COE_MANAGER';
+}
+
+function isDeliveryManagerAccount(user: UserAccount): boolean {
+  const codes = (user.roleCodes?.length ? user.roleCodes : [user.roleCode]).map((c) =>
+    c.toUpperCase(),
+  );
+  if (codes.some(isDeliveryManagerAppRole)) return true;
+  return /delivery\s*manager/i.test(user.managementRoleTitle ?? '');
+}
+
+function isCoeManagerAccount(user: UserAccount): boolean {
+  const codes = (user.roleCodes?.length ? user.roleCodes : [user.roleCode]).map((c) =>
+    c.toUpperCase(),
+  );
+  if (codes.some(isCoeManagerAppRole)) return true;
+  const title = user.managementRoleTitle ?? '';
+  return /\bcoe\b/i.test(title) || /cent(?:er|re)\s+of\s+excellence/i.test(title);
 }
 
 export function UserManagementPage() {
@@ -64,7 +90,16 @@ export function UserManagementPage() {
     [users],
   );
 
-  const { adminUsers, cxoUsers, vpUsers, managerUsers, pmUsers, employeeUsers } = useMemo(() => {
+  const {
+    adminUsers,
+    cxoUsers,
+    vpUsers,
+    engineeringManagerUsers,
+    deliveryManagerUsers,
+    coeManagerUsers,
+    pmUsers,
+    employeeUsers,
+  } = useMemo(() => {
     const list = users ?? [];
     const codesOf = (u: (typeof list)[number]) =>
       (u.roleCodes?.length ? u.roleCodes : [u.roleCode]).map((c) => c.toUpperCase());
@@ -76,23 +111,50 @@ export function UserManagementPage() {
     const afterCxo = remaining.filter((u) => !has(u, isCxoRole));
     const vpUsers = afterCxo.filter((u) => has(u, isVpRole));
     const afterVp = afterCxo.filter((u) => !has(u, isVpRole));
-    const pmUsers = afterVp.filter((u) => has(u, isPmAppRole));
-    const afterPm = afterVp.filter((u) => !has(u, isPmAppRole));
-    const managerUsers = afterPm.filter(
+    const deliveryManagerUsers = afterVp.filter(
+      (u) => !hasEmployeeAppRole(u.roleCodes, u.roleCode) && isDeliveryManagerAccount(u),
+    );
+    const afterDelivery = afterVp.filter((u) => !deliveryManagerUsers.some((d) => d.id === u.id));
+    const coeManagerUsers = afterDelivery.filter(
+      (u) => !hasEmployeeAppRole(u.roleCodes, u.roleCode) && isCoeManagerAccount(u),
+    );
+    const afterCoe = afterDelivery.filter((u) => !coeManagerUsers.some((c) => c.id === u.id));
+    const pmUsers = afterCoe.filter((u) => has(u, isPmAppRole));
+    const afterPm = afterCoe.filter((u) => !has(u, isPmAppRole));
+    const engineeringManagerUsers = afterPm.filter(
       (u) =>
         !hasEmployeeAppRole(u.roleCodes, u.roleCode) &&
-        (has(u, isManagerGridRole) ||
+        (has(u, isEngineeringManagerAppRole) ||
           (!!u.managementId &&
             !has(u, isAdminRole) &&
             !has(u, isCxoRole) &&
             !has(u, isVpRole) &&
-            !has(u, isManagerGridRole))),
+            !has(u, isPmAppRole) &&
+            !isDeliveryManagerAccount(u) &&
+            !isCoeManagerAccount(u))),
     );
     const placed = new Set(
-      [...adminUsers, ...cxoUsers, ...vpUsers, ...pmUsers, ...managerUsers].map((u) => u.id),
+      [
+        ...adminUsers,
+        ...cxoUsers,
+        ...vpUsers,
+        ...pmUsers,
+        ...engineeringManagerUsers,
+        ...deliveryManagerUsers,
+        ...coeManagerUsers,
+      ].map((u) => u.id),
     );
     const employeeUsers = list.filter((u) => !placed.has(u.id));
-    return { adminUsers, cxoUsers, vpUsers, managerUsers, pmUsers, employeeUsers };
+    return {
+      adminUsers,
+      cxoUsers,
+      vpUsers,
+      engineeringManagerUsers,
+      deliveryManagerUsers,
+      coeManagerUsers,
+      pmUsers,
+      employeeUsers,
+    };
   }, [users]);
 
   if (!can(P.USERS_VIEW)) {
@@ -232,13 +294,47 @@ export function UserManagementPage() {
             onDeactivate={handleDeactivate}
           />
           <UserAccountGrid
-            title="Managers"
-            description="Managers, SEM / Sr SEM, tech leads, and other management-roster roles."
-            users={managerUsers}
+            title="Engineering Managers"
+            description="Engineering managers, SEM / Sr SEM, tech leads, and other engineering management-roster roles."
+            users={engineeringManagerUsers}
             emptyMessage={
               search
-                ? `No manager accounts matching "${search}".`
-                : 'No manager accounts yet. Add people on the management roster, then create a login here.'
+                ? `No engineering manager accounts matching "${search}".`
+                : 'No engineering manager accounts yet. Add people on the management roster, then create a login here.'
+            }
+            showManagementRole
+            search={search}
+            unlockPending={unlockUser.isPending}
+            formatLockedUntil={formatLockedUntil}
+            onEdit={openEdit}
+            onUnlock={handleUnlock}
+            onDeactivate={handleDeactivate}
+          />
+          <UserAccountGrid
+            title="Delivery Managers"
+            description="Delivery managers from the management roster (including Software Delivery Manager) and DM app-role accounts."
+            users={deliveryManagerUsers}
+            emptyMessage={
+              search
+                ? `No delivery manager accounts matching "${search}".`
+                : 'No delivery manager accounts yet. Add people on the management roster, then create a login here.'
+            }
+            showManagementRole
+            search={search}
+            unlockPending={unlockUser.isPending}
+            formatLockedUntil={formatLockedUntil}
+            onEdit={openEdit}
+            onUnlock={handleUnlock}
+            onDeactivate={handleDeactivate}
+          />
+          <UserAccountGrid
+            title="COE Managers"
+            description="COE managers from the management roster and COE app-role accounts."
+            users={coeManagerUsers}
+            emptyMessage={
+              search
+                ? `No COE manager accounts matching "${search}".`
+                : 'No COE manager accounts yet. Add people on the management roster, then create a login here.'
             }
             showManagementRole
             search={search}
@@ -250,7 +346,7 @@ export function UserManagementPage() {
           />
           <UserAccountGrid
             title="PMs"
-            description="Users with the PM app role, including delivery managers and project managers."
+            description="Users with the PM app role, including project managers."
             users={pmUsers}
             emptyMessage={
               search ? `No PM accounts matching "${search}".` : 'No PM accounts yet.'

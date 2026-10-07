@@ -47,7 +47,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.designation
             LEFT JOIN FETCH e.stream
             LEFT JOIN FETCH e.manager
-            WHERE (:search IS NULL OR :search = '' OR
+            WHERE e.status = 'ACTIVE'
+              AND (:search IS NULL OR :search = '' OR
                    LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(e.email) LIKE LOWER(CONCAT('%', :search, '%')))
               AND (:filterByRole = false OR EXISTS (
@@ -55,7 +56,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             """,
             countQuery = """
             SELECT COUNT(DISTINCT e) FROM Employee e
-            WHERE (:search IS NULL OR :search = '' OR
+            WHERE e.status = 'ACTIVE'
+              AND (:search IS NULL OR :search = '' OR
                    LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(e.email) LIKE LOWER(CONCAT('%', :search, '%')))
               AND (:filterByRole = false OR EXISTS (
@@ -67,6 +69,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             SELECT DISTINCT e FROM Employee e
             JOIN e.roles r
             WHERE r.code IN ('VP', 'VP_ENG')
+              AND e.status = 'ACTIVE'
               AND LOWER(CONCAT(e.firstName, ' ', e.lastName)) LIKE LOWER(CONCAT('%', :term, '%'))
             """)
     List<Employee> findVpsByNameMatch(String term);
@@ -79,6 +82,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH m.designation
             LEFT JOIN FETCH m.manager
             WHERE r.code IN ('MANAGER', 'SEM')
+              AND m.status = 'ACTIVE'
               AND LOWER(CONCAT(m.firstName, ' ', m.lastName)) LIKE LOWER(CONCAT('%', :term, '%'))
             ORDER BY m.lastName, m.firstName
             """)
@@ -92,6 +96,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH m.designation
             LEFT JOIN FETCH m.manager
             WHERE r.code IN ('MANAGER', 'SEM')
+              AND m.status = 'ACTIVE'
               AND m.manager.id IN :vpIds
             ORDER BY m.lastName, m.firstName
             """)
@@ -105,6 +110,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.designation
             LEFT JOIN FETCH e.manager
             WHERE r.code = 'SW_ENGINEER'
+              AND e.status = 'ACTIVE'
               AND e.manager.id IN :managerIds
             ORDER BY e.lastName, e.firstName
             """)
@@ -115,6 +121,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
             WHERE e.manager.id = :managerId
+              AND e.status = 'ACTIVE'
             ORDER BY e.lastName, e.firstName
             """)
     List<Employee> findDirectReports(UUID managerId);
@@ -125,6 +132,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             LEFT JOIN FETCH e.designation
             LEFT JOIN FETCH e.engineeringManagerManagement em
             WHERE em.id = :managementId
+              AND e.status = 'ACTIVE'
             ORDER BY e.lastName, e.firstName
             """)
     List<Employee> findByEngineeringManagerManagementId(UUID managementId);
@@ -310,6 +318,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     @Query("""
             SELECT e FROM Employee e
             LEFT JOIN FETCH e.designation
+            LEFT JOIN FETCH e.engineeringManagerManagement
             WHERE e.status = 'ACTIVE'
               AND e.teamManagement IS NULL
             ORDER BY e.firstName, e.lastName

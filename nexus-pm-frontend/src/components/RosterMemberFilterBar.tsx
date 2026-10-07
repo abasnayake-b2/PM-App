@@ -6,7 +6,9 @@ import {
   fetchRosterStreams,
   fetchRosterWorkTypes,
 } from '@/api/rosterLookups.api';
-import { fetchEngineeringManagers, type TeamRosterMember } from '@/api/teamRoster.api';
+import { fetchEngineeringManagers, fetchTeamManagement, type TeamRosterMember } from '@/api/teamRoster.api';
+import { groupedManagerNames } from '@/utils/managementRoles';
+import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
 
 const EMPTY_ROWS: TeamRosterMember[] = [];
 
@@ -93,6 +95,10 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
     queryKey: ['engineering-managers'],
     queryFn: fetchEngineeringManagers,
   });
+  const { data: management = [] } = useQuery({
+    queryKey: ['team-management'],
+    queryFn: () => fetchTeamManagement(),
+  });
 
   const list = rows ?? EMPTY_ROWS;
 
@@ -119,13 +125,16 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
         [],
         list.map((row) => row.product),
       ),
-      ems: mergeOptions(engineeringManagers, list.map((row) => row.engineeringManagerName)),
+      managerGroups: groupedManagerNames(
+        management,
+        mergeOptions(engineeringManagers, list.map((row) => row.engineeringManagerName)),
+      ),
       workTypes: mergeOptions(
         workTypes.map((w) => w.name),
         list.map((row) => row.workType),
       ),
     };
-  }, [list, designations, streams, countries, engineeringManagers, workTypes]);
+  }, [list, designations, streams, countries, engineeringManagers, workTypes, management]);
 
   const filteredRows = useMemo(
     () =>
@@ -213,13 +222,17 @@ export function RosterMemberFilterBar({
         options={filters.options.products}
         allLabel="All products"
       />
-      <FilterSelect
-        label="EM"
-        value={filters.emFilter}
-        onChange={filters.setEmFilter}
-        options={filters.options.ems}
-        allLabel="All EMs"
-      />
+      <label className="min-w-[9rem] flex-1 text-sm sm:max-w-[14rem]">
+        <span className="text-text2">Manager</span>
+        <select
+          value={filters.emFilter}
+          onChange={(e) => filters.setEmFilter(e.target.value)}
+          className={filterSelectClass}
+        >
+          <option value="">All managers</option>
+          <ManagerNameOptGroups groups={filters.options.managerGroups} />
+        </select>
+      </label>
       <FilterSelect
         label="NTP/GBL"
         value={filters.workTypeFilter}

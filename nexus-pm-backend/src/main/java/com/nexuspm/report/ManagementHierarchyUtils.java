@@ -23,7 +23,11 @@ public final class ManagementHierarchyUtils {
     }
 
     public static boolean isVpRole(String roleTitle) {
-        return roleTitle != null && roleTitle.matches("(?i).*\\bvp\\b.*");
+        if (roleTitle == null || roleTitle.isBlank()) {
+            return false;
+        }
+        String title = roleTitle.toLowerCase();
+        return title.matches(".*\\bvp\\b.*") || title.contains("vice president");
     }
 
     public static boolean isCxoRole(String roleTitle) {
@@ -39,14 +43,67 @@ public final class ManagementHierarchyUtils {
     }
 
     /**
+     * Software Delivery Manager and similar titles on the management roster.
+     */
+    public static boolean isDeliveryManagerRole(String roleTitle) {
+        if (roleTitle == null || roleTitle.isBlank()) {
+            return false;
+        }
+        return roleTitle.toLowerCase().matches(".*delivery\\s*manager.*");
+    }
+
+    /**
+     * COE Manager and Center/Centre of Excellence titles on the management roster.
+     */
+    public static boolean isCoeManagerRole(String roleTitle) {
+        if (roleTitle == null || roleTitle.isBlank()) {
+            return false;
+        }
+        String title = roleTitle.toLowerCase();
+        return title.matches(".*\\bcoe\\b.*")
+                || title.contains("center of excellence")
+                || title.contains("centre of excellence");
+    }
+
+    /**
+     * Organisation overview pillars: CXO, VP, Engineering, Delivery, COE.
+     */
+    public enum OrgPillar {
+        CXO,
+        VP,
+        ENGINEERING,
+        DELIVERY,
+        COE
+    }
+
+    public static OrgPillar pillarFromRoleTitle(String roleTitle) {
+        if (isCxoRole(roleTitle)) {
+            return OrgPillar.CXO;
+        }
+        if (isVpRole(roleTitle)) {
+            return OrgPillar.VP;
+        }
+        if (isDeliveryManagerRole(roleTitle)) {
+            return OrgPillar.DELIVERY;
+        }
+        if (isCoeManagerRole(roleTitle)) {
+            return OrgPillar.COE;
+        }
+        return OrgPillar.ENGINEERING;
+    }
+
+    /**
      * Management-roster people who count as Engineering Managers on the Dashboard.
-     * Matches the product line: Senior Manager or Manager under VP (not CXO/VP titles).
+     * Matches the product line: Senior Manager or Manager under VP (not CXO/VP/delivery/COE titles).
      */
     public static boolean isEngineeringManagerRole(String roleTitle) {
         if (roleTitle == null || roleTitle.isBlank()) {
             return false;
         }
-        if (isVpRole(roleTitle) || isCxoRole(roleTitle)) {
+        if (isVpRole(roleTitle)
+                || isCxoRole(roleTitle)
+                || isDeliveryManagerRole(roleTitle)
+                || isCoeManagerRole(roleTitle)) {
             return false;
         }
         String title = roleTitle.toLowerCase();

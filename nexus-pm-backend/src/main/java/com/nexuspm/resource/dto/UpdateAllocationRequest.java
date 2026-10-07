@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 public class UpdateAllocationRequest {
@@ -24,4 +25,8 @@ public class UpdateAllocationRequest {
     private LocalDate toDate;
 
     private Boolean billable;
+
+    private UUID taskTypeId;
+
+    private UUID taskCategoryId;
 }

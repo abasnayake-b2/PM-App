@@ -121,7 +121,7 @@ export function TeamRosterMemberPanel({ member, canEdit, onClose, onEdit }: Team
               <DetailField label="Designation code" value={member.designationCode} />
               <DetailField label="Designation" value={member.designation} />
               <DetailField label="Team" value={member.teamName} />
-              <DetailField label="Engineering manager" value={member.engineeringManagerName} />
+              <DetailField label="Manager" value={member.engineeringManagerName} />
               <DetailField label="Employment type" value={member.employmentType} />
             </dl>
           </SectionCard>
