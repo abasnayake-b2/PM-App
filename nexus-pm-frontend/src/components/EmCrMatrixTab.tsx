@@ -22,6 +22,8 @@ interface EmMatrixDrillDown {
 
 interface EmCrMatrixTabProps {
   projectId?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
   enabled?: boolean;
   onIssueClick?: (issue: Issue) => void;
 }
@@ -87,35 +89,27 @@ function buildDisplayRows(rows: CrStatusMatrixRow[]): DisplayRow[] {
  * Clicking a count opens a matching RD grid beneath the matrix (stays on this tab).
  * Full view opens a read-only popup (no number clicks).
  */
-export function EmCrMatrixTab({ projectId, enabled = true, onIssueClick }: EmCrMatrixTabProps) {
+export function EmCrMatrixTab({
+  projectId,
+  projectTypeId,
+  workCategoryId,
+  enabled = true,
+  onIssueClick,
+}: EmCrMatrixTabProps) {
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [drillDown, setDrillDown] = useState<EmMatrixDrillDown | null>(null);
   const [fullViewOpen, setFullViewOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['cr-status-matrix', projectId ?? 'all'],
-    queryFn: () => fetchCrStatusMatrix(projectId),
+    queryKey: ['cr-status-matrix', projectId ?? 'all', projectTypeId ?? 'all', workCategoryId ?? 'all'],
+    queryFn: () => fetchCrStatusMatrix({ projectId, projectTypeId, workCategoryId }),
     enabled,
   });
 
   useEffect(() => {
     setDrillDown(null);
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!fullViewOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFullViewOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [fullViewOpen]);
+  }, [projectId, projectTypeId, workCategoryId]);
 
   const drillProjectId = drillDown?.projectId ?? projectId;
   const drillStatusIds = drillDown?.statusIds ?? [];
@@ -128,6 +122,8 @@ export function EmCrMatrixTab({ projectId, enabled = true, onIssueClick }: EmCrM
   } = useIssues(
     {
       projectId: drillProjectId,
+      projectTypeId,
+      workCategoryId,
       statusIds: statusFiltering ? drillStatusIds : undefined,
       page: 0,
       size: 2000,
@@ -254,33 +250,105 @@ export function EmCrMatrixTab({ projectId, enabled = true, onIssueClick }: EmCrM
 
       {fullViewOpen && (
         <EmMatrixFullViewModal
-          data={data}
-          displayRows={displayRows}
           onClose={() => setFullViewOpen(false)}
           onExportExcel={() => void handleExport('excel')}
           onExportPdf={() => void handleExport('pdf')}
           exporting={exporting}
-        />
+        >
+          <EmMatrixTable data={data} displayRows={displayRows} />
+        </EmMatrixFullViewModal>
       )}
     </div>
   );
 }
 
+/** Full-screen EM status matrix for one project (used from Resource Timeline project clicks). */
+export function EmCrMatrixPopup({
+  projectId,
+  projectName,
+  onClose,
+}: {
+  projectId: string;
+  projectName?: string;
+  onClose: () => void;
+}) {
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['cr-status-matrix', projectId],
+    queryFn: () => fetchCrStatusMatrix({ projectId }),
+  });
+
+  const displayRows = useMemo(() => (data?.rows ? buildDisplayRows(data.rows) : []), [data]);
+
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    if (!data) return;
+    setExporting(format);
+    try {
+      if (format === 'excel') {
+        await downloadEmCrMatrixExcel(data);
+      } else {
+        downloadEmCrMatrixPdf(data);
+      }
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  return (
+    <EmMatrixFullViewModal
+      subtitle={
+        projectName
+          ? `${projectName} · read-only (counts are not clickable)`
+          : 'Full view · read-only (counts are not clickable)'
+      }
+      onClose={onClose}
+      onExportExcel={() => void handleExport('excel')}
+      onExportPdf={() => void handleExport('pdf')}
+      exporting={exporting}
+      exportDisabled={!data}
+    >
+      {isLoading && <p className="p-3 text-sm text-text2">Loading EM matrix…</p>}
+      {error && <p className="p-3 text-sm text-danger">Failed to load EM status matrix.</p>}
+      {!isLoading && !error && (!data || data.rows.length === 0) && (
+        <p className="p-3 text-sm text-text2">No backlog items to show for this project.</p>
+      )}
+      {data && data.rows.length > 0 && <EmMatrixTable data={data} displayRows={displayRows} />}
+    </EmMatrixFullViewModal>
+  );
+}
+
 function EmMatrixFullViewModal({
-  data,
-  displayRows,
+  title = 'EM status matrix',
+  subtitle = 'Full view · read-only (counts are not clickable)',
   onClose,
   onExportExcel,
   onExportPdf,
   exporting,
+  exportDisabled = false,
+  children,
 }: {
-  data: CrStatusMatrix;
-  displayRows: DisplayRow[];
+  title?: string;
+  subtitle?: string;
   onClose: () => void;
   onExportExcel: () => void;
   onExportPdf: () => void;
   exporting: 'excel' | 'pdf' | null;
+  exportDisabled?: boolean;
+  children: ReactNode;
 }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center p-3 sm:p-6">
       <button
@@ -298,14 +366,14 @@ function EmMatrixFullViewModal({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div>
             <h2 id="em-matrix-full-view-title" className="text-lg font-bold">
-              EM status matrix
+              {title}
             </h2>
-            <p className="text-xs text-text2">Full view · read-only (counts are not clickable)</p>
+            <p className="text-xs text-text2">{subtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              disabled={!!exporting}
+              disabled={exportDisabled || !!exporting}
               onClick={onExportExcel}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-bg3 disabled:opacity-50"
             >
@@ -314,7 +382,7 @@ function EmMatrixFullViewModal({
             </button>
             <button
               type="button"
-              disabled={!!exporting}
+              disabled={exportDisabled || !!exporting}
               onClick={onExportPdf}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-bg3 disabled:opacity-50"
             >
@@ -331,9 +399,7 @@ function EmMatrixFullViewModal({
             </button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-3">
-          <EmMatrixTable data={data} displayRows={displayRows} />
-        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-3">{children}</div>
       </div>
     </div>
   );

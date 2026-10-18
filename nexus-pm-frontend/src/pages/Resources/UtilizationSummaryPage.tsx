@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ClipboardList } from 'lucide-react';
 import { ResourceAllocationSummary } from '@/components/ResourceAllocationSummary';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
 import { useCapacity } from '@/hooks/useResources';
+import { useDepartments } from '@/hooks/useEmployees';
 import { fetchRosterDesignations, fetchRosterStreams } from '@/api/rosterLookups.api';
 import { fetchEngineeringManagers, fetchTeamManagement } from '@/api/teamRoster.api';
-import { fetchTaskCategories, fetchTaskTypes } from '@/api/lookup.api';
+import { fetchTaskCategories, fetchTaskTypes, fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
@@ -20,6 +20,7 @@ import {
 import { defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
 import { groupedManagerNames } from '@/utils/managementRoles';
 import { isActiveRosterStatus } from '@/utils/rosterStatus';
+import { compareByPriority } from '@/utils/allocationSummary';
 
 export function UtilizationSummaryPage() {
   const role = useAuthStore((s) => s.user?.role);
@@ -37,10 +38,13 @@ export function UtilizationSummaryPage() {
 
   const defaults = defaultDateRange();
   const [teamFilter, setTeamFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [designationFilter, setDesignationFilter] = useState('');
   const [engineeringManagerFilter, setEngineeringManagerFilter] = useState('');
   const [taskCategoryId, setTaskCategoryId] = useState('');
   const [taskTypeId, setTaskTypeId] = useState('');
+  const [projectTypeId, setProjectTypeId] = useState('');
+  const [workCategoryId, setWorkCategoryId] = useState('');
   const [fromDate, setFromDate] = useState(defaults.from);
   const [toDate, setToDate] = useState(defaults.to);
 
@@ -55,13 +59,16 @@ export function UtilizationSummaryPage() {
     to: toDate,
     asOf: todayLocalIso(),
     team: teamFilter || undefined,
+    department: departmentFilter || undefined,
     designationCode: designationFilter || undefined,
     engineeringManager: engineeringManagerFilter || undefined,
+    workCategoryId: workCategoryId || undefined,
   };
 
   const { data: capacity, isLoading, error } = useCapacity(capacityParams, {
     enabled: showTeamCapacity,
   });
+  const { data: departments = [] } = useDepartments(showTeamCapacity);
   const { data: streams = [] } = useQuery({
     queryKey: ['roster-streams'],
     queryFn: fetchRosterStreams,
@@ -92,9 +99,23 @@ export function UtilizationSummaryPage() {
     queryFn: fetchTaskTypes,
     enabled: showTeamCapacity,
   });
+  const { data: projectTypes = [] } = useQuery({
+    queryKey: ['project-types'],
+    queryFn: fetchProjectTypes,
+    enabled: showTeamCapacity,
+  });
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
+    enabled: showTeamCapacity,
+  });
   const managerGroups = useMemo(
     () => groupedManagerNames(management, engineeringManagers),
     [management, engineeringManagers],
+  );
+  const sortedWorkCategories = useMemo(
+    () => [...workCategories].sort(compareByPriority),
+    [workCategories],
   );
 
   const rows = useMemo(() => {
@@ -114,8 +135,9 @@ export function UtilizationSummaryPage() {
     () => ({
       taskCategoryId: taskCategoryId || undefined,
       taskTypeId: taskTypeId || undefined,
+      projectTypeId: projectTypeId || undefined,
     }),
-    [taskCategoryId, taskTypeId],
+    [taskCategoryId, taskTypeId, projectTypeId],
   );
 
   if (!showTeamCapacity) {
@@ -124,17 +146,11 @@ export function UtilizationSummaryPage() {
 
   return (
     <div className="min-w-0 max-w-full">
-      <div className="flex items-start gap-3">
-        <ClipboardList className="mt-1 text-accent" size={28} />
-        <div>
-          <h1 className="text-2xl font-bold">Utilization summary</h1>
-          <p className="mt-1 text-text2">
-            Project-wise and manager-team allocation for the selected date range.
-          </p>
-        </div>
-      </div>
+      <p className="text-text2">
+        Project-wise and manager-team allocation for the selected date range.
+      </p>
 
-      <div className="mt-6 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-bg2 p-4">
+      <div className="mt-4 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-bg2 p-4">
         <label className="text-sm">
           <span className="text-text2">Designation</span>
           <select
@@ -150,6 +166,22 @@ export function UtilizationSummaryPage() {
                   {d.code} — {d.name}
                 </option>
               ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
+          <span className="text-text2">Department</span>
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="mt-1 block min-w-[10rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -217,6 +249,38 @@ export function UtilizationSummaryPage() {
         </label>
 
         <label className="text-sm">
+          <span className="text-text2">Project type</span>
+          <select
+            value={projectTypeId}
+            onChange={(e) => setProjectTypeId(e.target.value)}
+            className="mt-1 block min-w-[10rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All project types</option>
+            {projectTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
+          <span className="text-text2">Functional unit</span>
+          <select
+            value={workCategoryId}
+            onChange={(e) => setWorkCategoryId(e.target.value)}
+            className="mt-1 block min-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All functional units</option>
+            {sortedWorkCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.sortOrder != null ? `${category.sortOrder}. ${category.name}` : category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
           <span className="text-text2">From</span>
           <input
             type="date"
@@ -251,6 +315,8 @@ export function UtilizationSummaryPage() {
             rangeFrom={fromDate}
             rangeTo={toDate}
             filters={summaryFilters}
+            workCategories={sortedWorkCategories}
+            workCategoryId={workCategoryId || undefined}
           />
         </div>
       )}

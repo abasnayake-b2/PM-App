@@ -8,8 +8,10 @@ import com.nexuspm.issue.field.dto.UpdateIssueFieldDefinitionRequest;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.ProjectType;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.dto.WorkCategoryResponse;
 import com.nexuspm.user.entity.Department;
 import com.nexuspm.user.dto.DesignationResponse;
 import com.nexuspm.user.dto.StreamResponse;
@@ -400,6 +402,68 @@ public class AdminController {
     @PreAuthorize("@perm.can('REFERENCE_DELETE')")
     public void deleteTaskCategory(@PathVariable UUID id) {
         referenceDataService.deleteTaskCategory(id);
+    }
+
+    @GetMapping("/reference/project-types")
+    @PreAuthorize("@perm.can('REFERENCE_VIEW')")
+    public List<ProjectType> listReferenceProjectTypes() {
+        return referenceDataService.listProjectTypes();
+    }
+
+    @PostMapping("/reference/project-types")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perm.can('REFERENCE_CREATE')")
+    public ProjectType createProjectType(@Valid @RequestBody TaskTypeRequest request) {
+        return referenceDataService.createProjectType(request.getName(), request.getDescription());
+    }
+
+    @PutMapping("/reference/project-types/{id}")
+    @PreAuthorize("@perm.can('REFERENCE_UPDATE')")
+    public ProjectType updateProjectType(@PathVariable UUID id, @Valid @RequestBody TaskTypeRequest request) {
+        return referenceDataService.updateProjectType(id, request.getName(), request.getDescription());
+    }
+
+    @DeleteMapping("/reference/project-types/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perm.can('REFERENCE_DELETE')")
+    public void deleteProjectType(@PathVariable UUID id) {
+        referenceDataService.deleteProjectType(id);
+    }
+
+    @GetMapping("/reference/work-categories")
+    @PreAuthorize("@perm.can('REFERENCE_VIEW')")
+    public List<WorkCategoryResponse> listReferenceWorkCategories() {
+        return referenceDataService.listWorkCategories();
+    }
+
+    @PostMapping("/reference/work-categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perm.can('REFERENCE_CREATE')")
+    public WorkCategoryResponse createWorkCategory(@Valid @RequestBody WorkCategoryRequest request) {
+        return referenceDataService.createWorkCategory(
+                request.getName(),
+                request.getDescription(),
+                request.getSortOrder(),
+                request.getEngineeringManagerManagementIds());
+    }
+
+    @PutMapping("/reference/work-categories/{id}")
+    @PreAuthorize("@perm.can('REFERENCE_UPDATE')")
+    public WorkCategoryResponse updateWorkCategory(
+            @PathVariable UUID id, @Valid @RequestBody WorkCategoryRequest request) {
+        return referenceDataService.updateWorkCategory(
+                id,
+                request.getName(),
+                request.getDescription(),
+                request.getSortOrder(),
+                request.getEngineeringManagerManagementIds());
+    }
+
+    @DeleteMapping("/reference/work-categories/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perm.can('REFERENCE_DELETE')")
+    public void deleteWorkCategory(@PathVariable UUID id) {
+        referenceDataService.deleteWorkCategory(id);
     }
 
     @GetMapping("/reference/statuses")

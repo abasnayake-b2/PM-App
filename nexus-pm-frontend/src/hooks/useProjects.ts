@@ -29,6 +29,8 @@ export function useProjects(
     ragStatus?: string;
     vpManagementId?: string;
     engineeringManagerManagementId?: string;
+    projectTypeId?: string;
+    workCategoryId?: string;
     includeArchived?: boolean;
     size?: number;
   } = {},

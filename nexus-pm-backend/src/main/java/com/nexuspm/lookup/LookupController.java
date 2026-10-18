@@ -3,8 +3,10 @@ package com.nexuspm.lookup;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.ProjectType;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.dto.WorkCategoryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,6 +44,18 @@ public class LookupController {
     @PreAuthorize("isAuthenticated()")
     public List<TaskCategory> listTaskCategories() {
         return lookupService.listTaskCategories();
+    }
+
+    @GetMapping("/project-types")
+    @PreAuthorize("isAuthenticated()")
+    public List<ProjectType> listProjectTypes() {
+        return lookupService.listProjectTypes();
+    }
+
+    @GetMapping("/work-categories")
+    @PreAuthorize("isAuthenticated()")
+    public List<WorkCategoryResponse> listWorkCategories() {
+        return lookupService.listWorkCategories();
     }
 
     @GetMapping("/statuses")

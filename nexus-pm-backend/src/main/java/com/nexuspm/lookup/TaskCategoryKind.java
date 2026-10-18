@@ -15,6 +15,8 @@ public final class TaskCategoryKind {
             return false;
         }
         String normalized = name.toLowerCase().replace('_', ' ').replace('-', ' ').replaceAll("\\s+", " ").trim();
-        return normalized.contains("non project") || normalized.contains("nonproject");
+        return "other".equals(normalized)
+                || normalized.contains("non project")
+                || normalized.contains("nonproject");
     }
 }

@@ -40,6 +40,7 @@ public class IssueMapper {
                 .statusId(issue.getStatus().getId())
                 .statusName(issue.getStatus().getName())
                 .statusColour(issue.getStatus().getColour())
+                .statusSequence(issue.getStatus().getSequence())
                 .reportedById(issue.getReportedBy() != null ? issue.getReportedBy().getId() : null)
                 .reportedByName(employeeName(issue.getReportedBy()))
                 .assignedToId(issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null)

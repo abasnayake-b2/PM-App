@@ -15,6 +15,10 @@ public class UpdateProjectRequest {
 
     private String product;
 
+    private UUID projectTypeId;
+
+    private UUID workCategoryId;
+
     private String jiraProjectKey;
 
     private UUID leadEmployeeId;

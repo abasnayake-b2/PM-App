@@ -112,6 +112,31 @@ export interface TeamRosterMemberPayload {
   skillIds?: string[];
   totalYearsOfExperience?: number | null;
   experienceInDfn?: number | null;
+  /** Inclusive start date of this engineering-manager assignment (YYYY-MM-DD). */
+  managerAssignmentFromDate?: string;
+}
+
+export interface ManagerAssignment {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  designationCode?: string | null;
+  designation?: string | null;
+  status?: string | null;
+  engineeringManagerManagementId?: string | null;
+  engineeringManagerName?: string | null;
+  vpName?: string | null;
+  fromDate: string;
+  toDate?: string | null;
+  source?: string | null;
+}
+
+export interface ManagerAssignmentQuery {
+  asOf?: string;
+  employeeId?: string;
+  engineeringManagerManagementId?: string;
+  search?: string;
+  includeInactive?: boolean;
 }
 
 export async function fetchTeamManagement(
@@ -176,6 +201,28 @@ export async function fetchTeamRosterMembers(
 
 export async function fetchEngineeringManagers(): Promise<string[]> {
   const { data } = await api.get<string[]>('/team-roster/members/engineering-managers');
+  return data;
+}
+
+export async function fetchManagerAssignments(
+  query: ManagerAssignmentQuery = {},
+): Promise<ManagerAssignment[]> {
+  const { data } = await api.get<ManagerAssignment[]>('/team-roster/manager-assignments', {
+    params: {
+      asOf: query.asOf || undefined,
+      employeeId: query.employeeId || undefined,
+      engineeringManagerManagementId: query.engineeringManagerManagementId || undefined,
+      search: query.search || undefined,
+      includeInactive: query.includeInactive || undefined,
+    },
+  });
+  return data;
+}
+
+export async function fetchMemberManagerAssignments(employeeId: string): Promise<ManagerAssignment[]> {
+  const { data } = await api.get<ManagerAssignment[]>(
+    `/team-roster/members/${employeeId}/manager-assignments`,
+  );
   return data;
 }
 

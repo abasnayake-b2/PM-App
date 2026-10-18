@@ -26,6 +26,7 @@ import com.nexuspm.resource.entity.Allocation;
 import com.nexuspm.resource.repository.AllocationRepository;
 import com.nexuspm.shared.audit.AuditLogService;
 import com.nexuspm.shared.exception.BusinessException;
+import com.nexuspm.shared.security.OrgAccessScopeService;
 import com.nexuspm.shared.security.SecurityUtils;
 import com.nexuspm.shared.softdelete.SoftDeleteService;
 import com.nexuspm.user.entity.Employee;
@@ -37,10 +38,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -82,6 +85,8 @@ public class IssueService {
             UUID assignedToId,
             UUID priorityId,
             UUID issueTypeId,
+            UUID projectTypeId,
+            UUID workCategoryId,
             String q,
             Pageable pageable) {
         verifyListAccess(releaseId, projectId);
@@ -113,6 +118,8 @@ public class IssueService {
                         assignedToId,
                         priorityId,
                         issueTypeId,
+                        projectTypeId,
+                        workCategoryId,
                         hasSearch,
                         searchPattern,
                         hasIdHint,
@@ -134,7 +141,9 @@ public class IssueService {
             UUID projectId,
             Boolean unreleasedOnly,
             UUID priorityId,
-            UUID issueTypeId) {
+            UUID issueTypeId,
+            UUID projectTypeId,
+            UUID workCategoryId) {
         verifyListAccess(null, projectId);
         List<UUID> scopedProjectIds = resolveScopedProjectIds(projectId, null);
         if (scopedProjectIds != null && scopedProjectIds.isEmpty()) {
@@ -143,7 +152,6 @@ public class IssueService {
                     .total(0)
                     .build();
         }
-
         Map<UUID, Long> counts = new LinkedHashMap<>();
         long total = 0;
         for (Object[] row : issueRepository.countByStatusFiltered(
@@ -151,7 +159,9 @@ public class IssueService {
                 scopedProjectIds,
                 Boolean.TRUE.equals(unreleasedOnly),
                 priorityId,
-                issueTypeId)) {
+                issueTypeId,
+                projectTypeId,
+                workCategoryId)) {
             UUID statusId = (UUID) row[0];
             long count = ((Number) row[1]).longValue();
             counts.put(statusId, count);
@@ -185,13 +195,14 @@ public class IssueService {
             List<UUID> statusIds,
             UUID priorityId,
             UUID issueTypeId,
+            UUID projectTypeId,
+            UUID workCategoryId,
             String q) throws IOException {
         verifyListAccess(null, projectId);
         List<UUID> scopedProjectIds = resolveScopedProjectIds(projectId, null);
         if (scopedProjectIds != null && scopedProjectIds.isEmpty()) {
             return backlogExcelExportService.export(List.of(), issueStatusRepository.findAllByOrderBySequenceAsc(), Map.of());
         }
-
         List<UUID> resolvedStatusIds = resolveStatusFilter(statusId, statusIds);
         boolean filterByStatusIds = resolvedStatusIds != null && !resolvedStatusIds.isEmpty();
         String search = normalizeSearch(q);
@@ -211,6 +222,8 @@ public class IssueService {
                 filterByStatusIds ? resolvedStatusIds : List.of(),
                 priorityId,
                 issueTypeId,
+                projectTypeId,
+                workCategoryId,
                 hasSearch,
                 searchPattern,
                 hasIdHint,
@@ -257,7 +270,7 @@ public class IssueService {
      * EM × status pivot for Backlog Tracker matrix tab — one row per project.
      */
     @Transactional(readOnly = true)
-    public CrStatusMatrixResponse getCrStatusMatrix(UUID projectId) {
+    public CrStatusMatrixResponse getCrStatusMatrix(UUID projectId, UUID projectTypeId, UUID workCategoryId) {
         verifyListAccess(null, projectId);
         List<UUID> scopedProjectIds = resolveScopedProjectIds(projectId, null);
         if (scopedProjectIds != null && scopedProjectIds.isEmpty()) {
@@ -299,6 +312,16 @@ public class IssueService {
         long grandActive = 0;
 
         for (Project project : projects) {
+            if (projectTypeId != null && (project.getProjectType() == null
+                    || !projectTypeId.equals(project.getProjectType().getId()))) {
+                continue;
+            }
+            if (workCategoryId != null) {
+                var workCategory = project.getWorkCategory();
+                if (workCategory == null || !workCategoryId.equals(workCategory.getId())) {
+                    continue;
+                }
+            }
             Map<UUID, Long> statusCounts = countsByProject.getOrDefault(project.getId(), Map.of());
             Map<UUID, Long> fullCounts = new LinkedHashMap<>();
             for (IssueStatus status : statuses) {
@@ -372,6 +395,161 @@ public class IssueService {
                         .statusCounts(emptyCounts)
                         .build())
                 .build();
+    }
+
+    private static final String[] RD_BUCKET_KEYS = { "01", "02-04", "05-09", "10-12", "13-17" };
+    private static final String[] RD_BUCKET_LABELS = {
+            "Backlog", "In Requirement", "In RD Drafting", "In Quotation", "In Progress"
+    };
+
+    /**
+     * EM × project pivot of top-level RDs in statuses 01–17, with RD counts and
+     * Et from the RD field Man-days Total ({@code md_total}).
+     */
+    @Transactional(readOnly = true)
+    public EmProjectRdSummaryResponse getEmProjectRdSummary() {
+        verifyListAccess(null, null);
+        List<UUID> scopedProjectIds = resolveScopedProjectIds(null, null);
+        if (scopedProjectIds != null && scopedProjectIds.isEmpty()) {
+            return EmProjectRdSummaryResponse.builder().projects(List.of()).build();
+        }
+
+        Map<String, double[]> mdTotalByProject = new HashMap<>();
+        for (Object[] row : fieldValueRepository.sumNumberByProjectAndStatus("md_total", scopedProjectIds)) {
+            int bucket = rdBucketIndex(((Number) row[1]).intValue());
+            if (bucket < 0) {
+                continue;
+            }
+            UUID projectId = (UUID) row[0];
+            double[] efforts = mdTotalByProject.computeIfAbsent(projectId.toString(), ignored -> new double[5]);
+            efforts[bucket] += row[2] != null ? ((Number) row[2]).doubleValue() : 0;
+        }
+
+        Map<UUID, Double> mdTotalByIssue = new HashMap<>();
+        for (Object[] row : fieldValueRepository.listNumberByIssue("md_total", scopedProjectIds)) {
+            if (row[0] == null || row[1] == null) {
+                continue;
+            }
+            mdTotalByIssue.put((UUID) row[0], ((Number) row[1]).doubleValue());
+        }
+
+        Map<UUID, List<List<EmProjectRdSummaryResponse.RdItem>>> rdsByProject = new HashMap<>();
+        for (Object[] row : issueRepository.listTopLevelRdsForSummary(scopedProjectIds)) {
+            UUID projectId = (UUID) row[0];
+            UUID issueId = (UUID) row[1];
+            int sequence = ((Number) row[4]).intValue();
+            int bucket = rdBucketIndex(sequence);
+            if (bucket < 0) {
+                continue;
+            }
+            String key = row[2] != null ? row[2].toString().trim() : "";
+            String title = row[3] != null ? row[3].toString().trim() : "";
+            String statusName = row[5] != null ? row[5].toString() : "";
+            double effort = mdTotalByIssue.getOrDefault(issueId, 0d);
+            List<List<EmProjectRdSummaryResponse.RdItem>> byBucket =
+                    rdsByProject.computeIfAbsent(projectId, ignored -> {
+                        List<List<EmProjectRdSummaryResponse.RdItem>> buckets = new ArrayList<>(5);
+                        for (int i = 0; i < 5; i++) {
+                            buckets.add(new ArrayList<>());
+                        }
+                        return buckets;
+                    });
+            byBucket.get(bucket).add(EmProjectRdSummaryResponse.RdItem.builder()
+                    .issueId(issueId)
+                    .displayKey(key.isBlank() ? title : key)
+                    .title(title)
+                    .statusSequence(sequence)
+                    .statusName(statusName)
+                    .effort(roundEffort(effort))
+                    .build());
+        }
+
+        record Acc(UUID id, String name, String em, UUID workCategoryId, String workCategoryName,
+                   long[] rd, double[] effort) {}
+        Map<UUID, Acc> byProject = new LinkedHashMap<>();
+        for (Object[] row : issueRepository.aggregateTopLevelRdByProjectAndStatus(scopedProjectIds)) {
+            UUID projectId = (UUID) row[0];
+            int bucket = rdBucketIndex(((Number) row[5]).intValue());
+            if (bucket < 0) {
+                continue;
+            }
+            String emName = row[2] != null ? row[2].toString().trim() : "";
+            Acc acc = byProject.computeIfAbsent(projectId, id -> new Acc(
+                    id,
+                    row[1] != null ? row[1].toString() : "",
+                    emName.isBlank() ? "Unassigned" : emName,
+                    (UUID) row[3],
+                    row[4] != null ? row[4].toString() : null,
+                    new long[5],
+                    new double[5]));
+            acc.rd[bucket] += ((Number) row[6]).longValue();
+            double[] md = mdTotalByProject.get(projectId.toString());
+            if (md != null) {
+                acc.effort[bucket] = md[bucket];
+            }
+        }
+
+        List<EmProjectRdSummaryResponse.ProjectRow> projects = new ArrayList<>();
+        for (Acc acc : byProject.values()) {
+            List<EmProjectRdSummaryResponse.Bucket> buckets = new ArrayList<>();
+            long totalRd = 0;
+            double totalEffort = 0;
+            List<List<EmProjectRdSummaryResponse.RdItem>> projectRds =
+                    rdsByProject.getOrDefault(acc.id, List.of());
+            for (int i = 0; i < 5; i++) {
+                List<EmProjectRdSummaryResponse.RdItem> rds =
+                        i < projectRds.size() ? projectRds.get(i) : List.of();
+                buckets.add(EmProjectRdSummaryResponse.Bucket.builder()
+                        .key(RD_BUCKET_KEYS[i])
+                        .label(RD_BUCKET_LABELS[i])
+                        .rdCount(acc.rd[i])
+                        .effort(roundEffort(acc.effort[i]))
+                        .rds(rds)
+                        .build());
+                totalRd += acc.rd[i];
+                totalEffort += acc.effort[i];
+            }
+            if (totalRd <= 0) {
+                continue;
+            }
+            projects.add(EmProjectRdSummaryResponse.ProjectRow.builder()
+                    .projectId(acc.id)
+                    .projectName(acc.name)
+                    .emName(acc.em)
+                    .workCategoryId(acc.workCategoryId)
+                    .workCategoryName(acc.workCategoryName)
+                    .buckets(buckets)
+                    .totalRd(totalRd)
+                    .totalEffort(roundEffort(totalEffort))
+                    .build());
+        }
+        projects.sort(Comparator
+                .comparing((EmProjectRdSummaryResponse.ProjectRow p) -> p.getEmName() == null ? "" : p.getEmName().toLowerCase())
+                .thenComparing(p -> p.getProjectName() == null ? "" : p.getProjectName().toLowerCase()));
+        return EmProjectRdSummaryResponse.builder().projects(projects).build();
+    }
+
+    private static int rdBucketIndex(int sequence) {
+        if (sequence == 1) {
+            return 0;
+        }
+        if (sequence >= 2 && sequence <= 4) {
+            return 1;
+        }
+        if (sequence >= 5 && sequence <= 9) {
+            return 2;
+        }
+        if (sequence >= 10 && sequence <= 12) {
+            return 3;
+        }
+        if (sequence >= 13 && sequence <= 17) {
+            return 4;
+        }
+        return -1;
+    }
+
+    private static double roundEffort(double value) {
+        return BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP).doubleValue();
     }
 
     private static Map<UUID, Long> toCountMap(List<Object[]> rows) {

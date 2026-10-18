@@ -215,6 +215,68 @@ export function projectColor(projectId: string | undefined, projectName: string)
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
+/** Shared Gantt bar fill — RD status is shown with font colour only. */
+export const GANTT_BAR_FILL = '#D9E2EC';
+
+export const RD_STATUS_BUCKETS = [
+  { key: '01', name: 'Backlog', sequences: '1', color: '#111827' },
+  { key: '02-04', name: 'In Requirement', sequences: '02, 03, 04', color: '#2563EB' },
+  { key: '05-09', name: 'In RD Drafting', sequences: '05, 06, 07, 08, 09', color: '#16A34A' },
+  { key: '10-12', name: 'In Quotation', sequences: '10, 11, 12', color: '#EA580C' },
+  { key: '13-17', name: 'In Progress', sequences: '13, 14, 15, 16, 17', color: '#DC2626' },
+] as const;
+
+export function rdStatusBarFontColor(sequence?: number | null): string {
+  if (sequence == null) return '#111827';
+  if (sequence === 1) return '#111827';
+  if (sequence >= 2 && sequence <= 4) return '#2563EB';
+  if (sequence >= 5 && sequence <= 9) return '#16A34A';
+  if (sequence >= 10 && sequence <= 12) return '#EA580C';
+  if (sequence >= 13 && sequence <= 17) return '#DC2626';
+  return '#111827';
+}
+
+const RD_STATUS_SEQUENCE_BY_NAME: Record<string, number> = {
+  'requirements initiated': 1,
+  'initial requirement gathering': 2,
+  'pending bp effort': 3,
+  'pending bp effort approval': 4,
+  'ballpark accepted': 5,
+  'rd drafting': 6,
+  'pending rd approval': 7,
+  'rd signed off': 8,
+  'pending final effort': 9,
+  'pending quotation preparation': 10,
+  'pending quotation approval': 11,
+  'quotation approved / dev not started': 12,
+  'dev in progress': 13,
+  'dev completed': 14,
+  'sit testing': 15,
+  'uat testing': 16,
+  'uat signed off / pending production': 17,
+};
+
+export function rdStatusSequenceFromName(name?: string | null): number | null {
+  if (!name) return null;
+  return RD_STATUS_SEQUENCE_BY_NAME[name.trim().toLowerCase()] ?? null;
+}
+
+export function rdStatusFontColorForIssue(issue: {
+  statusSequence?: number | null;
+  statusId?: string | null;
+  statusName?: string | null;
+}, statuses: { id: string; name: string; sequence: number }[] = []): string {
+  const fromLookup =
+    (issue.statusId ? statuses.find((status) => status.id === issue.statusId)?.sequence : undefined) ??
+    (issue.statusName
+      ? statuses.find((status) => status.name.trim().toLowerCase() === issue.statusName.trim().toLowerCase())
+          ?.sequence
+      : undefined);
+  return rdStatusBarFontColor(
+    issue.statusSequence ?? fromLookup ?? rdStatusSequenceFromName(issue.statusName),
+  );
+}
+
 export function teamProjectSummary(row: Capacity): string {
   const allocations = capacityAllocations(row);
   if (allocations.length === 0) {
@@ -268,6 +330,19 @@ export function formatAllocationCardLabel(allocation: Allocation): string {
 
 export function allocationTargetLabel(allocation: Allocation): string {
   return allocation.issueTitle?.trim() || allocation.projectName;
+}
+
+export function allocationTaskLabel(allocation: Allocation): string {
+  return (
+    allocation.nonProjectTaskDescription?.trim() ||
+    allocation.rdIssueTaskDescription?.trim() ||
+    allocation.projectTaskDescription?.trim() ||
+    allocationTargetLabel(allocation)
+  );
+}
+
+export function allocationFunctionalUnitLabel(allocation: Allocation): string {
+  return allocation.workCategoryName?.trim() || 'No functional unit';
 }
 
 /** Compact id for timeline bars: RD task, project task, or RD key. */

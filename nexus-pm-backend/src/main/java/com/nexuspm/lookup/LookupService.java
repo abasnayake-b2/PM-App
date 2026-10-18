@@ -3,20 +3,33 @@ package com.nexuspm.lookup;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.ProjectType;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.dto.WorkCategoryResponse;
+import com.nexuspm.lookup.entity.WorkCategory;
+import com.nexuspm.lookup.entity.WorkCategoryManager;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
+import com.nexuspm.lookup.repository.ProjectTypeRepository;
 import com.nexuspm.lookup.repository.TaskCategoryRepository;
 import com.nexuspm.lookup.repository.TaskTypeRepository;
+import com.nexuspm.lookup.repository.WorkCategoryManagerRepository;
+import com.nexuspm.lookup.repository.WorkCategoryRepository;
+import com.nexuspm.teamroster.entity.TeamManagement;
 import com.nexuspm.shared.cache.CacheNames;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +40,9 @@ public class LookupService {
     private final IssueStatusRepository issueStatusRepository;
     private final TaskTypeRepository taskTypeRepository;
     private final TaskCategoryRepository taskCategoryRepository;
+    private final ProjectTypeRepository projectTypeRepository;
+    private final WorkCategoryRepository workCategoryRepository;
+    private final WorkCategoryManagerRepository workCategoryManagerRepository;
 
     @Cacheable(cacheNames = CacheNames.PRIORITIES, key = "'all'")
     @Transactional(readOnly = true)
@@ -50,6 +66,48 @@ public class LookupService {
     @Transactional(readOnly = true)
     public List<TaskCategory> listTaskCategories() {
         return taskCategoryRepository.findAllByOrderBySortOrderAscNameAsc();
+    }
+
+    @Cacheable(cacheNames = CacheNames.PROJECT_TYPES, key = "'all'")
+    @Transactional(readOnly = true)
+    public List<ProjectType> listProjectTypes() {
+        return projectTypeRepository.findAllByOrderBySortOrderAscNameAsc();
+    }
+
+    @Cacheable(cacheNames = CacheNames.WORK_CATEGORIES, key = "'all'")
+    @Transactional(readOnly = true)
+    public List<WorkCategoryResponse> listWorkCategories() {
+        List<WorkCategory> categories = workCategoryRepository.findAllByOrderBySortOrderAscNameAsc();
+        Map<UUID, List<WorkCategoryManager>> byCategory = new LinkedHashMap<>();
+        for (WorkCategoryManager assignment : workCategoryManagerRepository.findAllWithManager()) {
+            byCategory.computeIfAbsent(assignment.getWorkCategory().getId(), ignored -> new ArrayList<>())
+                    .add(assignment);
+        }
+        return categories.stream()
+                .map(category -> {
+                    List<WorkCategoryResponse.ManagerItem> managers = byCategory
+                            .getOrDefault(category.getId(), List.of())
+                            .stream()
+                            .map(assignment -> {
+                                TeamManagement manager = assignment.getEngineeringManager();
+                                return WorkCategoryResponse.ManagerItem.builder()
+                                        .id(manager.getId())
+                                        .name(manager.getFullName())
+                                        .roleTitle(manager.getRoleTitle())
+                                        .build();
+                            })
+                            .sorted(Comparator.comparing(
+                                    WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
+                            .toList();
+                    return WorkCategoryResponse.builder()
+                            .id(category.getId())
+                            .name(category.getName())
+                            .description(category.getDescription())
+                            .sortOrder(category.getSortOrder())
+                            .engineeringManagers(managers)
+                            .build();
+                })
+                .toList();
     }
 
     @Cacheable(cacheNames = CacheNames.ISSUE_STATUSES, key = "'all'")

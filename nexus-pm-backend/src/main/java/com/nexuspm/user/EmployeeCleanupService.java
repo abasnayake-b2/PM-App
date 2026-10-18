@@ -10,6 +10,7 @@ import com.nexuspm.resource.repository.AllocationRepository;
 import com.nexuspm.resource.repository.TaskRepository;
 import com.nexuspm.resource.repository.TimeLogRepository;
 import com.nexuspm.shared.audit.repository.AuditLogRepository;
+import com.nexuspm.teamroster.repository.EmployeeManagerAssignmentRepository;
 import com.nexuspm.user.repository.EmployeeRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class EmployeeCleanupService {
     private final AuditLogRepository auditLogRepository;
     private final SystemSettingRepository systemSettingRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmployeeManagerAssignmentRepository managerAssignmentRepository;
     private final EntityManager entityManager;
 
     @Transactional
@@ -57,6 +59,7 @@ public class EmployeeCleanupService {
         auditLogRepository.clearEmployeeReferences(ids);
         systemSettingRepository.clearUpdatedByEmployeeIds(ids);
         employeeRepository.clearManagerReferences(ids);
+        managerAssignmentRepository.deleteByEmployeeIdIn(ids);
         employeeRepository.deleteRoleLinks(ids);
         employeeRepository.deleteSkillLinks(ids);
         entityManager.flush();

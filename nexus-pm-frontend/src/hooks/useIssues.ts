@@ -15,6 +15,8 @@ export function useIssues(
     assignedToId?: string;
     priorityId?: string;
     issueTypeId?: string;
+    projectTypeId?: string;
+    workCategoryId?: string;
     q?: string;
     page?: number;
     size?: number;

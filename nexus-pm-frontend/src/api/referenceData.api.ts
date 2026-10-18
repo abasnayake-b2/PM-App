@@ -20,6 +20,8 @@ export interface ReferenceItem {
   streamName?: string;
   stream?: { id: string; name: string; department?: { id: string; name: string } };
   management?: boolean;
+  engineeringManagers?: { id: string; name: string; roleTitle?: string }[];
+  sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -276,6 +278,69 @@ export async function updateAdminTaskCategory(
 
 export async function deleteAdminTaskCategory(id: string): Promise<void> {
   await api.delete(`${base}/task-categories/${id}`);
+}
+
+export async function fetchAdminProjectTypes(): Promise<ReferenceItem[]> {
+  const { data } = await api.get<ReferenceItem[]>(`${base}/project-types`);
+  return data;
+}
+
+export async function createAdminProjectType(name: string, description?: string): Promise<ReferenceItem> {
+  const { data } = await api.post<ReferenceItem>(`${base}/project-types`, { name, description });
+  return data;
+}
+
+export async function updateAdminProjectType(
+  id: string,
+  name: string,
+  description?: string,
+): Promise<ReferenceItem> {
+  const { data } = await api.put<ReferenceItem>(`${base}/project-types/${id}`, { name, description });
+  return data;
+}
+
+export async function deleteAdminProjectType(id: string): Promise<void> {
+  await api.delete(`${base}/project-types/${id}`);
+}
+
+export async function fetchAdminWorkCategories(): Promise<ReferenceItem[]> {
+  const { data } = await api.get<ReferenceItem[]>(`${base}/work-categories`);
+  return data;
+}
+
+export async function createAdminWorkCategory(
+  name: string,
+  description?: string,
+  engineeringManagerManagementIds?: string[],
+  sortOrder?: number,
+): Promise<ReferenceItem> {
+  const { data } = await api.post<ReferenceItem>(`${base}/work-categories`, {
+    name,
+    description,
+    engineeringManagerManagementIds,
+    sortOrder,
+  });
+  return data;
+}
+
+export async function updateAdminWorkCategory(
+  id: string,
+  name: string,
+  description?: string,
+  engineeringManagerManagementIds?: string[],
+  sortOrder?: number,
+): Promise<ReferenceItem> {
+  const { data } = await api.put<ReferenceItem>(`${base}/work-categories/${id}`, {
+    name,
+    description,
+    engineeringManagerManagementIds,
+    sortOrder,
+  });
+  return data;
+}
+
+export async function deleteAdminWorkCategory(id: string): Promise<void> {
+  await api.delete(`${base}/work-categories/${id}`);
 }
 
 export async function fetchAdminStatuses(): Promise<ReferenceItem[]> {

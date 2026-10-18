@@ -17,6 +17,7 @@ public class CapacityResponse {
     private String departmentName;
     private String designationName;
     private String vpName;
+    private UUID engineeringManagerManagementId;
     private String engineeringManagerName;
     private String benchStatus;
     /** Employee roster status: ACTIVE or INACTIVE. */

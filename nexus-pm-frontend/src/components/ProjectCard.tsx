@@ -21,8 +21,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <div className="min-w-0">
           <h3 className="font-semibold">{project.name}</h3>
           <p className="mt-1 text-sm text-text2">{orgPath(project)}</p>
-          {project.product && (
-            <p className="mt-1 text-xs text-text2">Product: {project.product}</p>
+          {(project.projectTypeName || project.workCategoryName || project.product) && (
+            <p className="mt-1 text-xs text-text2">
+              {[project.projectTypeName, project.workCategoryName, project.product]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
           )}
         </div>
         <RAGIndicator status={project.ragStatus} />
@@ -36,6 +40,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <div className="flex justify-between gap-4">
           <dt className="text-text2">EM</dt>
           <dd className="text-right font-medium">{project.engineeringManagerName ?? '—'}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-text2">Functional unit</dt>
+          <dd className="text-right font-medium">{project.workCategoryName ?? '—'}</dd>
         </div>
         <div className="flex justify-between gap-4 border-t border-border pt-2">
           <dt className="text-text2"># Backlog item</dt>

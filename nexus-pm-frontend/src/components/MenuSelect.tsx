@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react';
 export type MenuSelectOption = {
   value: string;
   label: string;
+  color?: string;
 };
 
 interface MenuSelectProps {
@@ -105,7 +106,12 @@ export function MenuSelect({
         }}
         className={`flex w-full items-center justify-between gap-2 text-left disabled:opacity-50 ${className}`}
       >
-        <span className={`min-w-0 truncate ${selected ? '' : 'text-text2'}`}>{display}</span>
+        <span
+          className={`min-w-0 truncate ${selected ? 'font-medium' : 'text-text2'}`}
+          style={selected?.color ? { color: selected.color } : undefined}
+        >
+          {display}
+        </span>
         <ChevronDown size={16} className="shrink-0 text-text2" />
       </button>
       {required && (
@@ -152,7 +158,12 @@ export function MenuSelect({
                       pick(option.value);
                     }}
                   >
-                    {option.label}
+                    <span
+                      className="block truncate font-medium"
+                      style={option.color ? { color: option.color } : undefined}
+                    >
+                      {option.label}
+                    </span>
                   </button>
                 );
               })

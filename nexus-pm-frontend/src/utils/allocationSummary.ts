@@ -1,10 +1,12 @@
 import type { Allocation, Capacity } from '@/types';
+import type { WorkCategory } from '@/api/lookup.api';
 import { capacityAllocations, inclusiveDayCount } from '@/utils/allocationUi';
 
 export type SummaryPerson = {
   employeeId: string;
   employeeName: string;
   designationName?: string;
+  engineeringManagerManagementId?: string;
   engineeringManagerName: string;
   allocatedPct: number;
   availablePct: number;
@@ -53,6 +55,7 @@ export type AllocationSummaryTotals = {
 export type AllocationSummaryFilters = {
   taskCategoryId?: string;
   taskTypeId?: string;
+  projectTypeId?: string;
 };
 
 function matchesSummaryFilters(
@@ -63,6 +66,9 @@ function matchesSummaryFilters(
     return false;
   }
   if (filters?.taskTypeId && allocation.taskTypeId !== filters.taskTypeId) {
+    return false;
+  }
+  if (filters?.projectTypeId && allocation.projectTypeId !== filters.projectTypeId) {
     return false;
   }
   return true;
@@ -135,6 +141,7 @@ export function buildAllocationSummary(
         employeeId: row.employeeId,
         employeeName: row.employeeName,
         designationName: row.designationName,
+        engineeringManagerManagementId: row.engineeringManagerManagementId,
         engineeringManagerName: managerName,
         allocatedPct: rangeDays > 0 ? Math.round((projectPersonDays / rangeDays) * 100) : 0,
         availablePct: 0,
@@ -155,6 +162,7 @@ export function buildAllocationSummary(
       employeeId: row.employeeId,
       employeeName: row.employeeName,
       designationName: row.designationName,
+      engineeringManagerManagementId: row.engineeringManagerManagementId,
       engineeringManagerName: managerName,
       allocatedPct,
       availablePct: Math.max(0, 100 - allocatedPct),
@@ -264,6 +272,233 @@ export function buildAllocationSummary(
     allocatedPeople,
     unallocatedPeople,
   };
+}
+
+export type WorkCategoryManagerNode = {
+  key: string;
+  managerId: string;
+  managerName: string;
+  team: SummaryPerson[];
+  projects: { name: string; fte: number }[];
+  teamSize: number;
+  allocatedCount: number;
+  projectCount: number;
+  allocatedFte: number;
+  availableFte: number;
+};
+
+export type WorkCategoryTree = {
+  id: string;
+  name: string;
+  sortOrder?: number;
+  managers: WorkCategoryManagerNode[];
+  teamSize: number;
+  allocatedCount: number;
+  projectCount: number;
+  allocatedFte: number;
+  availableFte: number;
+};
+
+function normName(value?: string | null): string {
+  return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function priorityValue(value?: number | null): number {
+  if (value == null || !Number.isFinite(Number(value))) return Number.MAX_SAFE_INTEGER;
+  return Number(value);
+}
+
+export function compareByPriority(
+  a: { sortOrder?: number | null; name: string },
+  b: { sortOrder?: number | null; name: string },
+): number {
+  const order = priorityValue(a.sortOrder) - priorityValue(b.sortOrder);
+  return order !== 0
+    ? order
+    : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+}
+
+function personScopedToWorkCategory(
+  person: SummaryPerson,
+  workCategoryId: string | null,
+  rangeFrom: string,
+  rangeTo: string,
+  rangeDays: number,
+): SummaryPerson | null {
+  const scoped = person.allocations.filter((allocation) =>
+    workCategoryId
+      ? allocation.workCategoryId === workCategoryId
+      : !allocation.workCategoryId,
+  );
+  let personDays = 0;
+  const inRange: Allocation[] = [];
+  for (const allocation of scoped) {
+    const days = overlapDays(allocation, rangeFrom, rangeTo);
+    if (days <= 0) continue;
+    inRange.push(allocation);
+    personDays += (allocation.percentage * days) / 100;
+  }
+  if (inRange.length === 0) return null;
+  const fte = rangeDays > 0 ? personDays / rangeDays : 0;
+  const allocatedPct = Math.round(fte * 100);
+  return {
+    ...person,
+    allocations: inRange,
+    personDays,
+    fte,
+    allocatedPct,
+    availablePct: Math.max(0, 100 - allocatedPct),
+  };
+}
+
+function projectsFromPeople(
+  people: SummaryPerson[],
+  rangeFrom: string,
+  rangeTo: string,
+  rangeDays: number,
+): { name: string; fte: number }[] {
+  const byName = new Map<string, number>();
+  for (const person of people) {
+    for (const allocation of person.allocations) {
+      const days = overlapDays(allocation, rangeFrom, rangeTo);
+      if (days <= 0) continue;
+      const name = allocation.projectName?.trim() || allocation.workCategoryName || 'Unassigned';
+      byName.set(name, (byName.get(name) ?? 0) + (allocation.percentage * days) / 100);
+    }
+  }
+  return [...byName.entries()]
+    .map(([name, days]) => ({
+      name,
+      fte: rangeDays > 0 ? days / rangeDays : 0,
+    }))
+    .sort((a, b) => b.fte - a.fte || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function managerNodeFromTeam(
+  key: string,
+  managerId: string,
+  managerName: string,
+  team: SummaryPerson[],
+  rangeFrom: string,
+  rangeTo: string,
+  rangeDays: number,
+): WorkCategoryManagerNode {
+  const unique = [...new Map(team.map((person) => [person.employeeId, person])).values()].sort(
+    (a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { sensitivity: 'base' }),
+  );
+  const projects = projectsFromPeople(unique, rangeFrom, rangeTo, rangeDays);
+  const allocatedFte = unique.reduce((sum, person) => sum + person.fte, 0);
+  const availableFte = unique.reduce((sum, person) => sum + Math.max(0, 1 - person.fte), 0);
+  return {
+    key,
+    managerId,
+    managerName,
+    team: unique,
+    projects,
+    teamSize: unique.length,
+    allocatedCount: unique.filter((person) => person.fte > 0).length,
+    projectCount: projects.length,
+    allocatedFte,
+    availableFte,
+  };
+}
+
+export function buildWorkCategoryTrees(
+  people: SummaryPerson[],
+  managers: ManagerAllocationSummary[],
+  workCategories: WorkCategory[],
+  rangeFrom: string,
+  rangeTo: string,
+  options?: { includeUnassigned?: boolean },
+): WorkCategoryTree[] {
+  const rangeDays = inclusiveDayCount(rangeFrom, rangeTo);
+
+  const trees = workCategories
+    .map((category) => {
+      const scopedPeople = people
+        .map((person) =>
+          personScopedToWorkCategory(person, category.id, rangeFrom, rangeTo, rangeDays),
+        )
+        .filter((person): person is SummaryPerson => person != null);
+      const byManager = new Map<string, { id: string; name: string; team: SummaryPerson[] }>();
+      for (const person of scopedPeople) {
+        const managerId =
+          person.engineeringManagerManagementId ||
+          normName(person.engineeringManagerName) ||
+          'unassigned';
+        const managerName = person.engineeringManagerName?.trim() || 'Unassigned';
+        const existing = byManager.get(managerId);
+        if (existing) {
+          existing.team.push(person);
+        } else {
+          byManager.set(managerId, { id: managerId, name: managerName, team: [person] });
+        }
+      }
+      const managerNodes = [...byManager.values()]
+        .map((group) =>
+          managerNodeFromTeam(
+            `${category.id}:${group.id}`,
+            group.id,
+            group.name,
+            group.team,
+            rangeFrom,
+            rangeTo,
+            rangeDays,
+          ),
+        )
+        .sort((a, b) =>
+          a.managerName.localeCompare(b.managerName, undefined, { sensitivity: 'base' }),
+        );
+      return {
+        id: category.id,
+        name: category.name,
+        sortOrder: category.sortOrder,
+        managers: managerNodes,
+        teamSize: managerNodes.reduce((sum, node) => sum + node.teamSize, 0),
+        allocatedCount: managerNodes.reduce((sum, node) => sum + node.allocatedCount, 0),
+        projectCount: new Set(managerNodes.flatMap((node) => node.projects.map((project) => project.name))).size,
+        allocatedFte: managerNodes.reduce((sum, node) => sum + node.allocatedFte, 0),
+        availableFte: managerNodes.reduce((sum, node) => sum + node.availableFte, 0),
+      };
+    })
+    .sort(compareByPriority);
+
+  if (options?.includeUnassigned !== false) {
+    const leftoverNodes: WorkCategoryManagerNode[] = managers
+      .map((manager) => {
+        const team = manager.people
+          .map((person) =>
+            personScopedToWorkCategory(person, null, rangeFrom, rangeTo, rangeDays),
+          )
+          .filter((person): person is SummaryPerson => person != null);
+        return managerNodeFromTeam(
+          `unassigned:${manager.key}`,
+          manager.key,
+          manager.managerName,
+          team,
+          rangeFrom,
+          rangeTo,
+          rangeDays,
+        );
+      })
+      .filter((node) => node.teamSize > 0);
+    leftoverNodes.sort((a, b) =>
+      a.managerName.localeCompare(b.managerName, undefined, { sensitivity: 'base' }),
+    );
+    if (leftoverNodes.length > 0) {
+      trees.push({
+        id: 'unassigned',
+        name: 'No functional unit',
+        managers: leftoverNodes,
+        teamSize: leftoverNodes.reduce((sum, node) => sum + node.teamSize, 0),
+        allocatedCount: leftoverNodes.reduce((sum, node) => sum + node.allocatedCount, 0),
+        projectCount: new Set(leftoverNodes.flatMap((node) => node.projects.map((project) => project.name))).size,
+        allocatedFte: leftoverNodes.reduce((sum, node) => sum + node.allocatedFte, 0),
+        availableFte: leftoverNodes.reduce((sum, node) => sum + node.availableFte, 0),
+      });
+    }
+  }
+  return trees;
 }
 
 export function formatFte(value: number): string {

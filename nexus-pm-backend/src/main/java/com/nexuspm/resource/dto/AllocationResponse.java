@@ -16,8 +16,12 @@ public class AllocationResponse {
     private UUID issueId;
     private String issueTitle;
     private String issueDisplayKey;
+    private Integer issueStatusSequence;
+    private String issueStatusName;
     private UUID projectId;
     private String projectName;
+    private UUID projectTypeId;
+    private String projectTypeName;
     private UUID projectTaskId;
     private String projectTaskKey;
     private String projectTaskDescription;
@@ -28,6 +32,8 @@ public class AllocationResponse {
     private String taskTypeName;
     private UUID taskCategoryId;
     private String taskCategoryName;
+    private UUID workCategoryId;
+    private String workCategoryName;
     private UUID nonProjectTaskId;
     private String nonProjectTaskDescription;
     private String roleOnProject;

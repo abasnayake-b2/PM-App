@@ -133,10 +133,16 @@ public class TaskTypeSchemaMigrator implements BeanPostProcessor {
                             """
                             INSERT INTO task_category (id, name, description, sort_order) VALUES
                             ('b1000001-0000-0000-0000-000000000001', 'Project related', NULL, 1),
-                            ('b1000001-0000-0000-0000-000000000002', 'Non-Project Related', NULL, 2)
+                            ('b1000001-0000-0000-0000-000000000002', 'Non-Project Related', NULL, 2),
+                            ('b1000001-0000-0000-0000-000000000003', 'Other', NULL, 3)
                             """);
                 }
             }
+            statement.execute(
+                    """
+                    INSERT IGNORE INTO task_category (id, name, description, sort_order) VALUES
+                    ('b1000001-0000-0000-0000-000000000003', 'Other', NULL, 3)
+                    """);
             boolean allocationExists;
             try (ResultSet rs = statement.executeQuery(
                     """

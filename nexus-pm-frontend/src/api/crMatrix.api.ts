@@ -33,9 +33,17 @@ export interface CrStatusMatrix {
   };
 }
 
-export async function fetchCrStatusMatrix(projectId?: string): Promise<CrStatusMatrix> {
+export async function fetchCrStatusMatrix(params: {
+  projectId?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
+} = {}): Promise<CrStatusMatrix> {
   const { data } = await api.get<CrStatusMatrix>('/issues/cr-status-matrix', {
-    params: projectId ? { projectId } : undefined,
+    params: {
+      ...(params.projectId ? { projectId: params.projectId } : {}),
+      ...(params.projectTypeId ? { projectTypeId: params.projectTypeId } : {}),
+      ...(params.workCategoryId ? { workCategoryId: params.workCategoryId } : {}),
+    },
   });
   return data;
 }

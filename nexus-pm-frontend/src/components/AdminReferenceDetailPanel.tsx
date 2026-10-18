@@ -10,6 +10,8 @@ export type RefTab =
   | 'issue-types'
   | 'task-types'
   | 'task-categories'
+  | 'project-types'
+  | 'work-categories'
   | 'statuses'
   | 'priorities';
 
@@ -65,6 +67,23 @@ function detailFields(tab: RefTab, item: ReferenceItem): { label: string; value?
       return [
         { label: 'Name', value: item.name },
         { label: 'Description', value: item.description },
+      ];
+    case 'project-types':
+      return [
+        { label: 'Name', value: item.name },
+        { label: 'Description', value: item.description },
+      ];
+    case 'work-categories':
+      return [
+        { label: 'Name', value: item.name },
+        { label: 'Priority', value: item.sortOrder != null ? String(item.sortOrder) : null },
+        { label: 'Description', value: item.description },
+        {
+          label: 'Engineering managers',
+          value: item.engineeringManagers?.length
+            ? item.engineeringManagers.map((manager) => manager.name).join(', ')
+            : null,
+        },
       ];
     case 'statuses':
       return [
@@ -151,9 +170,11 @@ export function itemSearchText(item: ReferenceItem): string {
     item.streamName,
     item.colour,
     item.sequence != null ? String(item.sequence) : null,
+    item.sortOrder != null ? String(item.sortOrder) : null,
     item.level != null ? String(item.level) : null,
     item.terminal ? 'terminal' : null,
     item.management ? 'management' : 'employee',
+    ...(item.engineeringManagers ?? []).map((manager) => manager.name),
   ]
     .filter(Boolean)
     .join(' ')

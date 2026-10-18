@@ -18,6 +18,7 @@ import {
 } from '@/hooks/useTeamRoster';
 import { EMPLOYMENT_TYPE_OPTIONS } from '@/utils/employmentType';
 import { partitionManagersByType } from '@/utils/managementRoles';
+import { todayLocalIso } from '@/utils/allocationUi';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -220,6 +221,9 @@ export function TeamRosterMemberForm({
   const [workTypeId, setWorkTypeId] = useState(() => resolveWorkTypeId(initial, workTypes));
   const [countryId, setCountryId] = useState(() => resolveCountryId(initial, countries));
   const [emManagementId, setEmManagementId] = useState(() => resolveEmManagementId(initial, managers));
+  const initialEmId = resolveEmManagementId(initial, managers);
+  const [assignmentFromDate, setAssignmentFromDate] = useState(todayLocalIso());
+  const managerChanged = emManagementId !== initialEmId;
   const [skillIds, setSkillIds] = useState<string[]>(() => initial?.skillIds ?? []);
   const [pictureUrl, setPictureUrl] = useState<string | null | undefined>(initial?.profilePictureUrl);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -313,6 +317,9 @@ export function TeamRosterMemberForm({
       skillIds,
       totalYearsOfExperience,
       experienceInDfn,
+      ...((!initial || managerChanged) && assignmentFromDate
+        ? { managerAssignmentFromDate: assignmentFromDate }
+        : {}),
     });
   };
 
@@ -456,7 +463,11 @@ export function TeamRosterMemberForm({
       </label>
       <label className="block text-sm">
         <span className="text-text2">Manager</span>
-        <select value={emManagementId} onChange={(e) => setEmManagementId(e.target.value)} className={selectClass}>
+        <select
+          value={emManagementId}
+          onChange={(e) => setEmManagementId(e.target.value)}
+          className={selectClass}
+        >
           <option value="">Select manager…</option>
           {managerGroups.engineering.length > 0 && (
             <optgroup label="Engineering Managers">
@@ -496,6 +507,23 @@ export function TeamRosterMemberForm({
           )}
         </select>
       </label>
+      {(!initial || managerChanged) && (
+        <label className="block text-sm">
+          <span className="text-text2">Manager effective date</span>
+          <input
+            type="date"
+            required
+            max={todayLocalIso()}
+            value={assignmentFromDate}
+            onChange={(e) => setAssignmentFromDate(e.target.value)}
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-text2">
+            Date they started reporting to this manager. Use today for a move that starts now, or a
+            past date if the move already happened.
+          </p>
+        </label>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="text-text2">NTP/GBL</span>

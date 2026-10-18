@@ -95,11 +95,16 @@ public class ReportTools {
                             uuidOrNull(args, "projectId"),
                             boolOrNull(args, "unreleasedOnly"),
                             uuidOrNull(args, "priorityId"),
-                            uuidOrNull(args, "issueTypeId"));
+                            uuidOrNull(args, "issueTypeId"),
+                            uuidOrNull(args, "projectTypeId"),
+                            uuidOrNull(args, "workCategoryId"));
                 }
                 case EligibleToolRegistry.ISSUES_CR_MATRIX -> {
                     requireIssues();
-                    yield issueService.getCrStatusMatrix(uuidOrNull(args, "projectId"));
+                    yield issueService.getCrStatusMatrix(
+                            uuidOrNull(args, "projectId"),
+                            uuidOrNull(args, "projectTypeId"),
+                            uuidOrNull(args, "workCategoryId"));
                 }
                 default -> Map.of("error", "Unknown tool: " + toolName);
             };

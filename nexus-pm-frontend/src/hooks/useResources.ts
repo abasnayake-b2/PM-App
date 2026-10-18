@@ -22,9 +22,11 @@ export function useCapacity(
     to?: string;
     asOf?: string;
     team?: string;
+    department?: string;
     designationCode?: string;
     engineeringManager?: string;
     name?: string;
+    workCategoryId?: string;
   } = {},
   options: { enabled?: boolean } = {},
 ) {

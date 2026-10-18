@@ -37,6 +37,7 @@ public class IssueResponse {
     private UUID statusId;
     private String statusName;
     private String statusColour;
+    private Integer statusSequence;
     private UUID reportedById;
     private String reportedByName;
     private UUID assignedToId;

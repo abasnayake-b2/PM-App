@@ -184,8 +184,16 @@ export function ProjectDetailPage() {
             )}
           </div>
           <p className="mt-1 text-text2">{project.clientName}</p>
-          {project.product && (
-            <p className="mt-1 text-sm text-text2">Product: {project.product}</p>
+          {(project.projectTypeName || project.workCategoryName || project.product) && (
+            <p className="mt-1 text-sm text-text2">
+              {[
+                project.projectTypeName,
+                project.workCategoryName,
+                project.product && `Product: ${project.product}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">

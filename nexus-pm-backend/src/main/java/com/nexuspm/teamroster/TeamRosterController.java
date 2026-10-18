@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class TeamRosterController {
 
     private final TeamRosterService teamRosterService;
+    private final EmployeeManagerAssignmentService managerAssignmentService;
 
     @GetMapping("/management")
     @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
@@ -112,6 +114,24 @@ public class TeamRosterController {
     @PreAuthorize("@perm.canAny('TEAM_VIEW', 'ORG_STRUCTURE_VIEW')")
     public List<String> listEngineeringManagers() {
         return teamRosterService.listEngineeringManagers();
+    }
+
+    @GetMapping("/manager-assignments")
+    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    public List<ManagerAssignmentResponse> listManagerAssignments(
+            @RequestParam(required = false) LocalDate asOf,
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) UUID engineeringManagerManagementId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return managerAssignmentService.listAsOf(
+                asOf, employeeId, engineeringManagerManagementId, search, includeInactive);
+    }
+
+    @GetMapping("/members/{id}/manager-assignments")
+    @PreAuthorize("@perm.can('TEAM_VIEW')")
+    public List<ManagerAssignmentResponse> listMemberManagerAssignments(@PathVariable UUID id) {
+        return managerAssignmentService.listForEmployee(id);
     }
 
     @PostMapping("/members")

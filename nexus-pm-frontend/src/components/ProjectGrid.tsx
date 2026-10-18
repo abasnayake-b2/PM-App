@@ -15,6 +15,8 @@ export function ProjectGrid({ projects, showManageActions = false }: ProjectGrid
           <tr>
             <th className="w-12 px-3 py-3">#</th>
             <th className="px-4 py-3">Project</th>
+            <th className="px-4 py-3">Type</th>
+            <th className="px-4 py-3">Functional unit</th>
             <th className="px-4 py-3">Client</th>
             <th className="px-4 py-3">RAG</th>
             <th className="px-4 py-3">Region</th>
@@ -35,6 +37,8 @@ export function ProjectGrid({ projects, showManageActions = false }: ProjectGrid
                   <span className="ml-2 rounded bg-bg3 px-1.5 py-0.5 text-xs text-text2">Archived</span>
                 )}
               </td>
+              <td className="px-4 py-3 text-text2">{project.projectTypeName ?? '—'}</td>
+              <td className="px-4 py-3 text-text2">{project.workCategoryName ?? '—'}</td>
               <td className="px-4 py-3 text-text2">{project.clientName ?? '—'}</td>
               <td className="px-4 py-3">
                 <RAGIndicator status={project.ragStatus} />

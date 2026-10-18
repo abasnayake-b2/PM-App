@@ -8,6 +8,7 @@ import com.nexuspm.report.dto.OrgWorkforceSummary;
 import com.nexuspm.report.dto.VpOrgBreakdownRow;
 import com.nexuspm.teamroster.entity.TeamManagement;
 import com.nexuspm.teamroster.repository.TeamManagementRepository;
+import com.nexuspm.user.ActiveRosterStatus;
 import com.nexuspm.user.EmployeeRosterRefs;
 import com.nexuspm.user.entity.Employee;
 import com.nexuspm.user.repository.EmployeeRepository;
@@ -68,7 +69,7 @@ public class OrgWorkforceService {
             }
         }
 
-        for (Employee employee : employeeRepository.findActiveRosterEmployees()) {
+        for (Employee employee : activeRosterEmployees()) {
             EmOrgEngineerItem item = EmOrgEngineerItem.builder()
                     .name(employee.getFullName())
                     .designation(designationLabel(employee))
@@ -133,7 +134,7 @@ public class OrgWorkforceService {
         Map<String, TeamManagement> byName = indexByName(management);
         Map<UUID, List<TeamManagement>> childrenBySupervisor =
                 childrenBySupervisor(management, byId, byName);
-        List<Employee> engineers = employeeRepository.findActiveEngineersWithManager();
+        List<Employee> engineers = activeEngineersWithManager();
 
         List<TeamManagement> vps = management.stream()
                 .filter(person -> isVpRole(person.getRoleTitle()))
@@ -167,7 +168,7 @@ public class OrgWorkforceService {
             return List.of();
         }
 
-        List<Employee> engineers = employeeRepository.findActiveEngineersWithManager();
+        List<Employee> engineers = activeEngineersWithManager();
         return management.stream()
                 .filter(person -> roleMatch.test(person.getRoleTitle()))
                 .sorted(Comparator.comparing(TeamManagement::getFullName, String.CASE_INSENSITIVE_ORDER))
@@ -178,6 +179,18 @@ public class OrgWorkforceService {
     private List<TeamManagement> activeManagement() {
         return managementRepository.findAll().stream()
                 .filter(person -> "ACTIVE".equalsIgnoreCase(person.getStatus()))
+                .toList();
+    }
+
+    private List<Employee> activeRosterEmployees() {
+        return employeeRepository.findActiveRosterEmployees().stream()
+                .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
+                .toList();
+    }
+
+    private List<Employee> activeEngineersWithManager() {
+        return employeeRepository.findActiveEngineersWithManager().stream()
+                .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                 .toList();
     }
 

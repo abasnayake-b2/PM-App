@@ -15,13 +15,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE (:projectId IS NULL OR p.id = :projectId)
               AND (:issueId IS NULL OR i.id = :issueId)
               AND (:employeeId IS NULL OR e.id = :employeeId)
@@ -37,11 +41,15 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE i.id IN :issueIds
               AND a.fromDate <= :asOf
               AND (a.toDate IS NULL OR a.toDate >= :asOf)
@@ -57,13 +65,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE a.fromDate <= :rangeEnd
               AND (a.toDate IS NULL OR a.toDate >= :rangeStart)
               AND a.deleted = false
@@ -79,13 +91,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.designation
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE a.fromDate <= :rangeEnd
               AND (a.toDate IS NULL OR a.toDate >= :rangeStart)
               AND a.deleted = false
@@ -100,13 +116,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE p.id IN :projectIds
               AND (:issueId IS NULL OR i.id = :issueId)
               AND (:employeeId IS NULL OR e.id = :employeeId)
@@ -148,13 +168,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
     @Query("""
             SELECT a FROM Allocation a
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE a.employee.id = :employeeId
               AND a.fromDate <= :rangeEnd
               AND (a.toDate IS NULL OR a.toDate >= :rangeStart)
@@ -166,12 +190,16 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE i.id = :issueId
               AND a.deleted = false
             ORDER BY e.lastName, e.firstName
@@ -182,13 +210,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE p.id = :projectId
             ORDER BY e.lastName, e.firstName, i.title
             """)
@@ -198,13 +230,17 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
             SELECT a FROM Allocation a
             JOIN FETCH a.employee e
             LEFT JOIN FETCH a.project p
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             LEFT JOIN FETCH a.issue i
+            LEFT JOIN FETCH i.status
             LEFT JOIN FETCH i.release r
             LEFT JOIN FETCH a.projectTask pt
             LEFT JOIN FETCH a.rdIssueTask rt
             LEFT JOIN FETCH a.nonProjectTask npt
             LEFT JOIN FETCH a.taskType
             LEFT JOIN FETCH a.taskCategory
+            LEFT JOIN FETCH a.workCategory
             WHERE e.id = :employeeId
             ORDER BY p.name, i.title
             """)

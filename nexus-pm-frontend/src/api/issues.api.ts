@@ -11,6 +11,8 @@ export interface IssueListParams {
   assignedToId?: string;
   priorityId?: string;
   issueTypeId?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
   q?: string;
   page?: number;
   size?: number;
@@ -43,6 +45,8 @@ export async function fetchIssueStatusCounts(params: {
   unreleasedOnly?: boolean;
   priorityId?: string;
   issueTypeId?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
 } = {}): Promise<IssueStatusCounts> {
   const { data } = await api.get<IssueStatusCounts>('/issues/status-counts', { params });
   // Backend may serialize UUID keys; normalize to string keys + number values
@@ -55,6 +59,39 @@ export async function fetchIssueStatusCounts(params: {
     countsByStatusId,
     total: Number(data?.total) || 0,
   };
+}
+
+export interface EmProjectRdItem {
+  issueId?: string;
+  displayKey: string;
+  title?: string;
+  statusSequence: number;
+  statusName: string;
+  effort?: number;
+}
+
+export interface EmProjectRdBucket {
+  key: string;
+  label: string;
+  rdCount: number;
+  effort: number;
+  rds?: EmProjectRdItem[];
+}
+
+export interface EmProjectRdRow {
+  projectId: string;
+  projectName: string;
+  emName?: string;
+  workCategoryId?: string;
+  workCategoryName?: string;
+  buckets: EmProjectRdBucket[];
+  totalRd: number;
+  totalEffort: number;
+}
+
+export async function fetchEmProjectRdSummary(): Promise<{ projects: EmProjectRdRow[] }> {
+  const { data } = await api.get<{ projects: EmProjectRdRow[] }>('/issues/em-project-rd-summary');
+  return data;
 }
 
 export async function fetchIssue(id: string): Promise<Issue> {
@@ -206,6 +243,8 @@ export async function exportBacklogExcel(params: {
   statusIds?: string[];
   priorityId?: string;
   issueTypeId?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
   q?: string;
 } = {}): Promise<void> {
   const { statusIds, ...rest } = params;

@@ -60,11 +60,13 @@ public class IssueController {
             @RequestParam(required = false) UUID assignedToId,
             @RequestParam(required = false) UUID priorityId,
             @RequestParam(required = false) UUID issueTypeId,
+            @RequestParam(required = false) UUID projectTypeId,
+            @RequestParam(required = false) UUID workCategoryId,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 50, sort = {"project.name", "rdNumber", "childNumber", "createdAt"}) Pageable pageable) {
         return issueService.listIssues(
                 releaseId, projectId, unreleasedOnly, statusId, statusIds, slaStatus,
-                assignedToId, priorityId, issueTypeId, q, pageable);
+                assignedToId, priorityId, issueTypeId, projectTypeId, workCategoryId, q, pageable);
     }
 
     @GetMapping("/export")
@@ -75,9 +77,11 @@ public class IssueController {
             @RequestParam(required = false) List<UUID> statusIds,
             @RequestParam(required = false) UUID priorityId,
             @RequestParam(required = false) UUID issueTypeId,
+            @RequestParam(required = false) UUID projectTypeId,
+            @RequestParam(required = false) UUID workCategoryId,
             @RequestParam(required = false) String q) throws IOException {
         byte[] body = issueService.exportBacklogExcel(
-                projectId, statusId, statusIds, priorityId, issueTypeId, q);
+                projectId, statusId, statusIds, priorityId, issueTypeId, projectTypeId, workCategoryId, q);
         String filename = "backlog-rds-by-project-" + FILE_DATE.format(LocalDate.now()) + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
@@ -92,14 +96,25 @@ public class IssueController {
             @RequestParam(required = false) UUID projectId,
             @RequestParam(required = false) Boolean unreleasedOnly,
             @RequestParam(required = false) UUID priorityId,
-            @RequestParam(required = false) UUID issueTypeId) {
-        return issueService.getStatusCounts(projectId, unreleasedOnly, priorityId, issueTypeId);
+            @RequestParam(required = false) UUID issueTypeId,
+            @RequestParam(required = false) UUID projectTypeId,
+            @RequestParam(required = false) UUID workCategoryId) {
+        return issueService.getStatusCounts(projectId, unreleasedOnly, priorityId, issueTypeId, projectTypeId, workCategoryId);
     }
 
     @GetMapping("/cr-status-matrix")
     @PreAuthorize("@perm.can('ISSUES_VIEW')")
-    public CrStatusMatrixResponse crStatusMatrix(@RequestParam(required = false) UUID projectId) {
-        return issueService.getCrStatusMatrix(projectId);
+    public CrStatusMatrixResponse crStatusMatrix(
+            @RequestParam(required = false) UUID projectId,
+            @RequestParam(required = false) UUID projectTypeId,
+            @RequestParam(required = false) UUID workCategoryId) {
+        return issueService.getCrStatusMatrix(projectId, projectTypeId, workCategoryId);
+    }
+
+    @GetMapping("/em-project-rd-summary")
+    @PreAuthorize("@perm.can('ISSUES_VIEW') or @perm.can('ALLOCATIONS_VIEW')")
+    public EmProjectRdSummaryResponse emProjectRdSummary() {
+        return issueService.getEmProjectRdSummary();
     }
 
     @GetMapping("/{id}")

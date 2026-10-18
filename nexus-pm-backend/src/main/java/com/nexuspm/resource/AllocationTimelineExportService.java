@@ -39,6 +39,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -72,9 +73,11 @@ public class AllocationTimelineExportService {
             LocalDate to,
             LocalDate asOf,
             String team,
+            String department,
             String designationCode,
             String engineeringManager,
-            String name) throws IOException {
+            String name,
+            UUID workCategoryId) throws IOException {
 
         LocalDate rangeStart = from != null ? from : LocalDate.now().withDayOfMonth(1);
         LocalDate rangeEnd = to != null
@@ -82,7 +85,7 @@ public class AllocationTimelineExportService {
                 : rangeStart.plusMonths(5).withDayOfMonth(rangeStart.plusMonths(5).lengthOfMonth());
 
         List<CapacityResponse> capacity = allocationService.getCapacity(
-                rangeStart, rangeEnd, asOf, team, designationCode, engineeringManager, name);
+                rangeStart, rangeEnd, asOf, team, department, designationCode, engineeringManager, name, workCategoryId);
 
         List<CapacityResponse> sorted = capacity.stream()
                 .sorted(Comparator

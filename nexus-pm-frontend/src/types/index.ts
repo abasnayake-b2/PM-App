@@ -74,6 +74,10 @@ export interface Project {
   id: string;
   name: string;
   product?: string;
+  projectTypeId?: string;
+  projectTypeName?: string;
+  workCategoryId?: string;
+  workCategoryName?: string;
   jiraProjectKey?: string;
   code?: string;
   description?: string;
@@ -151,6 +155,7 @@ export interface Issue {
   statusId: string;
   statusName?: string;
   statusColour?: string;
+  statusSequence?: number;
   reportedById?: string;
   reportedByName?: string;
   assignedToId?: string;
@@ -184,8 +189,12 @@ export interface Allocation {
   issueId?: string;
   issueTitle?: string;
   issueDisplayKey?: string;
+  issueStatusSequence?: number;
+  issueStatusName?: string;
   projectId?: string;
   projectName: string;
+  projectTypeId?: string;
+  projectTypeName?: string;
   projectTaskId?: string;
   projectTaskKey?: string;
   projectTaskDescription?: string;
@@ -196,6 +205,8 @@ export interface Allocation {
   taskTypeName?: string;
   taskCategoryId?: string;
   taskCategoryName?: string;
+  workCategoryId?: string;
+  workCategoryName?: string;
   nonProjectTaskId?: string;
   nonProjectTaskDescription?: string;
   roleOnProject?: string;
@@ -213,6 +224,7 @@ export interface Capacity {
   departmentName?: string;
   designationName?: string;
   vpName?: string;
+  engineeringManagerManagementId?: string;
   engineeringManagerName?: string;
   benchStatus?: string;
   /** ACTIVE or INACTIVE — inactive keep historical allocations but cannot be newly allocated. */

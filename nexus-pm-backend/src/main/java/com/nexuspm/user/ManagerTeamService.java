@@ -28,14 +28,14 @@ public class ManagerTeamService {
     public List<Employee> resolveTeam(Employee manager) {
         String role = manager.getPrimaryRoleCode();
         if ("CXO".equals(role) || "CTO".equals(role)) {
-            return employeeRepository.findActiveRosterFiltered(null, null, null, null);
+            return employeeRepository.findActiveRosterFiltered(null, null, null, null, null);
         }
         if (("VP".equals(role) || "VP_ENG".equals(role)
                 || "MANAGER".equals(role) || "SEM".equals(role) || "SR_SEM".equals(role)
                 || "PM".equals(role) || "PROJECT_MANAGER".equals(role)
                 || "DM".equals(role) || "DELIVERY_MANAGER".equals(role))
                 && manager.isOrgWideVisibility()) {
-            return employeeRepository.findActiveRosterFiltered(null, null, null, null);
+            return employeeRepository.findActiveRosterFiltered(null, null, null, null, null);
         }
         return resolveTeamDefault(manager);
     }

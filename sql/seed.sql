@@ -253,7 +253,8 @@ INSERT INTO task_type (id, name, description, sort_order) VALUES
 
 INSERT INTO task_category (id, name, description, sort_order) VALUES
 ('b1000001-0000-0000-0000-000000000001', 'Project related', NULL, 1),
-('b1000001-0000-0000-0000-000000000002', 'Non-Project Related', NULL, 2);
+('b1000001-0000-0000-0000-000000000002', 'Non-Project Related', NULL, 2),
+('b1000001-0000-0000-0000-000000000003', 'Other', NULL, 3);
 
 INSERT INTO notification_template (id, code, subject, body_template) VALUES
 ('03000001-0000-0000-0000-000000000002', 'ALLOCATION_NEW', 'New project allocation', 'You have been allocated {{percentage}}% to {{projectName}}.'),

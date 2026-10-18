@@ -50,10 +50,13 @@ public class AllocationController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
             @RequestParam(required = false) String team,
+            @RequestParam(required = false) String department,
             @RequestParam(required = false) String designationCode,
             @RequestParam(required = false) String engineeringManager,
-            @RequestParam(required = false) String name) {
-        return allocationService.getCapacity(from, to, asOf, team, designationCode, engineeringManager, name);
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) UUID workCategoryId) {
+        return allocationService.getCapacity(
+                from, to, asOf, team, department, designationCode, engineeringManager, name, workCategoryId);
     }
 
     @GetMapping("/capacity/timeline/export")
@@ -63,11 +66,13 @@ public class AllocationController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
             @RequestParam(required = false) String team,
+            @RequestParam(required = false) String department,
             @RequestParam(required = false) String designationCode,
             @RequestParam(required = false) String engineeringManager,
-            @RequestParam(required = false) String name) throws IOException {
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) UUID workCategoryId) throws IOException {
         byte[] body = allocationTimelineExportService.exportTimeline(
-                from, to, asOf, team, designationCode, engineeringManager, name);
+                from, to, asOf, team, department, designationCode, engineeringManager, name, workCategoryId);
 
         String fromLabel = from != null ? FILE_DATE.format(from) : "start";
         String toLabel = to != null ? FILE_DATE.format(to) : "end";

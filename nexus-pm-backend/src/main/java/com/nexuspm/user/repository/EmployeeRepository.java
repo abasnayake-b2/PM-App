@@ -228,10 +228,13 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             SELECT e FROM Employee e
             LEFT JOIN FETCH e.designation d
             LEFT JOIN FETCH d.stream
+            LEFT JOIN FETCH d.department
             LEFT JOIN FETCH e.stream
+            LEFT JOIN FETCH e.department
             LEFT JOIN FETCH e.workType
             LEFT JOIN FETCH e.country
             LEFT JOIN FETCH e.engineeringManagerManagement em
+            LEFT JOIN FETCH em.department
             LEFT JOIN FETCH em.supervisor
             WHERE e.status = 'ACTIVE'
               AND e.teamManagement IS NULL
@@ -247,6 +250,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                    OR LOWER(COALESCE(e.workType.name, '')) LIKE LOWER(CONCAT('%', :name, '%'))
                    OR LOWER(COALESCE(e.email, '')) LIKE LOWER(CONCAT('%', :name, '%')))
               AND (:team IS NULL OR :team = '' OR LOWER(COALESCE(e.stream.name, d.stream.name, '')) = LOWER(:team))
+              AND (:department IS NULL OR :department = '' OR
+                   LOWER(COALESCE(em.department.name, '')) = LOWER(:department))
               AND (:designationCode IS NULL OR :designationCode = '' OR LOWER(COALESCE(d.code, '')) = LOWER(:designationCode))
               AND (:engineeringManager IS NULL OR :engineeringManager = '' OR
                    LOWER(CONCAT(COALESCE(e.engineeringManagerManagement.firstName, ''), ' ',
@@ -255,7 +260,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             ORDER BY e.firstName, e.lastName
             """)
     List<Employee> findActiveRosterFiltered(
-            String name, String team, String designationCode, String engineeringManager);
+            @Param("name") String name,
+            @Param("team") String team,
+            @Param("department") String department,
+            @Param("designationCode") String designationCode,
+            @Param("engineeringManager") String engineeringManager);
 
     @Query("""
             SELECT DISTINCT CONCAT(em.firstName, ' ', em.lastName) FROM Employee e

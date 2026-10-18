@@ -9,6 +9,7 @@ import { ProjectGrid } from '@/components/ProjectGrid';
 import { RAGIndicator } from '@/components/RAGIndicator';
 import { fetchClients, fetchCountries, fetchRegions } from '@/api/organisations.api';
 import { fetchTeamManagement } from '@/api/teamRoster.api';
+import { fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
 import { useProjects } from '@/hooks/useProjects';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -40,6 +41,8 @@ export function ProjectsPage() {
   const [ragStatus, setRagStatus] = useState('');
   const [vpManagementId, setVpManagementId] = useState('');
   const [engineeringManagerManagementId, setEngineeringManagerManagementId] = useState('');
+  const [projectTypeId, setProjectTypeId] = useState('');
+  const [workCategoryId, setWorkCategoryId] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
   const { data: regions } = useQuery({
@@ -63,6 +66,14 @@ export function ProjectsPage() {
   const { data: management } = useQuery({
     queryKey: ['team-management'],
     queryFn: () => fetchTeamManagement(),
+  });
+  const { data: projectTypes = [] } = useQuery({
+    queryKey: ['project-types'],
+    queryFn: fetchProjectTypes,
+  });
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
   });
 
   const vpOptions = useMemo(() => filterVpOptions(management ?? []), [management]);
@@ -106,6 +117,8 @@ export function ProjectsPage() {
     ragStatus: ragStatus || undefined,
     vpManagementId: vpManagementId || undefined,
     engineeringManagerManagementId: engineeringManagerManagementId || undefined,
+    projectTypeId: projectTypeId || undefined,
+    workCategoryId: workCategoryId || undefined,
     includeArchived: showArchived,
   });
 
@@ -326,6 +339,38 @@ export function ProjectsPage() {
             {engineeringManagerOptions.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-text2">Project type</span>
+          <select
+            value={projectTypeId}
+            onChange={(e) => setProjectTypeId(e.target.value)}
+            className="min-w-[10rem] rounded-lg border border-border bg-bg2 px-3 py-2 text-sm"
+          >
+            <option value="">All project types</option>
+            {projectTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-text2">Functional unit</span>
+          <select
+            value={workCategoryId}
+            onChange={(e) => setWorkCategoryId(e.target.value)}
+            className="min-w-[14rem] rounded-lg border border-border bg-bg2 px-3 py-2 text-sm"
+          >
+            <option value="">All functional units</option>
+            {workCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
           </select>

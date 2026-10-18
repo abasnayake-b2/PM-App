@@ -1,5 +1,9 @@
 package com.nexuspm.project;
 
+import com.nexuspm.lookup.entity.ProjectType;
+import com.nexuspm.lookup.entity.WorkCategory;
+import com.nexuspm.lookup.repository.ProjectTypeRepository;
+import com.nexuspm.lookup.repository.WorkCategoryRepository;
 import com.nexuspm.organisation.entity.Client;
 import com.nexuspm.organisation.repository.ClientRepository;
 import com.nexuspm.issue.repository.RdIssueRepository;
@@ -43,6 +47,8 @@ public class ProjectService {
     private final ClientRepository clientRepository;
     private final EmployeeRepository employeeRepository;
     private final TeamManagementRepository teamManagementRepository;
+    private final ProjectTypeRepository projectTypeRepository;
+    private final WorkCategoryRepository workCategoryRepository;
     private final ProjectMapper projectMapper;
     private final AuditLogService auditLogService;
     private final ProjectProgressService projectProgressService;
@@ -59,6 +65,8 @@ public class ProjectService {
             String ragStatus,
             UUID vpManagementId,
             UUID engineeringManagerManagementId,
+            UUID projectTypeId,
+            UUID workCategoryId,
             boolean includeArchived,
             Pageable pageable) {
         UUID userId = SecurityUtils.currentUserId();
@@ -90,6 +98,8 @@ public class ProjectService {
                 filterByVpEms,
                 vpFilterEmIds,
                 engineeringManagerManagementId,
+                projectTypeId,
+                workCategoryId,
                 pageable);
         Map<UUID, ProjectProgressService.ProgressResult> progressByProject =
                 projectProgressService.calculateBatch(page.getContent());
@@ -153,6 +163,8 @@ public class ProjectService {
         project.setClient(client);
         project.setName(request.getName());
         project.setProduct(trimOrNull(request.getProduct()));
+        project.setProjectType(resolveProjectType(request.getProjectTypeId()));
+        project.setWorkCategory(resolveWorkCategory(request.getWorkCategoryId()));
         project.setJiraProjectKey(normalizeJiraProjectKey(request.getJiraProjectKey()));
         project.setLeadEmployee(lead);
         applyStakeholdersOnCreate(project, request.getArchitectEmployeeId(),
@@ -194,6 +206,8 @@ public class ProjectService {
         Project project = loadAccessibleProjectForEdit(id);
         project.setName(request.getName());
         project.setProduct(trimOrNull(request.getProduct()));
+        project.setProjectType(resolveProjectType(request.getProjectTypeId()));
+        project.setWorkCategory(resolveWorkCategory(request.getWorkCategoryId()));
         project.setJiraProjectKey(normalizeJiraProjectKey(request.getJiraProjectKey()));
         if (request.getLeadEmployeeId() != null) {
             Employee lead = employeeRepository.findById(request.getLeadEmployeeId())
@@ -478,6 +492,22 @@ public class ProjectService {
         if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
             throw new BusinessException("INVALID_DATES", "End date must be on or after the start date", 400);
         }
+    }
+
+    private ProjectType resolveProjectType(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        return projectTypeRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Project type not found", 404));
+    }
+
+    private WorkCategory resolveWorkCategory(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        return workCategoryRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit not found", 404));
     }
 
     private static String trimOrNull(String value) {

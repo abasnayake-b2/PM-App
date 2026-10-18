@@ -35,6 +35,7 @@ export interface CreateAllocationPayload {
   rdIssueTaskId?: string;
   taskTypeId?: string;
   taskCategoryId?: string;
+  workCategoryId?: string;
   nonProjectTaskDescription?: string;
   nonProjectTaskModule?: string;
   roleOnProject?: string;
@@ -90,9 +91,11 @@ export async function fetchCapacity(params: {
   to?: string;
   asOf?: string;
   team?: string;
+  department?: string;
   designationCode?: string;
   engineeringManager?: string;
   name?: string;
+  workCategoryId?: string;
 } = {}): Promise<Capacity[]> {
   const { data } = await api.get<Capacity[]>('/allocations/capacity', { params });
   return data;
@@ -103,9 +106,11 @@ export async function exportCapacityTimeline(params: {
   to?: string;
   asOf?: string;
   team?: string;
+  department?: string;
   designationCode?: string;
   engineeringManager?: string;
   name?: string;
+  workCategoryId?: string;
 } = {}): Promise<void> {
   const response = await api.get<Blob>('/allocations/capacity/timeline/export', {
     params,

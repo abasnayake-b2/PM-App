@@ -47,6 +47,9 @@ DROP TABLE IF EXISTS project_access;
 DROP TABLE IF EXISTS budget;
 DROP TABLE IF EXISTS `release`;
 DROP TABLE IF EXISTS project;
+DROP TABLE IF EXISTS work_category_manager;
+DROP TABLE IF EXISTS work_category;
+DROP TABLE IF EXISTS project_type;
 DROP TABLE IF EXISTS issue_status;
 DROP TABLE IF EXISTS issue_type;
 DROP TABLE IF EXISTS task_category;
@@ -317,6 +320,23 @@ CREATE TABLE employee_skill (
     CONSTRAINT fk_es_skill    FOREIGN KEY (skill_id)    REFERENCES skill(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE employee_manager_assignment (
+    id                                   CHAR(36)    NOT NULL PRIMARY KEY,
+    employee_id                          CHAR(36)    NOT NULL,
+    engineering_manager_management_id    CHAR(36)    NULL,
+    from_date                            DATE        NOT NULL,
+    to_date                              DATE        NULL,
+    source                               VARCHAR(20) NOT NULL DEFAULT 'UI',
+    created_by                           CHAR(36)    NULL,
+    updated_by                           CHAR(36)    NULL,
+    created_at                           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_ema_employee_from (employee_id, from_date),
+    KEY idx_ema_manager_from (engineering_manager_management_id, from_date),
+    CONSTRAINT fk_ema_employee FOREIGN KEY (employee_id) REFERENCES employee(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ema_manager  FOREIGN KEY (engineering_manager_management_id) REFERENCES team_management(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE user_auth (
     id                   CHAR(36)     NOT NULL PRIMARY KEY,
     employee_id          CHAR(36)     NOT NULL UNIQUE,
@@ -376,6 +396,52 @@ CREATE TABLE task_category (
     updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE project_type (
+    id          CHAR(36)     NOT NULL PRIMARY KEY,
+    name        VARCHAR(150) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order  INT          NOT NULL DEFAULT 0,
+    created_by  CHAR(36)     NULL,
+    updated_by  CHAR(36)     NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE work_category (
+    id          CHAR(36)     NOT NULL PRIMARY KEY,
+    name        VARCHAR(150) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order  INT          NOT NULL DEFAULT 0,
+    created_by  CHAR(36)     NULL,
+    updated_by  CHAR(36)     NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO project_type (id, name, sort_order) VALUES
+('d1000001-0000-0000-0000-000000000001', 'NTP', 1),
+('d1000001-0000-0000-0000-000000000002', 'GBL', 2),
+('d1000001-0000-0000-0000-000000000003', 'Client Project', 3);
+
+INSERT INTO work_category (id, name, sort_order) VALUES
+('e1000001-0000-0000-0000-000000000001', 'Global BMS L3 Support', 1),
+('e1000001-0000-0000-0000-000000000002', 'Global BMS KTLO', 2),
+('e1000001-0000-0000-0000-000000000003', 'BAU - ALL KSA GBL', 3),
+('e1000001-0000-0000-0000-000000000004', 'Dedicated Allocation', 4),
+('e1000001-0000-0000-0000-000000000005', 'KSA NTP BAU Team 01', 5),
+('e1000001-0000-0000-0000-000000000006', 'KSA NTP BAU Team 02', 6),
+('e1000001-0000-0000-0000-000000000007', 'BMS Product Development NTP 2.0', 7),
+('e1000001-0000-0000-0000-000000000008', 'BMS - None Functional Development', 8),
+('e1000001-0000-0000-0000-000000000009', 'DT/PRO - BMS', 9),
+('e1000001-0000-0000-0000-000000000010', 'DFNOne + PRO Retails', 10),
+('e1000001-0000-0000-0000-000000000011', 'MBE Products', 11),
+('e1000001-0000-0000-0000-000000000012', 'CMS Product', 12),
+('e1000001-0000-0000-0000-000000000013', 'UA Product', 13),
+('e1000001-0000-0000-0000-000000000014', 'International - BAU RDs only', 14),
+('e1000001-0000-0000-0000-000000000015', 'ASIA and Africa - All GBL and NTP clients', 15),
+('e1000001-0000-0000-0000-000000000016', 'GCC GBL', 16),
+('e1000001-0000-0000-0000-000000000017', 'GCC NTP', 17);
+
 CREATE TABLE issue_status (
     id         CHAR(36)    NOT NULL PRIMARY KEY,
     name       VARCHAR(50) NOT NULL UNIQUE,
@@ -395,6 +461,8 @@ CREATE TABLE project (
     client_id                           CHAR(36)     NOT NULL,
     name                                VARCHAR(200) NOT NULL,
     product                             VARCHAR(120) NULL,
+    project_type_id                     CHAR(36)     NULL,
+    work_category_id                    CHAR(36)     NULL,
     jira_project_key                    VARCHAR(50)  NULL,
     lead_employee_id                    CHAR(36)     NULL,
     architect_employee_id               CHAR(36)     NULL,
@@ -411,10 +479,21 @@ CREATE TABLE project (
     updated_by                          CHAR(36)     NULL,
     created_at                          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_project_client     FOREIGN KEY (client_id)                         REFERENCES client(id),
-    CONSTRAINT fk_project_lead       FOREIGN KEY (lead_employee_id)                  REFERENCES employee(id),
-    CONSTRAINT fk_project_architect  FOREIGN KEY (architect_employee_id)             REFERENCES employee(id),
-    CONSTRAINT fk_project_em         FOREIGN KEY (engineering_manager_management_id) REFERENCES team_management(id)
+    CONSTRAINT fk_project_client         FOREIGN KEY (client_id)                         REFERENCES client(id),
+    CONSTRAINT fk_project_lead           FOREIGN KEY (lead_employee_id)                  REFERENCES employee(id),
+    CONSTRAINT fk_project_architect      FOREIGN KEY (architect_employee_id)             REFERENCES employee(id),
+    CONSTRAINT fk_project_em             FOREIGN KEY (engineering_manager_management_id) REFERENCES team_management(id),
+    CONSTRAINT fk_project_type           FOREIGN KEY (project_type_id)                   REFERENCES project_type(id),
+    CONSTRAINT fk_project_work_category  FOREIGN KEY (work_category_id)                  REFERENCES work_category(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE work_category_manager (
+    id                                   CHAR(36) NOT NULL PRIMARY KEY,
+    work_category_id                     CHAR(36) NOT NULL,
+    engineering_manager_management_id    CHAR(36) NOT NULL,
+    UNIQUE KEY uk_work_category_manager (work_category_id, engineering_manager_management_id),
+    CONSTRAINT fk_wcm_category FOREIGN KEY (work_category_id) REFERENCES work_category(id) ON DELETE CASCADE,
+    CONSTRAINT fk_wcm_manager  FOREIGN KEY (engineering_manager_management_id) REFERENCES team_management(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE budget (
@@ -724,6 +803,7 @@ CREATE TABLE allocation (
     rd_issue_task_id CHAR(36)   NULL,
     task_type_id    CHAR(36)    NULL,
     task_category_id CHAR(36)   NULL,
+    work_category_id CHAR(36)   NULL,
     non_project_task_id CHAR(36) NULL,
     role_on_project VARCHAR(50) NULL,
     percentage      INT         NOT NULL,
@@ -743,6 +823,7 @@ CREATE TABLE allocation (
     CONSTRAINT fk_alloc_rd_issue_task FOREIGN KEY (rd_issue_task_id) REFERENCES rd_issue_task(id),
     CONSTRAINT fk_alloc_task_type FOREIGN KEY (task_type_id) REFERENCES task_type(id),
     CONSTRAINT fk_alloc_task_category FOREIGN KEY (task_category_id) REFERENCES task_category(id),
+    CONSTRAINT fk_alloc_work_category FOREIGN KEY (work_category_id) REFERENCES work_category(id),
     CONSTRAINT fk_alloc_non_project_task FOREIGN KEY (non_project_task_id) REFERENCES non_project_task(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

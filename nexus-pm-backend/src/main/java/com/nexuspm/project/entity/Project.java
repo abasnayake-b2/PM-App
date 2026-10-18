@@ -1,5 +1,7 @@
 package com.nexuspm.project.entity;
 
+import com.nexuspm.lookup.entity.ProjectType;
+import com.nexuspm.lookup.entity.WorkCategory;
 import com.nexuspm.organisation.entity.Client;
 import com.nexuspm.shared.entity.AuditableEntity;
 import com.nexuspm.teamroster.entity.TeamManagement;
@@ -30,6 +32,14 @@ public class Project extends AuditableEntity {
 
     @Column(length = 120)
     private String product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_type_id")
+    private ProjectType projectType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_category_id")
+    private WorkCategory workCategory;
 
     /** Optional Jira Cloud project key used for backlog sync (e.g. TEST). */
     @Column(name = "jira_project_key", length = 50)

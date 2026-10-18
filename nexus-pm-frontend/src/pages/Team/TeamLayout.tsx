@@ -45,6 +45,18 @@ export function TeamLayout() {
         >
           Employee
         </NavLink>
+        <NavLink
+          to="/team/history"
+          className={({ isActive }) =>
+            `border-b-2 pb-3 text-sm font-medium transition ${
+              isActive
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text2 hover:text-text'
+            }`
+          }
+        >
+          Team history
+        </NavLink>
       </nav>
 
       <div className="mt-6">

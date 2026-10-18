@@ -1,7 +1,10 @@
 import { FormEvent, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { Project } from '@/types';
 import type { CreateProjectPayload, UpdateProjectPayload } from '@/hooks/useProjects';
 import { ClientHierarchySelect, type ClientHierarchyValue } from '@/components/ClientHierarchySelect';
+import { fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
+import { compareByPriority } from '@/utils/allocationSummary';
 
 export interface ProjectFormOption {
   id: string;
@@ -50,6 +53,21 @@ export function ProjectForm({
   );
   const [engineeringManagerManagementId, setEngineeringManagerManagementId] = useState(
     initial?.engineeringManagerManagementId ?? '',
+  );
+  const [projectTypeId, setProjectTypeId] = useState(initial?.projectTypeId ?? '');
+  const [workCategoryId, setWorkCategoryId] = useState(initial?.workCategoryId ?? '');
+
+  const { data: projectTypes = [] } = useQuery({
+    queryKey: ['project-types'],
+    queryFn: fetchProjectTypes,
+  });
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
+  });
+  const functionalUnits = useMemo(
+    () => [...workCategories].sort(compareByPriority),
+    [workCategories],
   );
   const [startDate, setStartDate] = useState(initial?.startDate ?? '');
   const [endDate, setEndDate] = useState(initial?.endDate ?? '');
@@ -100,6 +118,8 @@ export function ProjectForm({
         clientId,
         name: (fd.get('name') as string).trim(),
         product: (fd.get('product') as string).trim() || undefined,
+        projectTypeId: projectTypeId || undefined,
+        workCategoryId: workCategoryId || undefined,
         jiraProjectKey: (fd.get('jiraProjectKey') as string).trim() || undefined,
         leadEmployeeId: fd.get('leadEmployeeId') as string,
         architectEmployeeId: readOptionalId(fd, 'architectEmployeeId') ?? undefined,
@@ -117,6 +137,8 @@ export function ProjectForm({
     const payload: UpdateProjectPayload = {
       name: (fd.get('name') as string).trim(),
       product: (fd.get('product') as string).trim() || null,
+      projectTypeId: projectTypeId || null,
+      workCategoryId: workCategoryId || null,
       jiraProjectKey: (fd.get('jiraProjectKey') as string).trim() || null,
       leadEmployeeId: (fd.get('leadEmployeeId') as string) || undefined,
       architectEmployeeId: readOptionalId(fd, 'architectEmployeeId'),
@@ -163,6 +185,39 @@ export function ProjectForm({
             className={inputClass}
             placeholder="e.g. TEST"
           />
+        </label>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="text-text2">Project type</span>
+          <select
+            className={inputClass}
+            value={projectTypeId}
+            onChange={(e) => setProjectTypeId(e.target.value)}
+          >
+            <option value="">Select project type…</option>
+            {projectTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="text-text2">Functional unit</span>
+          <select
+            className={inputClass}
+            value={workCategoryId}
+            onChange={(e) => setWorkCategoryId(e.target.value)}
+          >
+            <option value="">Select functional unit…</option>
+            {functionalUnits.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

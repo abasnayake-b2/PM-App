@@ -36,6 +36,14 @@ import {
   createAdminTaskCategory,
   updateAdminTaskCategory,
   deleteAdminTaskCategory,
+  fetchAdminProjectTypes,
+  createAdminProjectType,
+  updateAdminProjectType,
+  deleteAdminProjectType,
+  fetchAdminWorkCategories,
+  createAdminWorkCategory,
+  updateAdminWorkCategory,
+  deleteAdminWorkCategory,
   fetchAdminStatuses,
   createAdminStatus,
   updateAdminStatus,
@@ -55,6 +63,12 @@ import {
   type RefTab,
 } from '@/components/AdminReferenceDetailPanel';
 import { ReferenceDataExcelUpload } from '@/components/ReferenceDataExcelUpload';
+import { fetchTeamManagement } from '@/api/teamRoster.api';
+import {
+  isCoeManagerTitle,
+  isDeliveryManagerTitle,
+  isEngineeringManagerRole,
+} from '@/utils/managementRoles';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 
@@ -67,6 +81,8 @@ const REF_TABS: { key: RefTab; label: string; addLabel?: string }[] = [
   { key: 'issue-types', label: 'Issue types' },
   { key: 'task-types', label: 'Task types' },
   { key: 'task-categories', label: 'Task categories', addLabel: 'Task category' },
+  { key: 'project-types', label: 'Project types', addLabel: 'Project type' },
+  { key: 'work-categories', label: 'Functional units', addLabel: 'Functional unit' },
   { key: 'statuses', label: 'Statuses' },
   { key: 'priorities', label: 'Priorities' },
 ];
@@ -130,6 +146,25 @@ function gridColumns(tab: RefTab): GridColumn[] {
       return [
         { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
         { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
+      ];
+    case 'project-types':
+      return [
+        { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
+        { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
+      ];
+    case 'work-categories':
+      return [
+        { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
+        { key: 'priority', header: 'Priority', render: (i) => (i.sortOrder != null ? String(i.sortOrder) : '—') },
+        { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
+        {
+          key: 'managers',
+          header: 'Engineering managers',
+          render: (i) =>
+            i.engineeringManagers?.length
+              ? i.engineeringManagers.map((manager) => manager.name).join(', ')
+              : '—',
+        },
       ];
     case 'statuses':
       return [
@@ -220,6 +255,8 @@ function useRefQuery(tab: RefTab) {
     'issue-types': fetchAdminIssueTypes,
     'task-types': fetchAdminTaskTypes,
     'task-categories': fetchAdminTaskCategories,
+    'project-types': fetchAdminProjectTypes,
+    'work-categories': fetchAdminWorkCategories,
     statuses: fetchAdminStatuses,
     priorities: fetchAdminPriorities,
   };
@@ -227,6 +264,51 @@ function useRefQuery(tab: RefTab) {
     queryKey: ['admin-reference', tab],
     queryFn: fetchers[tab],
   });
+}
+
+function WorkCategoryManagerFields({ initial }: { initial?: ReferenceItem }) {
+  const { data: management = [] } = useQuery({
+    queryKey: ['team-management'],
+    queryFn: () => fetchTeamManagement(),
+  });
+  const selected = new Set((initial?.engineeringManagers ?? []).map((manager) => manager.id));
+  const options = management
+    .filter(
+      (person) =>
+        (person.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE' &&
+        (isEngineeringManagerRole(person.roleTitle) ||
+          isDeliveryManagerTitle(person.roleTitle) ||
+          isCoeManagerTitle(person.roleTitle)),
+    )
+    .slice()
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' }));
+
+  return (
+    <fieldset className="mt-1">
+      <legend className="text-sm text-text2">Engineering managers</legend>
+      <p className="mt-1 text-xs text-text3">
+        Assigned managers own this functional unit’s projects and team when filters are applied.
+      </p>
+      <div className="mt-2 max-h-56 space-y-1 overflow-auto rounded-lg border border-border bg-bg3 p-3">
+        {options.length === 0 && <p className="text-sm text-text2">No engineering managers found.</p>}
+        {options.map((person) => (
+          <label key={person.id} className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="engineeringManagerManagementIds"
+              value={person.id}
+              defaultChecked={selected.has(person.id)}
+              className="mt-0.5"
+            />
+            <span>
+              {person.fullName}
+              <span className="text-text2"> · {person.roleTitle}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 function ReferenceFormFields({
@@ -248,13 +330,19 @@ function ReferenceFormFields({
         tab === 'skills' ||
         tab === 'task-types' ||
         tab === 'task-categories' ||
+        tab === 'project-types' ||
+        tab === 'work-categories' ||
         tab === 'statuses') && (
         <label className="block text-sm">
           <span className="text-text2">Name</span>
           <input name="name" required defaultValue={initial?.name ?? ''} className={inputClass} />
         </label>
       )}
-      {(tab === 'skills' || tab === 'task-types' || tab === 'task-categories') && (
+      {(tab === 'skills' ||
+        tab === 'task-types' ||
+        tab === 'task-categories' ||
+        tab === 'project-types' ||
+        tab === 'work-categories') && (
         <label className="block text-sm">
           <span className="text-text2">Description</span>
           <input
@@ -264,6 +352,25 @@ function ReferenceFormFields({
             className={inputClass}
           />
         </label>
+      )}
+      {tab === 'work-categories' && (
+        <>
+          <label className="block text-sm">
+            <span className="text-text2">Priority</span>
+            <input
+              name="sortOrder"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={initial?.sortOrder ?? ''}
+              className={inputClass}
+            />
+            <span className="mt-1 block text-xs text-text3">
+              Lower number appears first. Leave blank when adding to append at the end.
+            </span>
+          </label>
+          <WorkCategoryManagerFields initial={initial} />
+        </>
       )}
       {tab === 'streams' && (
         <DepartmentSelect departments={departments} defaultValue={refItemDepartmentId(initial)} />
@@ -383,10 +490,17 @@ export function AdminReferenceSection() {
 
   const filteredItems = useMemo(() => {
     if (!items) return [];
-    if (!search) return items;
     const q = search.toLowerCase();
-    return items.filter((item) => itemSearchText(item).includes(q));
-  }, [items, search]);
+    const list = search ? items.filter((item) => itemSearchText(item).includes(q)) : [...items];
+    if (tab === 'work-categories') {
+      list.sort(
+        (a, b) =>
+          (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+          (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+      );
+    }
+    return list;
+  }, [items, search, tab]);
 
   const columns = gridColumns(tab);
 
@@ -398,6 +512,8 @@ export function AdminReferenceSection() {
     qc.invalidateQueries({ queryKey: ['roster-designations'] });
     qc.invalidateQueries({ queryKey: ['task-types'] });
     qc.invalidateQueries({ queryKey: ['task-categories'] });
+    qc.invalidateQueries({ queryKey: ['project-types'] });
+    qc.invalidateQueries({ queryKey: ['work-categories'] });
   };
 
   const saveFromForm = async (fd: FormData, itemId?: string) => {
@@ -443,6 +559,24 @@ export function AdminReferenceSection() {
         return itemId
           ? updateAdminTaskCategory(itemId, name, description)
           : createAdminTaskCategory(name, description);
+      }
+      case 'project-types': {
+        const description = ((fd.get('description') as string) || '').trim() || undefined;
+        return itemId
+          ? updateAdminProjectType(itemId, name, description)
+          : createAdminProjectType(name, description);
+      }
+      case 'work-categories': {
+        const description = ((fd.get('description') as string) || '').trim() || undefined;
+        const engineeringManagerManagementIds = fd
+          .getAll('engineeringManagerManagementIds')
+          .map((value) => String(value));
+        const sortRaw = String(fd.get('sortOrder') ?? '').trim();
+        const parsed = Number(sortRaw);
+        const sortOrder = sortRaw === '' || Number.isNaN(parsed) ? undefined : parsed;
+        return itemId
+          ? updateAdminWorkCategory(itemId, name, description, engineeringManagerManagementIds, sortOrder)
+          : createAdminWorkCategory(name, description, engineeringManagerManagementIds, sortOrder);
       }
       case 'issue-types':
         return itemId
@@ -507,6 +641,10 @@ export function AdminReferenceSection() {
           return deleteAdminTaskType(id);
         case 'task-categories':
           return deleteAdminTaskCategory(id);
+        case 'project-types':
+          return deleteAdminProjectType(id);
+        case 'work-categories':
+          return deleteAdminWorkCategory(id);
         case 'statuses':
           return deleteAdminStatus(id);
         case 'priorities':
@@ -549,7 +687,12 @@ export function AdminReferenceSection() {
         Manage lookup values used across the application. Changes apply immediately.
       </p>
 
-      {canImportReference && tab !== 'skills' && tab !== 'task-types' && tab !== 'task-categories' && (
+      {canImportReference &&
+        tab !== 'skills' &&
+        tab !== 'task-types' &&
+        tab !== 'task-categories' &&
+        tab !== 'project-types' &&
+        tab !== 'work-categories' && (
         <ReferenceDataExcelUpload onImported={invalidate} />
       )}
       {canImportReference && tab === 'skills' && (

@@ -7,8 +7,10 @@ import com.nexuspm.issue.repository.RdIssueTaskRepository;
 import com.nexuspm.lookup.TaskCategoryKind;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.entity.WorkCategory;
 import com.nexuspm.lookup.repository.TaskCategoryRepository;
 import com.nexuspm.lookup.repository.TaskTypeRepository;
+import com.nexuspm.lookup.repository.WorkCategoryRepository;
 import com.nexuspm.project.ProjectService;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.entity.ProjectTask;
@@ -57,6 +59,7 @@ public class AllocationService {
     private final ProjectTaskRepository projectTaskRepository;
     private final TaskTypeRepository taskTypeRepository;
     private final TaskCategoryRepository taskCategoryRepository;
+    private final WorkCategoryRepository workCategoryRepository;
     private final NonProjectTaskRepository nonProjectTaskRepository;
     private final ProjectService projectService;
     private final ResourceMapper resourceMapper;
@@ -109,14 +112,15 @@ public class AllocationService {
 
     @Transactional(readOnly = true)
     public List<CapacityResponse> getCapacity(
-            LocalDate from, LocalDate to, LocalDate asOf, String team, String designationCode,
-            String engineeringManager, String name) {
+            LocalDate from, LocalDate to, LocalDate asOf, String team, String department, String designationCode,
+            String engineeringManager, String name, UUID workCategoryId) {
         LocalDate rangeStart = from != null ? from : LocalDate.now().withDayOfMonth(1);
         LocalDate rangeEnd = to != null ? to : rangeStart.plusMonths(5).withDayOfMonth(rangeStart.plusMonths(5).lengthOfMonth());
         LocalDate snapshotAsOf = asOf != null ? asOf : LocalDate.now();
 
         String nameFilter = name != null && !name.isBlank() ? name.trim() : null;
         String teamFilter = team != null && !team.isBlank() ? team.trim() : null;
+        String departmentFilter = department != null && !department.isBlank() ? department.trim() : null;
         String designationFilter = designationCode != null && !designationCode.isBlank()
                 ? designationCode.trim()
                 : null;
@@ -130,7 +134,7 @@ public class AllocationService {
         }
 
         List<Employee> rosterEmployees = employeeRepository.findActiveRosterFiltered(
-                nameFilter, teamFilter, designationFilter, engineeringManagerFilter);
+                nameFilter, teamFilter, departmentFilter, designationFilter, engineeringManagerFilter);
 
         List<Allocation> inRange = scopedProjectIds == null
                 ? allocationRepository.findInRange(rangeStart, rangeEnd, null)
@@ -151,7 +155,7 @@ public class AllocationService {
             rosterEmployees = teamById.values().stream()
                     .filter(employee -> ActiveRosterStatus.isActive(employee.getStatus()))
                     .filter(employee -> matchesRosterFilters(
-                            employee, nameFilter, teamFilter, designationFilter, engineeringManagerFilter))
+                            employee, nameFilter, teamFilter, departmentFilter, designationFilter, engineeringManagerFilter))
                     .sorted(Comparator.comparing(Employee::getLastName).thenComparing(Employee::getFirstName))
                     .toList();
         }
@@ -161,6 +165,17 @@ public class AllocationService {
         Map<UUID, List<Allocation>> asOfByEmployee = activeAtAsOf.stream()
                 .collect(Collectors.groupingBy(a -> a.getEmployee().getId()));
 
+        if (workCategoryId != null) {
+            rosterEmployees = rosterEmployees.stream()
+                    .filter(employee -> {
+                        List<Allocation> period = periodByEmployee.getOrDefault(employee.getId(), List.of());
+                        List<Allocation> snapshot = asOfByEmployee.getOrDefault(employee.getId(), List.of());
+                        return Stream.concat(period.stream(), snapshot.stream())
+                                .anyMatch(allocation -> allocationMatchesWorkCategory(allocation, workCategoryId));
+                    })
+                    .toList();
+        }
+
         Map<UUID, String> vpNameByEmId = new HashMap<>();
 
         return rosterEmployees.stream()
@@ -169,6 +184,14 @@ public class AllocationService {
                     UUID employeeId = employee.getId();
                     List<Allocation> periodEntities = periodByEmployee.getOrDefault(employeeId, List.of());
                     List<Allocation> asOfEntities = asOfByEmployee.getOrDefault(employeeId, List.of());
+                    if (workCategoryId != null) {
+                        periodEntities = periodEntities.stream()
+                                .filter(allocation -> allocationMatchesWorkCategory(allocation, workCategoryId))
+                                .toList();
+                        asOfEntities = asOfEntities.stream()
+                                .filter(allocation -> allocationMatchesWorkCategory(allocation, workCategoryId))
+                                .toList();
+                    }
                     List<AllocationResponse> snapshot = asOfEntities.stream()
                             .map(resourceMapper::toResponse)
                             .toList();
@@ -192,6 +215,7 @@ public class AllocationService {
                             .departmentName(EmployeeRosterRefs.teamName(employee))
                             .designationName(EmployeeRosterRefs.designationName(employee))
                             .vpName(vpName)
+                            .engineeringManagerManagementId(em != null ? em.getId() : null)
                             .engineeringManagerName(EmployeeRosterRefs.engineeringManagerName(employee))
                             .benchStatus(employee.getBenchStatus())
                             .status(employee.getStatus())
@@ -288,6 +312,7 @@ public class AllocationService {
             Employee employee,
             String nameFilter,
             String teamFilter,
+            String departmentFilter,
             String designationFilter,
             String engineeringManagerFilter) {
         if (nameFilter != null) {
@@ -302,6 +327,11 @@ public class AllocationService {
         }
         if (teamFilter != null
                 && !teamFilter.equalsIgnoreCase(nullToEmpty(EmployeeRosterRefs.teamName(employee)))) {
+            return false;
+        }
+        if (departmentFilter != null
+                && !departmentFilter.equalsIgnoreCase(
+                        nullToEmpty(EmployeeRosterRefs.engineeringManagerDepartmentName(employee)))) {
             return false;
         }
         if (designationFilter != null
@@ -327,14 +357,17 @@ public class AllocationService {
             throw new BusinessException("ACCESS_DENIED", "Only managers can create allocations", 403);
         }
 
-        TaskCategory category = resolveTaskCategory(request.getTaskCategoryId());
-        boolean nonProject = TaskCategoryKind.isNonProjectRelated(category);
+        ResolvedCategories resolved = resolveCategories(request);
+        TaskCategory category = resolved.taskCategory();
+        boolean nonProject = isNonProjectAllocation(request, category, resolved.workCategory());
         ResolvedTarget target = nonProject
                 ? resolveNonProjectTarget(request)
                 : resolveTarget(request.getIssueId(), request.getProjectTaskId(), request.getRdIssueTaskId());
         if (target.project() != null) {
             projectService.getProject(target.project().getId());
         }
+        WorkCategory workCategory = resolveAllocationWorkCategory(
+                resolved.workCategory(), nonProject ? null : target.project());
 
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
@@ -366,6 +399,7 @@ public class AllocationService {
         allocation.setNonProjectTask(target.nonProjectTask());
         allocation.setTaskType(resolveTaskType(request.getTaskTypeId()));
         allocation.setTaskCategory(category);
+        allocation.setWorkCategory(workCategory);
         allocation.setRoleOnProject(request.getRoleOnProject());
         allocation.setPercentage(request.getPercentage());
         allocation.setFromDate(request.getFromDate());
@@ -460,6 +494,69 @@ public class AllocationService {
         return taskCategoryRepository.findById(taskCategoryId)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Task category not found", 404));
     }
+
+    private ResolvedCategories resolveCategories(CreateAllocationRequest request) {
+        WorkCategory workCategory = request.getWorkCategoryId() != null
+                ? workCategoryRepository.findById(request.getWorkCategoryId())
+                        .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit not found", 404))
+                : null;
+        TaskCategory taskCategory = null;
+        if (request.getTaskCategoryId() != null) {
+            taskCategory = taskCategoryRepository.findById(request.getTaskCategoryId()).orElse(null);
+            if (taskCategory == null) {
+                WorkCategory fromTaskId = workCategoryRepository.findById(request.getTaskCategoryId()).orElse(null);
+                if (fromTaskId == null) {
+                    throw new BusinessException("NOT_FOUND", "Task category not found", 404);
+                }
+                if (workCategory == null) {
+                    workCategory = fromTaskId;
+                }
+            }
+        }
+        return new ResolvedCategories(taskCategory, workCategory);
+    }
+
+    private boolean isNonProjectAllocation(
+            CreateAllocationRequest request, TaskCategory category, WorkCategory workCategory) {
+        boolean hasProjectTarget = request.getIssueId() != null
+                || request.getProjectTaskId() != null
+                || request.getRdIssueTaskId() != null;
+        if (hasProjectTarget) {
+            return false;
+        }
+        if (TaskCategoryKind.isNonProjectRelated(category)) {
+            return true;
+        }
+        String description = request.getNonProjectTaskDescription() != null
+                ? request.getNonProjectTaskDescription().trim()
+                : "";
+        return workCategory != null || !description.isEmpty();
+    }
+
+    private WorkCategory resolveAllocationWorkCategory(WorkCategory selected, Project project) {
+        WorkCategory projectFu = project != null ? project.getWorkCategory() : null;
+        if (projectFu != null) {
+            if (selected != null && !selected.getId().equals(projectFu.getId())) {
+                throw new BusinessException(
+                        "VALIDATION", "Project is not in the selected functional unit", 400);
+            }
+            return projectFu;
+        }
+        return selected;
+    }
+
+    private static boolean allocationMatchesWorkCategory(Allocation allocation, UUID workCategoryId) {
+        if (allocation.getWorkCategory() != null
+                && workCategoryId.equals(allocation.getWorkCategory().getId())) {
+            return true;
+        }
+        Project project = allocation.getProject();
+        return project != null
+                && project.getWorkCategory() != null
+                && workCategoryId.equals(project.getWorkCategory().getId());
+    }
+
+    private record ResolvedCategories(TaskCategory taskCategory, WorkCategory workCategory) {}
 
     private List<String> roleCodesForFilter(String roleFilter) {
         if (roleFilter == null || roleFilter.isBlank()) {

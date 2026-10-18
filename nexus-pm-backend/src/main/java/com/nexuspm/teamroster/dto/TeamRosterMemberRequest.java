@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -32,4 +33,6 @@ public class TeamRosterMemberRequest {
     private List<UUID> skillIds = new ArrayList<>();
     private BigDecimal totalYearsOfExperience;
     private BigDecimal experienceInDfn;
+    /** Inclusive start date of this engineering-manager assignment. Defaults to today. */
+    private LocalDate managerAssignmentFromDate;
 }

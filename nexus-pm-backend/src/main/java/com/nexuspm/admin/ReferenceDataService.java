@@ -4,13 +4,23 @@ import com.nexuspm.lookup.IssueTypeCatalog;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
+import com.nexuspm.lookup.entity.ProjectType;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.dto.WorkCategoryResponse;
+import com.nexuspm.lookup.entity.WorkCategory;
+import com.nexuspm.lookup.entity.WorkCategoryManager;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
+import com.nexuspm.lookup.repository.ProjectTypeRepository;
 import com.nexuspm.lookup.repository.TaskCategoryRepository;
 import com.nexuspm.lookup.repository.TaskTypeRepository;
+import com.nexuspm.lookup.repository.WorkCategoryManagerRepository;
+import com.nexuspm.lookup.repository.WorkCategoryRepository;
+import com.nexuspm.project.repository.ProjectRepository;
+import com.nexuspm.teamroster.entity.TeamManagement;
+import com.nexuspm.teamroster.repository.TeamManagementRepository;
 import com.nexuspm.admin.dto.ReferenceRoleResponse;
 import com.nexuspm.shared.audit.AuditNameEnricher;
 import com.nexuspm.shared.exception.BusinessException;
@@ -36,7 +46,11 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,6 +67,11 @@ public class ReferenceDataService {
     private final IssueTypeRepository issueTypeRepository;
     private final TaskTypeRepository taskTypeRepository;
     private final TaskCategoryRepository taskCategoryRepository;
+    private final ProjectTypeRepository projectTypeRepository;
+    private final WorkCategoryRepository workCategoryRepository;
+    private final WorkCategoryManagerRepository workCategoryManagerRepository;
+    private final TeamManagementRepository teamManagementRepository;
+    private final ProjectRepository projectRepository;
     private final IssueStatusRepository issueStatusRepository;
     private final PriorityRepository priorityRepository;
     private final EmployeeRepository employeeRepository;
@@ -402,6 +421,191 @@ public class ReferenceDataService {
     private int nextTaskCategorySortOrder() {
         return taskCategoryRepository.findAll().stream()
                 .map(TaskCategory::getSortOrder)
+                .filter(order -> order != null)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(0) + 1;
+    }
+
+    @Cacheable(cacheNames = CacheNames.PROJECT_TYPES, key = "'admin-all'")
+    @Transactional(readOnly = true)
+    public List<ProjectType> listProjectTypes() {
+        return auditNameEnricher.enrichAll(projectTypeRepository.findAllByOrderBySortOrderAscNameAsc());
+    }
+
+    @CacheEvict(cacheNames = CacheNames.PROJECT_TYPES, allEntries = true)
+    @Transactional
+    public ProjectType createProjectType(String name, String description) {
+        String trimmed = name.trim();
+        if (projectTypeRepository.findByNameIgnoreCase(trimmed).isPresent()) {
+            throw new BusinessException("DUPLICATE", "Project type already exists", 400);
+        }
+        ProjectType projectType = new ProjectType();
+        projectType.setId(UUID.randomUUID());
+        projectType.setName(trimmed);
+        projectType.setDescription(trimToNull(description));
+        projectType.setSortOrder(nextProjectTypeSortOrder());
+        return auditNameEnricher.enrich(projectTypeRepository.save(projectType));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.PROJECT_TYPES, allEntries = true)
+    @Transactional
+    public ProjectType updateProjectType(UUID id, String name, String description) {
+        ProjectType projectType = projectTypeRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Project type not found", 404));
+        String trimmed = name.trim();
+        projectTypeRepository.findByNameIgnoreCase(trimmed)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BusinessException("DUPLICATE", "Project type already exists", 400);
+                });
+        projectType.setName(trimmed);
+        projectType.setDescription(trimToNull(description));
+        return auditNameEnricher.enrich(projectTypeRepository.save(projectType));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.PROJECT_TYPES, allEntries = true)
+    @Transactional
+    public void deleteProjectType(UUID id) {
+        if (!projectTypeRepository.existsById(id)) {
+            throw new BusinessException("NOT_FOUND", "Project type not found", 404);
+        }
+        if (projectRepository.existsByProjectType_Id(id)) {
+            throw new BusinessException("IN_USE", "Project type is assigned to one or more projects", 400);
+        }
+        projectTypeRepository.deleteById(id);
+    }
+
+    private int nextProjectTypeSortOrder() {
+        return projectTypeRepository.findAll().stream()
+                .map(ProjectType::getSortOrder)
+                .filter(order -> order != null)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(0) + 1;
+    }
+
+    @Cacheable(cacheNames = CacheNames.WORK_CATEGORIES, key = "'admin-all'")
+    @Transactional(readOnly = true)
+    public List<WorkCategoryResponse> listWorkCategories() {
+        List<WorkCategory> categories =
+                auditNameEnricher.enrichAll(workCategoryRepository.findAllByOrderBySortOrderAscNameAsc());
+        Map<UUID, List<WorkCategoryManager>> byCategory = new LinkedHashMap<>();
+        for (WorkCategoryManager assignment : workCategoryManagerRepository.findAllWithManager()) {
+            byCategory.computeIfAbsent(assignment.getWorkCategory().getId(), ignored -> new ArrayList<>())
+                    .add(assignment);
+        }
+        return categories.stream()
+                .map(category -> toWorkCategoryResponse(category, byCategory.getOrDefault(category.getId(), List.of())))
+                .toList();
+    }
+
+    @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
+    @Transactional
+    public WorkCategoryResponse createWorkCategory(
+            String name, String description, Integer sortOrder, List<UUID> engineeringManagerManagementIds) {
+        String trimmed = name.trim();
+        if (workCategoryRepository.findByNameIgnoreCase(trimmed).isPresent()) {
+            throw new BusinessException("DUPLICATE", "Functional unit already exists", 400);
+        }
+        WorkCategory category = new WorkCategory();
+        category.setId(UUID.randomUUID());
+        category.setName(trimmed);
+        category.setDescription(trimToNull(description));
+        category.setSortOrder(sortOrder != null ? sortOrder : nextWorkCategorySortOrder());
+        workCategoryRepository.save(category);
+        replaceWorkCategoryManagers(category, engineeringManagerManagementIds);
+        return toWorkCategoryResponse(
+                auditNameEnricher.enrich(category),
+                workCategoryManagerRepository.findAllWithManager().stream()
+                        .filter(assignment -> assignment.getWorkCategory().getId().equals(category.getId()))
+                        .toList());
+    }
+
+    @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
+    @Transactional
+    public WorkCategoryResponse updateWorkCategory(
+            UUID id, String name, String description, Integer sortOrder, List<UUID> engineeringManagerManagementIds) {
+        WorkCategory category = workCategoryRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit not found", 404));
+        String trimmed = name.trim();
+        workCategoryRepository.findByNameIgnoreCase(trimmed)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BusinessException("DUPLICATE", "Functional unit already exists", 400);
+                });
+        category.setName(trimmed);
+        category.setDescription(trimToNull(description));
+        if (sortOrder != null) {
+            category.setSortOrder(sortOrder);
+        }
+        workCategoryRepository.save(category);
+        replaceWorkCategoryManagers(category, engineeringManagerManagementIds);
+        return toWorkCategoryResponse(
+                auditNameEnricher.enrich(category),
+                workCategoryManagerRepository.findAllWithManager().stream()
+                        .filter(assignment -> assignment.getWorkCategory().getId().equals(category.getId()))
+                        .toList());
+    }
+
+    @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
+    @Transactional
+    public void deleteWorkCategory(UUID id) {
+        if (!workCategoryRepository.existsById(id)) {
+            throw new BusinessException("NOT_FOUND", "Functional unit not found", 404);
+        }
+        if (projectRepository.existsByWorkCategory_Id(id)) {
+            throw new BusinessException("IN_USE", "Functional unit is assigned to one or more projects", 400);
+        }
+        workCategoryManagerRepository.deleteByWorkCategoryId(id);
+        workCategoryRepository.deleteById(id);
+    }
+
+    private void replaceWorkCategoryManagers(WorkCategory category, List<UUID> managerIds) {
+        workCategoryManagerRepository.deleteByWorkCategoryId(category.getId());
+        if (managerIds == null || managerIds.isEmpty()) {
+            return;
+        }
+        List<UUID> distinct = managerIds.stream().filter(id -> id != null).distinct().toList();
+        for (UUID managerId : distinct) {
+            TeamManagement manager = teamManagementRepository.findById(managerId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "Engineering manager not found", 404));
+            WorkCategoryManager assignment = new WorkCategoryManager();
+            assignment.setId(UUID.randomUUID());
+            assignment.setWorkCategory(category);
+            assignment.setEngineeringManager(manager);
+            workCategoryManagerRepository.save(assignment);
+        }
+    }
+
+    private WorkCategoryResponse toWorkCategoryResponse(
+            WorkCategory category, List<WorkCategoryManager> assignments) {
+        List<WorkCategoryResponse.ManagerItem> managers = assignments.stream()
+                .map(assignment -> {
+                    TeamManagement manager = assignment.getEngineeringManager();
+                    return WorkCategoryResponse.ManagerItem.builder()
+                            .id(manager.getId())
+                            .name(manager.getFullName())
+                            .roleTitle(manager.getRoleTitle())
+                            .build();
+                })
+                .sorted(Comparator.comparing(
+                        WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        return WorkCategoryResponse.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .description(category.getDescription())
+                .sortOrder(category.getSortOrder())
+                .engineeringManagers(managers)
+                .createdByName(category.getCreatedByName())
+                .updatedByName(category.getUpdatedByName())
+                .build();
+    }
+
+    private int nextWorkCategorySortOrder() {
+        return workCategoryRepository.findAll().stream()
+                .map(WorkCategory::getSortOrder)
                 .filter(order -> order != null)
                 .mapToInt(Integer::intValue)
                 .max()

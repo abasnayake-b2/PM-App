@@ -1,19 +1,25 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { SlideOverListPanel } from '@/components/SlideOverListPanel';
 import type { Capacity, Allocation } from '@/types';
+import type { WorkCategory } from '@/api/lookup.api';
 import type { SlideOverEntry, SlideOverGroup } from '@/utils/breakdownProjects';
 import {
-  allocationTargetLabel,
+  allocationFunctionalUnitLabel,
+  allocationTaskLabel,
   formatAllocationDateRange,
 } from '@/utils/allocationUi';
 import {
   buildAllocationSummary,
+  buildWorkCategoryTrees,
+  compareByPriority,
   formatFte,
   formatPersonDays,
   type AllocationSummaryFilters,
   type ManagerAllocationSummary,
   type ProjectAllocationSummary,
   type SummaryPerson,
+  type WorkCategoryManagerNode,
 } from '@/utils/allocationSummary';
 
 type DrillPanel = {
@@ -26,12 +32,13 @@ type DrillPanel = {
 
 function allocationEntry(allocation: Allocation): SlideOverEntry {
   const extras = [
+    allocation.workCategoryName?.trim(),
     formatAllocationDateRange(allocation),
     allocation.taskTypeName,
     allocation.taskCategoryName,
   ].filter(Boolean);
   return {
-    label: `${allocation.percentage}% · ${allocationTargetLabel(allocation)}`,
+    label: `${allocation.percentage}% · ${allocationTaskLabel(allocation)}`,
     meta: extras.join(' · '),
   };
 }
@@ -85,19 +92,76 @@ function personEntry(person: SummaryPerson): SlideOverEntry {
   };
 }
 
-function peopleGroups(people: SummaryPerson[]): SlideOverGroup[] {
-  const allocated = people.filter((person) => person.fte > 0);
-  const unallocated = people.filter((person) => person.fte <= 0);
-  return [
-    {
+function engineerAllocationGroups(people: SummaryPerson[]): SlideOverGroup[] {
+  const allocated = people
+    .filter((person) => person.allocations.length > 0)
+    .slice()
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { sensitivity: 'base' }));
+  const unallocated = people.filter((person) => person.allocations.length === 0);
+  const groups: SlideOverGroup[] = [];
+  if (allocated.length > 0) {
+    groups.push({
       title: `Allocated (${allocated.length})`,
-      items: allocated.map(personEntry),
-    },
-    {
+      items: allocated.flatMap((person) =>
+        [...person.allocations]
+          .sort(
+            (a, b) =>
+              allocationFunctionalUnitLabel(a).localeCompare(allocationFunctionalUnitLabel(b), undefined, {
+                sensitivity: 'base',
+              }) || a.fromDate.localeCompare(b.fromDate),
+          )
+          .map((allocation) => ({
+            label: person.employeeName,
+            meta: [
+              allocationFunctionalUnitLabel(allocation),
+              allocationTaskLabel(allocation),
+              `${allocation.percentage}%`,
+              person.designationName,
+              formatAllocationDateRange(allocation),
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          })),
+      ),
+    });
+  }
+  if (unallocated.length > 0) {
+    groups.push({
       title: `Not allocated (${unallocated.length})`,
       items: unallocated.map(personEntry),
-    },
-  ];
+    });
+  }
+  return groups;
+}
+
+function toggleSet(current: Set<string>, key: string): Set<string> {
+  const next = new Set(current);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
+}
+
+function ExpandLabel({
+  open,
+  label,
+  onClick,
+}: {
+  open: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  const Icon = open ? ChevronDown : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex max-w-full items-center gap-1 text-left font-medium hover:text-accent"
+      aria-expanded={open}
+    >
+      <Icon size={16} className="shrink-0 text-text2" />
+      <span className="truncate">{label}</span>
+    </button>
+  );
 }
 
 function CountButton({
@@ -122,12 +186,46 @@ function CountButton({
   );
 }
 
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Kpi({
+  label,
+  value,
+  hint,
+  onValueClick,
+  onHintClick,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  onValueClick?: () => void;
+  onHintClick?: () => void;
+}) {
   return (
     <div className="rounded-xl border border-border bg-bg2 px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-wide text-text2">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      {hint && <p className="mt-1 text-xs text-text2">{hint}</p>}
+      {onValueClick ? (
+        <button
+          type="button"
+          onClick={onValueClick}
+          className="mt-1 text-2xl font-semibold tabular-nums text-accent hover:underline"
+          title="View names"
+        >
+          {value}
+        </button>
+      ) : (
+        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      )}
+      {hint &&
+        (onHintClick ? (
+          <button
+            type="button"
+            onClick={onHintClick}
+            className="mt-1 block text-xs text-text2 hover:text-accent hover:underline"
+          >
+            {hint}
+          </button>
+        ) : (
+          <p className="mt-1 text-xs text-text2">{hint}</p>
+        ))}
     </div>
   );
 }
@@ -179,22 +277,59 @@ function SummaryTable({
   );
 }
 
+function indentClass(level: 0 | 1 | 2): string {
+  if (level === 1) return 'pl-6';
+  if (level === 2) return 'pl-11';
+  return '';
+}
+
 export function ResourceAllocationSummary({
   rows,
   rangeFrom,
   rangeTo,
   filters,
+  workCategories = [],
+  workCategoryId,
 }: {
   rows: Capacity[];
   rangeFrom: string;
   rangeTo: string;
   filters?: AllocationSummaryFilters;
+  workCategories?: WorkCategory[];
+  workCategoryId?: string;
 }) {
   const [drill, setDrill] = useState<DrillPanel | null>(null);
+  const [openManagers, setOpenManagers] = useState<Set<string>>(() => new Set());
   const summary = useMemo(
     () => buildAllocationSummary(rows, rangeFrom, rangeTo, filters),
     [rows, rangeFrom, rangeTo, filters],
   );
+  const scopedWorkCategories = useMemo(
+    () =>
+      [...(workCategoryId
+        ? workCategories.filter((category) => category.id === workCategoryId)
+        : workCategories)].sort(compareByPriority),
+    [workCategories, workCategoryId],
+  );
+  const categoryTrees = useMemo(
+    () =>
+      buildWorkCategoryTrees(
+        summary.allocatedPeople,
+        summary.managers,
+        scopedWorkCategories,
+        rangeFrom,
+        rangeTo,
+        { includeUnassigned: !workCategoryId },
+      ),
+    [summary.allocatedPeople, summary.managers, scopedWorkCategories, rangeFrom, rangeTo, workCategoryId],
+  );
+  const categoryIds = categoryTrees.map((tree) => tree.id).join('|');
+  useEffect(() => {
+    setOpenManagers(new Set());
+  }, [categoryIds]);
+  const toggleManager = (key: string) => {
+    setOpenManagers((prev) => toggleSet(prev, key));
+  };
 
   const openProjectPeople = (project: ProjectAllocationSummary) => {
     setDrill({
@@ -226,7 +361,7 @@ export function ResourceAllocationSummary({
     setDrill({
       title: manager.managerName,
       subtitle: `${manager.allocatedCount} of ${manager.teamSize} allocated · ${formatFte(manager.allocatedFte)} FTE · ${rangeFrom} → ${rangeTo}`,
-      groups: peopleGroups(manager.people),
+      groups: engineerAllocationGroups(manager.people),
       defaultExpanded: true,
     });
   };
@@ -242,25 +377,208 @@ export function ResourceAllocationSummary({
     });
   };
 
+  const openTreeManagerPeople = (node: WorkCategoryManagerNode) => {
+    setDrill({
+      title: node.managerName,
+      subtitle: `${node.allocatedCount} people allocated · ${formatFte(node.allocatedFte)} FTE · ${rangeFrom} → ${rangeTo}`,
+      groups: engineerAllocationGroups(node.team),
+      defaultExpanded: true,
+    });
+  };
+
+  const openTreeManagerProjects = (node: WorkCategoryManagerNode) => {
+    setDrill({
+      title: node.managerName,
+      subtitle: `Projects in ${rangeFrom} → ${rangeTo}`,
+      items: node.projects.map((project) => ({
+        label: project.name,
+        meta: `${formatFte(project.fte)} FTE`,
+      })),
+    });
+  };
+
+  const openTeamMembers = () => {
+    setDrill({
+      title: 'Team members',
+      subtitle: `${summary.totals.teamSize} people · ${rangeFrom} → ${rangeTo}`,
+      groups: [
+        {
+          title: `Allocated (${summary.allocatedPeople.length})`,
+          items: summary.allocatedPeople.map(personEntry),
+        },
+        {
+          title: `Not allocated (${summary.unallocatedPeople.length})`,
+          items: summary.unallocatedPeople.map(personEntry),
+        },
+      ].filter((group) => group.items.length > 0),
+      defaultExpanded: true,
+    });
+  };
+
+  const openAllocatedPeople = () => {
+    setDrill({
+      title: 'People allocated',
+      subtitle: `${summary.totals.allocatedCount} people · ${rangeFrom} → ${rangeTo}`,
+      items: summary.allocatedPeople.map(personEntry),
+    });
+  };
+
+  const openUnallocatedPeople = () => {
+    setDrill({
+      title: 'Not allocated',
+      subtitle: `${summary.totals.unallocatedCount} people · ${rangeFrom} → ${rangeTo}`,
+      items: summary.unallocatedPeople.map(personEntry),
+    });
+  };
+
   const cell = 'whitespace-nowrap px-3 py-2';
+  const treeCell = 'px-3 py-2';
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Kpi label="Team members" value={String(summary.totals.teamSize)} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Kpi
+          label="Team members"
+          value={String(summary.totals.teamSize)}
+          onValueClick={summary.totals.teamSize > 0 ? openTeamMembers : undefined}
+        />
         <Kpi
           label="People allocated"
           value={String(summary.totals.allocatedCount)}
-          hint={`${summary.totals.unallocatedCount} not allocated`}
+          onValueClick={summary.totals.allocatedCount > 0 ? openAllocatedPeople : undefined}
         />
-        <Kpi label="Projects" value={String(summary.totals.projectCount)} />
         <Kpi
-          label="Allocated FTE"
-          value={formatFte(summary.totals.allocatedFte)}
-          hint={`${summary.totals.rangeDays} calendar days`}
+          label="Not allocated"
+          value={String(summary.totals.unallocatedCount)}
+          onValueClick={summary.totals.unallocatedCount > 0 ? openUnallocatedPeople : undefined}
         />
-        <Kpi label="Available FTE" value={formatFte(summary.totals.availableFte)} />
       </div>
+
+      <SummaryTable
+        title="By functional unit → manager → team"
+        description="People allocated to each functional unit, grouped under the relevant engineering manager."
+        headers={[
+          { label: 'Priority', align: 'right' },
+          { label: 'Functional unit' },
+          { label: 'Manager' },
+          { label: 'Team', align: 'right' },
+          { label: 'Allocated', align: 'right' },
+          { label: 'Projects', align: 'right' },
+          { label: 'FTE', align: 'right' },
+          { label: 'Available FTE', align: 'right' },
+        ]}
+        empty={categoryTrees.length === 0}
+        emptyMessage="No functional units."
+      >
+        {categoryTrees.flatMap((tree) => {
+          if (tree.managers.length === 0) {
+            return [
+              <tr key={tree.id} className="border-t border-border hover:bg-bg2/50">
+                <td className={`${cell} text-right tabular-nums text-text2`}>
+                  {tree.sortOrder != null ? tree.sortOrder : '—'}
+                </td>
+                <td className={`${treeCell} font-semibold`}>{tree.name}</td>
+                <td className={`${treeCell} text-text2`}>No engineering managers assigned.</td>
+                <td className={`${cell} text-right tabular-nums`}>0</td>
+                <td className={`${cell} text-right tabular-nums`}>0</td>
+                <td className={`${cell} text-right tabular-nums`}>0</td>
+                <td className={`${cell} text-right tabular-nums`}>{formatFte(0)}</td>
+                <td className={`${cell} text-right tabular-nums`}>{formatFte(0)}</td>
+              </tr>,
+            ];
+          }
+          return tree.managers.flatMap((node, managerIndex) => {
+            const managerOpen = openManagers.has(node.key);
+            const rows = [
+              <tr key={node.key} className="border-t border-border hover:bg-bg2/50">
+                <td className={`${cell} text-right tabular-nums text-text2`}>
+                  {managerIndex === 0 ? (tree.sortOrder != null ? tree.sortOrder : '—') : ''}
+                </td>
+                <td className={`${treeCell} font-semibold`}>
+                  {managerIndex === 0 ? tree.name : ''}
+                </td>
+                <td className={`${treeCell} font-medium`}>
+                  <ExpandLabel
+                    open={managerOpen}
+                    label={node.managerName}
+                    onClick={() => toggleManager(node.key)}
+                  />
+                </td>
+                <td className={`${cell} text-right`}>
+                  <CountButton value={node.teamSize} onClick={() => openTreeManagerPeople(node)} />
+                </td>
+                <td className={`${cell} text-right`}>
+                  <CountButton value={node.allocatedCount} onClick={() => openTreeManagerPeople(node)} />
+                </td>
+                <td className={`${cell} text-right`}>
+                  <CountButton value={node.projectCount} onClick={() => openTreeManagerProjects(node)} />
+                </td>
+                <td className={`${cell} text-right tabular-nums`}>{formatFte(node.allocatedFte)}</td>
+                <td className={`${cell} text-right tabular-nums`}>{formatFte(node.availableFte)}</td>
+              </tr>,
+            ];
+            if (!managerOpen) return rows;
+            if (node.team.length === 0) {
+              rows.push(
+                <tr key={`${node.key}:empty`} className="border-t border-border">
+                  <td className={cell} />
+                  <td className={treeCell} />
+                  <td className={`${treeCell} ${indentClass(1)} text-text2`}>
+                    No people allocated to this functional unit.
+                  </td>
+                  <td className={cell} />
+                  <td className={cell} />
+                  <td className={cell} />
+                  <td className={cell} />
+                  <td className={cell} />
+                </tr>,
+              );
+              return rows;
+            }
+            for (const person of node.team) {
+              rows.push(
+                <tr key={`${node.key}:${person.employeeId}`} className="border-t border-border hover:bg-bg2/30">
+                  <td className={cell} />
+                  <td className={treeCell} />
+                  <td className={`${treeCell} ${indentClass(1)}`}>
+                    {person.fte > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => openPersonAllocations(person)}
+                        className="text-left text-accent hover:underline"
+                      >
+                        {person.employeeName}
+                      </button>
+                    ) : (
+                      person.employeeName
+                    )}
+                    {person.designationName ? (
+                      <span className="ml-2 text-xs text-text2">{person.designationName}</span>
+                    ) : null}
+                  </td>
+                  <td className={`${cell} text-right tabular-nums text-text2`}>1</td>
+                  <td className={`${cell} text-right tabular-nums`}>{person.fte > 0 ? 1 : 0}</td>
+                  <td className={`${cell} text-right`}>
+                    <CountButton
+                      value={person.allocations.length}
+                      onClick={
+                        person.allocations.length > 0
+                          ? () => openPersonAllocations(person)
+                          : undefined
+                      }
+                    />
+                  </td>
+                  <td className={`${cell} text-right tabular-nums`}>{formatFte(person.fte)}</td>
+                  <td className={`${cell} text-right tabular-nums`}>
+                    {formatFte(Math.max(0, 1 - person.fte))}
+                  </td>
+                </tr>,
+              );
+            }
+            return rows;
+          });
+        })}
+      </SummaryTable>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <SummaryTable

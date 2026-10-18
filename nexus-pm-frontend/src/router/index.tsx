@@ -12,12 +12,16 @@ import { OrganisationPage } from '@/pages/Organisation/OrganisationPage';
 import { IssuesPage } from '@/pages/Issues/IssuesPage';
 import { IssueCreatePage } from '@/pages/Issues/IssueCreatePage';
 import { IssueDetailPage } from '@/pages/IssueDetail/IssueDetailPage';
+import { ResourcesLayout } from '@/pages/Resources/ResourcesLayout';
 import { ResourcesPage } from '@/pages/Resources/ResourcesPage';
+import { UtilizationTimelinePage } from '@/pages/Resources/UtilizationTimelinePage';
 import { UtilizationSummaryPage } from '@/pages/Resources/UtilizationSummaryPage';
+import { AllocationHistoryPage } from '@/pages/Resources/AllocationHistoryPage';
 import { TeamPage } from '@/pages/Team/TeamPage';
 import { TeamLayout } from '@/pages/Team/TeamLayout';
 import { ManagementPage } from '@/pages/Team/ManagementPage';
 import { TeamEmployeesPage } from '@/pages/Team/TeamEmployeesPage';
+import { TeamHistoryPage } from '@/pages/Team/TeamHistoryPage';
 import { ResourceDetailPage } from '@/pages/Resources/ResourceDetailPage';
 import { TimePage } from '@/pages/Time/TimePage';
 import { NotificationsPage } from '@/pages/Notifications/NotificationsPage';
@@ -51,8 +55,12 @@ export function AppRouter() {
             <Route path="/issues" element={<IssuesPage />} />
             <Route path="/issues/new" element={<IssueCreatePage />} />
             <Route path="/issues/:id" element={<IssueDetailPage />} />
-            <Route path="/resources" element={<ResourcesPage />} />
-            <Route path="/resources/summary" element={<UtilizationSummaryPage />} />
+            <Route path="/resources" element={<ResourcesLayout />}>
+              <Route index element={<ResourcesPage />} />
+              <Route path="timeline" element={<UtilizationTimelinePage />} />
+              <Route path="summary" element={<UtilizationSummaryPage />} />
+              <Route path="history" element={<AllocationHistoryPage />} />
+            </Route>
             <Route path="/reports" element={<Navigate to="/" replace />} />
             <Route path="/resources/:id" element={<ResourceDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
@@ -66,6 +74,7 @@ export function AppRouter() {
                 <Route index element={<Navigate to="/team/management" replace />} />
                 <Route path="management" element={<ManagementPage />} />
                 <Route path="employees" element={<TeamEmployeesPage />} />
+                <Route path="history" element={<TeamHistoryPage />} />
                 <Route path="directory" element={<TeamPage />} />
               </Route>
               <Route path="/resources/team" element={<Navigate to="/team" replace />} />

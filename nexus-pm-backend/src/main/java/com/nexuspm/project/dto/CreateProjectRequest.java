@@ -20,6 +20,10 @@ public class CreateProjectRequest {
 
     private String product;
 
+    private UUID projectTypeId;
+
+    private UUID workCategoryId;
+
     private String jiraProjectKey;
 
     @NotNull

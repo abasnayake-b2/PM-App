@@ -23,7 +23,7 @@ CREATE DATABASE IF NOT EXISTS dfn_pm
   COLLATE utf8mb4_unicode_ci;
 
 USE dfn_pm;
-
+`
 SET SQL_SAFE_UPDATES = 0;
 
 -- -----------------------------------------------------------------------------

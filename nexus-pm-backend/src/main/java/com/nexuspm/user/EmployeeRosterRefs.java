@@ -60,6 +60,17 @@ public final class EmployeeRosterRefs {
         return null;
     }
 
+    public static String engineeringManagerDepartmentName(Employee employee) {
+        TeamManagement manager = employee.getEngineeringManagerManagement();
+        if (manager != null
+                && manager.getDepartment() != null
+                && manager.getDepartment().getName() != null
+                && !manager.getDepartment().getName().isBlank()) {
+            return manager.getDepartment().getName().trim();
+        }
+        return null;
+    }
+
     /**
      * Walks the management supervisor chain from the employee's EM up to the first VP title.
      */

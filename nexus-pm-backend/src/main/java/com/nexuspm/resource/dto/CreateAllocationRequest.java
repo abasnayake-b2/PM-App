@@ -28,6 +28,9 @@ public class CreateAllocationRequest {
 
     private UUID taskCategoryId;
 
+    /** Work category assigned to the engineering manager; treated as a non-project allocation. */
+    private UUID workCategoryId;
+
     /** Description for a non-project task created with this allocation. */
     private String nonProjectTaskDescription;
 

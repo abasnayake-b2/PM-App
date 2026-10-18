@@ -7,6 +7,7 @@ import { ResourceAllocationCard } from '@/components/ResourceAllocationCard';
 import { ResourceAllocationGrid } from '@/components/ResourceAllocationGrid';
 import { TeamMemberPanel } from '@/components/TeamMemberPanel';
 import { useCapacity, useAllocations, useUpdateAllocation } from '@/hooks/useResources';
+import { useDepartments } from '@/hooks/useEmployees';
 import { exportCapacityTimeline } from '@/api/resources.api';
 import { fetchRosterDesignations, fetchRosterStreams } from '@/api/rosterLookups.api';
 import { fetchEngineeringManagers, fetchTeamManagement } from '@/api/teamRoster.api';
@@ -15,7 +16,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
 import { isManagerOrAboveRole, hasOrgWideVisibility, isScopedEngineeringManagerRole, isDeliveryManagerRole } from '@/utils/orgRoles';
-import { defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
+import { fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
+import { averageAllocatedPct, defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
 import { groupedManagerNames } from '@/utils/managementRoles';
 import { isActiveRosterStatus } from '@/utils/rosterStatus';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
@@ -23,7 +25,7 @@ import type { Capacity } from '@/types';
 
 type ViewMode = 'cards' | 'grid' | 'timeline';
 
-export function ResourcesPage() {
+export function ResourcesPage({ variant = 'full' }: { variant?: 'full' | 'timeline' } = {}) {
   const role = useAuthStore((s) => s.user?.role);
   const orgWideVisibility = useAuthStore((s) => s.user?.orgWideVisibility);
   const { can } = usePermissions();
@@ -41,10 +43,14 @@ export function ResourcesPage() {
   const userName = useAuthStore((s) => s.user?.name);
 
   const defaults = defaultDateRange();
-  const [view, setView] = useState<ViewMode>('cards');
+  const [view, setView] = useState<ViewMode>(variant === 'timeline' ? 'timeline' : 'cards');
+  const timelineOnly = variant === 'timeline';
   const [teamFilter, setTeamFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [designationFilter, setDesignationFilter] = useState('');
   const [engineeringManagerFilter, setEngineeringManagerFilter] = useState('');
+  const [projectTypeId, setProjectTypeId] = useState('');
+  const [workCategoryId, setWorkCategoryId] = useState('');
   const [nameSearch, setNameSearch] = useState('');
   const deferredNameSearch = useDeferredValue(nameSearch);
   const userId = useAuthStore((s) => s.user?.userId);
@@ -70,14 +76,17 @@ export function ResourcesPage() {
     to: toDate,
     asOf: todayLocalIso(),
     team: teamFilter || undefined,
+    department: departmentFilter || undefined,
     designationCode: designationFilter || undefined,
     engineeringManager: engineeringManagerFilter || undefined,
     name: deferredNameSearch.trim() || undefined,
+    workCategoryId: workCategoryId || undefined,
   };
 
   const { data: capacity, isLoading, error } = useCapacity(capacityParams, {
     enabled: showTeamCapacity,
   });
+  const { data: departments = [] } = useDepartments(showTeamCapacity);
   const { data: streams = [] } = useQuery({
     queryKey: ['roster-streams'],
     queryFn: fetchRosterStreams,
@@ -96,6 +105,16 @@ export function ResourcesPage() {
   const { data: management = [] } = useQuery({
     queryKey: ['team-management'],
     queryFn: () => fetchTeamManagement(),
+    enabled: showTeamCapacity,
+  });
+  const { data: projectTypes = [] } = useQuery({
+    queryKey: ['project-types'],
+    queryFn: fetchProjectTypes,
+    enabled: showTeamCapacity,
+  });
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
     enabled: showTeamCapacity,
   });
   const managerGroups = useMemo(
@@ -119,11 +138,25 @@ export function ResourcesPage() {
       .filter((row) => isActiveRosterStatus(row.status))
       .sort(
         (a, b) =>
-          sortKey(a.vpName).localeCompare(sortKey(b.vpName)) ||
           sortKey(a.engineeringManagerName).localeCompare(sortKey(b.engineeringManagerName)) ||
           a.employeeName.localeCompare(b.employeeName),
-      );
-  }, [capacity]);
+      )
+      .map((row) => {
+        if (!projectTypeId) return row;
+        const period = (row.periodAllocations ?? row.allocations ?? []).filter(
+          (allocation) => !projectTypeId || allocation.projectTypeId === projectTypeId,
+        );
+        const pct = averageAllocatedPct(period, fromDate, toDate);
+        return {
+          ...row,
+          periodAllocations: period,
+          allocations: period,
+          totalPercentage: pct,
+          availablePercentage: Math.max(0, 100 - pct),
+          overAllocated: pct > 100,
+        };
+      });
+  }, [capacity, projectTypeId, fromDate, toDate]);
 
   const selectedEmployeeCapacity = useMemo(() => {
     if (!selectedRow) return null;
@@ -175,20 +208,8 @@ export function ResourcesPage() {
 
   return (
     <div className="min-w-0 max-w-full">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Resource Utilization</h1>
-          <p className="mt-1 text-text2">
-            {isScopedManager
-              ? isManagerOrAboveRole(role)
-                ? 'Your team and allocations on your projects'
-                : 'Your Engineering Manager’s team and project allocations'
-              : 'Team capacity from the employee roster and issue-level allocations'}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-bg2 p-4">
+      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-bg2 p-4">
+        {!timelineOnly && (
         <div className="flex rounded-lg border border-border p-0.5">
           <button
             type="button"
@@ -221,6 +242,7 @@ export function ResourcesPage() {
             Timeline
           </button>
         </div>
+        )}
 
         <label className="text-sm">
           <span className="text-text2">Designation</span>
@@ -249,6 +271,22 @@ export function ResourcesPage() {
             placeholder="Type a name…"
             className="mt-1 block min-w-[10rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
           />
+        </label>
+
+        <label className="text-sm">
+          <span className="text-text2">Department</span>
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="mt-1 block min-w-[10rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="text-sm">
@@ -283,6 +321,38 @@ export function ResourcesPage() {
         </label>
 
         <label className="text-sm">
+          <span className="text-text2">Project type</span>
+          <select
+            value={projectTypeId}
+            onChange={(e) => setProjectTypeId(e.target.value)}
+            className="mt-1 block min-w-[10rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All project types</option>
+            {projectTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
+          <span className="text-text2">Functional unit</span>
+          <select
+            value={workCategoryId}
+            onChange={(e) => setWorkCategoryId(e.target.value)}
+            className="mt-1 block min-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All functional units</option>
+            {workCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
           <span className="text-text2">From</span>
           <input
             type="date"
@@ -305,7 +375,7 @@ export function ResourcesPage() {
           {filteredCapacity.length} team member{filteredCapacity.length !== 1 ? 's' : ''}
         </span>
 
-        {view === 'timeline' && (
+        {(timelineOnly || view === 'timeline') && (
           <button
             type="button"
             onClick={handleExportTimeline}
@@ -357,6 +427,7 @@ export function ResourcesPage() {
             rows={filteredCapacity}
             rangeFrom={fromDate}
             rangeTo={toDate}
+            workCategoryId={workCategoryId || undefined}
             onSelect={(row) => {
               setPanelEditAllocationId(null);
               setSelectedRow(row);

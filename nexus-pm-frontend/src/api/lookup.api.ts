@@ -25,6 +25,26 @@ export interface TaskCategory {
   description?: string;
 }
 
+export interface ProjectType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface WorkCategoryManager {
+  id: string;
+  name: string;
+  roleTitle?: string;
+}
+
+export interface WorkCategory {
+  id: string;
+  name: string;
+  description?: string;
+  sortOrder?: number;
+  engineeringManagers?: WorkCategoryManager[];
+}
+
 export interface IssueStatus {
   id: string;
   name: string;
@@ -50,6 +70,16 @@ export async function fetchTaskTypes(): Promise<TaskType[]> {
 
 export async function fetchTaskCategories(): Promise<TaskCategory[]> {
   const { data } = await api.get<TaskCategory[]>('/lookup/task-categories');
+  return data;
+}
+
+export async function fetchProjectTypes(): Promise<ProjectType[]> {
+  const { data } = await api.get<ProjectType[]>('/lookup/project-types');
+  return data;
+}
+
+export async function fetchWorkCategories(): Promise<WorkCategory[]> {
+  const { data } = await api.get<WorkCategory[]>('/lookup/work-categories');
   return data;
 }
 

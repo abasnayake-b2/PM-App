@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchTeamManagement,
   fetchTeamRosterMembers,
+  fetchManagerAssignments,
+  fetchMemberManagerAssignments,
   createTeamManagement,
   updateTeamManagement,
   deleteTeamManagement,
@@ -23,6 +25,7 @@ import {
   type TeamRosterMemberPayload,
   type PromoteEmployeeToManagementPayload,
   type DemoteManagementToEmployeePayload,
+  type ManagerAssignmentQuery,
 } from '@/api/teamRoster.api';
 
 export function useTeamManagement(search = '', enabled = true, includeInactive = false) {
@@ -38,6 +41,22 @@ export function useTeamRosterMembers(search = '', enabled = true, includeInactiv
     queryKey: ['team-roster-members', search, includeInactive],
     queryFn: () => fetchTeamRosterMembers(search, includeInactive),
     enabled,
+  });
+}
+
+export function useManagerAssignments(query: ManagerAssignmentQuery, enabled = true) {
+  return useQuery({
+    queryKey: ['manager-assignments', query],
+    queryFn: () => fetchManagerAssignments(query),
+    enabled,
+  });
+}
+
+export function useMemberManagerAssignments(employeeId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['manager-assignments', 'member', employeeId],
+    queryFn: () => fetchMemberManagerAssignments(employeeId!),
+    enabled: enabled && !!employeeId,
   });
 }
 
@@ -133,7 +152,10 @@ export function useCreateTeamRosterMember() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createTeamRosterMember,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-roster-members'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
+      qc.invalidateQueries({ queryKey: ['manager-assignments'] });
+    },
   });
 }
 
@@ -141,7 +163,10 @@ export function useUpdateTeamRosterMember(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: TeamRosterMemberPayload) => updateTeamRosterMember(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-roster-members'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
+      qc.invalidateQueries({ queryKey: ['manager-assignments'] });
+    },
   });
 }
 
@@ -149,7 +174,10 @@ export function useDeleteTeamRosterMember() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteTeamRosterMember,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-roster-members'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
+      qc.invalidateQueries({ queryKey: ['manager-assignments'] });
+    },
   });
 }
 
@@ -185,6 +213,7 @@ export function usePromoteEmployeeToManagement() {
       qc.invalidateQueries({ queryKey: ['eligible-management'] });
       qc.invalidateQueries({ queryKey: ['eligible-employees'] });
       qc.invalidateQueries({ queryKey: ['user-accounts'] });
+      qc.invalidateQueries({ queryKey: ['manager-assignments'] });
     },
   });
 }
@@ -205,6 +234,7 @@ export function useDemoteManagementToEmployee() {
       qc.invalidateQueries({ queryKey: ['eligible-management'] });
       qc.invalidateQueries({ queryKey: ['eligible-employees'] });
       qc.invalidateQueries({ queryKey: ['user-accounts'] });
+      qc.invalidateQueries({ queryKey: ['manager-assignments'] });
     },
   });
 }

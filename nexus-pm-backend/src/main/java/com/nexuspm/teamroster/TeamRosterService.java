@@ -48,6 +48,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -69,6 +70,7 @@ public class TeamRosterService {
     private final DepartmentRepository departmentRepository;
     private final RoleRepository roleRepository;
     private final EmployeeCleanupService employeeCleanupService;
+    private final EmployeeManagerAssignmentService managerAssignmentService;
     private final ManagementUserProvisioningService managementUserProvisioningService;
     private final UserAuthRepository userAuthRepository;
     private final EntityManager entityManager;
@@ -254,6 +256,11 @@ public class TeamRosterService {
         clearRosterEmployees();
         List<Employee> entities = memberRows.stream().map(ImportedMemberRow::employee).toList();
         employeeRepository.saveAll(entities);
+        employeeRepository.flush();
+        LocalDate importDay = LocalDate.now();
+        for (Employee imported : entities) {
+            recordManagerAssignment(imported, importDay, EmployeeManagerAssignmentService.SOURCE_IMPORT);
+        }
 
         batch.setManagementCount(0);
         batch.setMemberCount(entities.size());
@@ -425,6 +432,8 @@ public class TeamRosterService {
         employee.setTeamManagement(entity);
         // No longer an engineer reporting to an EM once they are management.
         employee.setEngineeringManagerManagement(null);
+        managerAssignmentService.applyFromDate(
+                employee, null, LocalDate.now(), EmployeeManagerAssignmentService.SOURCE_PROMOTE);
         employeeRepository.save(employee);
         return entity;
     }
@@ -478,7 +487,8 @@ public class TeamRosterService {
         }
 
         // Persist unlink (or new roster employee) before deleting the management row.
-        employeeRepository.save(employee);
+        employeeRepository.saveAndFlush(employee);
+        recordManagerAssignment(employee, LocalDate.now(), EmployeeManagerAssignmentService.SOURCE_DEMOTE);
         employeeRepository.clearEngineeringManagerManagement(managementId);
         detachManagementReferences(managementId);
         entityManager.flush();
@@ -615,7 +625,10 @@ public class TeamRosterService {
         entity.setStatus("ACTIVE");
         entity.setBenchStatus("ASSIGNED");
         applyMemberRequest(entity, request);
-        return toMemberResponse(auditNameEnricher.enrich(employeeRepository.save(entity)));
+        Employee saved = employeeRepository.saveAndFlush(entity);
+        recordManagerAssignment(
+                saved, request.getManagerAssignmentFromDate(), EmployeeManagerAssignmentService.SOURCE_UI);
+        return toMemberResponse(auditNameEnricher.enrich(saved));
     }
 
     @Transactional
@@ -624,6 +637,8 @@ public class TeamRosterService {
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Employee not found", 404));
         ensureRosterEmployee(entity);
         applyMemberRequest(entity, request);
+        recordManagerAssignment(
+                entity, request.getManagerAssignmentFromDate(), EmployeeManagerAssignmentService.SOURCE_UI);
         return toMemberResponse(auditNameEnricher.enrich(employeeRepository.save(entity)));
     }
 
@@ -1194,6 +1209,14 @@ public class TeamRosterService {
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             entity.setStatus(request.getStatus().trim().toUpperCase());
         }
+    }
+
+    private void recordManagerAssignment(Employee employee, LocalDate fromDate, String source) {
+        managerAssignmentService.applyFromDate(
+                employee,
+                EmployeeManagerAssignmentService.managerIdOf(employee),
+                fromDate,
+                source);
     }
 
     private void applySkills(Employee entity, List<UUID> skillIds) {

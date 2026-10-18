@@ -4,6 +4,7 @@ import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.entity.RdIssueTask;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.entity.WorkCategory;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.entity.ProjectTask;
 import com.nexuspm.shared.entity.AuditableEntity;
@@ -52,6 +53,10 @@ public class Allocation extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_category_id")
     private TaskCategory taskCategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_category_id")
+    private WorkCategory workCategory;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "non_project_task_id")

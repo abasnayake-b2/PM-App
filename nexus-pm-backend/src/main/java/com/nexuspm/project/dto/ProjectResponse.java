@@ -15,6 +15,10 @@ public class ProjectResponse {
     private UUID id;
     private String name;
     private String product;
+    private UUID projectTypeId;
+    private String projectTypeName;
+    private UUID workCategoryId;
+    private String workCategoryName;
     private String jiraProjectKey;
     private String status;
     private String ragStatus;

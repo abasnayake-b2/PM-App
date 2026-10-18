@@ -14,6 +14,7 @@ import com.nexuspm.resource.dto.AllocationResponse;
 import com.nexuspm.resource.dto.CapacityResponse;
 import com.nexuspm.shared.exception.BusinessException;
 import com.nexuspm.shared.security.SecurityUtils;
+import com.nexuspm.user.ActiveRosterStatus;
 import com.nexuspm.teamroster.entity.TeamManagement;
 import com.nexuspm.teamroster.repository.TeamManagementRepository;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +57,10 @@ public class CapacityUtilisationService {
         LocalDate heatmapEnd = weekStart.plusWeeks(heatmapWeeks).minusDays(1);
 
         List<CapacityResponse> capacity = allocationService.getCapacity(
-                weekStart, heatmapEnd, today, null, null, null, null);
+                weekStart, heatmapEnd, today, null, null, null, null, null, null)
+                .stream()
+                .filter(row -> ActiveRosterStatus.isActive(row.getStatus()))
+                .toList();
 
         List<WeekWindow> weeks = buildWeeks(weekStart, heatmapWeeks);
         ManagerNameSets names = loadManagerNames();

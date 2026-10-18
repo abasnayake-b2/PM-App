@@ -122,6 +122,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
     @Query(value = """
             SELECT i FROM RdIssue i
             JOIN FETCH i.project p
+            LEFT JOIN p.projectType pt
+            LEFT JOIN p.workCategory wc
             LEFT JOIN FETCH i.release r
             JOIN FETCH i.issueType
             JOIN FETCH i.priority
@@ -138,6 +140,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
               AND (:assignedToId IS NULL OR i.assignedTo.id = :assignedToId)
               AND (:priorityId IS NULL OR i.priority.id = :priorityId)
               AND (:issueTypeId IS NULL OR i.issueType.id = :issueTypeId)
+              AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
+              AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
               AND (
                     :hasSearch = FALSE
                     OR LOWER(i.title) LIKE :searchPattern
@@ -161,6 +165,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             countQuery = """
             SELECT COUNT(i) FROM RdIssue i
             JOIN i.project p
+            LEFT JOIN p.projectType pt
+            LEFT JOIN p.workCategory wc
             LEFT JOIN i.release r
             JOIN i.status st
             LEFT JOIN i.assignedTo a
@@ -173,6 +179,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
               AND (:assignedToId IS NULL OR i.assignedTo.id = :assignedToId)
               AND (:priorityId IS NULL OR i.priority.id = :priorityId)
               AND (:issueTypeId IS NULL OR i.issueType.id = :issueTypeId)
+              AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
+              AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
               AND (
                     :hasSearch = FALSE
                     OR LOWER(i.title) LIKE :searchPattern
@@ -204,6 +212,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             @Param("assignedToId") UUID assignedToId,
             @Param("priorityId") UUID priorityId,
             @Param("issueTypeId") UUID issueTypeId,
+            @Param("projectTypeId") UUID projectTypeId,
+            @Param("workCategoryId") UUID workCategoryId,
             @Param("hasSearch") boolean hasSearch,
             @Param("searchPattern") String searchPattern,
             @Param("hasIdHint") boolean hasIdHint,
@@ -214,6 +224,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
     @Query(value = """
             SELECT DISTINCT i FROM RdIssue i
             JOIN FETCH i.project p
+            LEFT JOIN p.projectType pt
+            LEFT JOIN p.workCategory wc
             LEFT JOIN FETCH p.client c
             LEFT JOIN FETCH c.country
             LEFT JOIN FETCH p.engineeringManagerManagement em
@@ -230,6 +242,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
               AND (:filterByStatusIds = FALSE OR i.status.id IN :statusIds)
               AND (:priorityId IS NULL OR i.priority.id = :priorityId)
               AND (:issueTypeId IS NULL OR i.issueType.id = :issueTypeId)
+              AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
+              AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
               AND (
                     :hasSearch = FALSE
                     OR LOWER(i.title) LIKE :searchPattern
@@ -258,6 +272,8 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             @Param("statusIds") List<UUID> statusIds,
             @Param("priorityId") UUID priorityId,
             @Param("issueTypeId") UUID issueTypeId,
+            @Param("projectTypeId") UUID projectTypeId,
+            @Param("workCategoryId") UUID workCategoryId,
             @Param("hasSearch") boolean hasSearch,
             @Param("searchPattern") String searchPattern,
             @Param("hasIdHint") boolean hasIdHint,
@@ -361,12 +377,17 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
     @Query("""
             SELECT i.status.id, COUNT(i)
             FROM RdIssue i
+            JOIN i.project p
+            LEFT JOIN p.projectType pt
+            LEFT JOIN p.workCategory wc
             WHERE i.deleted = false
-              AND (:projectId IS NULL OR i.project.id = :projectId)
-              AND (:scopedProjectIds IS NULL OR i.project.id IN :scopedProjectIds)
+              AND (:projectId IS NULL OR p.id = :projectId)
+              AND (:scopedProjectIds IS NULL OR p.id IN :scopedProjectIds)
               AND (:unreleasedOnly = FALSE OR i.release IS NULL)
               AND (:priorityId IS NULL OR i.priority.id = :priorityId)
               AND (:issueTypeId IS NULL OR i.issueType.id = :issueTypeId)
+              AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
+              AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
             GROUP BY i.status.id
             """)
     List<Object[]> countByStatusFiltered(
@@ -374,7 +395,9 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds,
             @Param("unreleasedOnly") boolean unreleasedOnly,
             @Param("priorityId") UUID priorityId,
-            @Param("issueTypeId") UUID issueTypeId);
+            @Param("issueTypeId") UUID issueTypeId,
+            @Param("projectTypeId") UUID projectTypeId,
+            @Param("workCategoryId") UUID workCategoryId);
 
     @Query("""
             SELECT i.project.id, i.status.id, COUNT(i)
@@ -468,6 +491,43 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
               )
             """)
     List<RdIssue> findCapacityPlanCandidates(
+            @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds);
+
+    @Query("""
+            SELECT p.id, p.name,
+                   CONCAT(COALESCE(em.firstName, ''), ' ', COALESCE(em.lastName, '')),
+                   wc.id, wc.name,
+                   s.sequence, COUNT(i)
+            FROM RdIssue i
+            JOIN i.project p
+            LEFT JOIN p.engineeringManagerManagement em
+            LEFT JOIN p.workCategory wc
+            JOIN i.status s
+            WHERE i.deleted = false
+              AND i.parentIssue IS NULL
+              AND p.deleted = false
+              AND p.archived = false
+              AND s.sequence BETWEEN 1 AND 17
+              AND (:scopedProjectIds IS NULL OR p.id IN :scopedProjectIds)
+            GROUP BY p.id, p.name, em.firstName, em.lastName, wc.id, wc.name, s.sequence
+            """)
+    List<Object[]> aggregateTopLevelRdByProjectAndStatus(
+            @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds);
+
+    @Query("""
+            SELECT p.id, i.id, i.displayKey, i.title, s.sequence, s.name
+            FROM RdIssue i
+            JOIN i.project p
+            JOIN i.status s
+            WHERE i.deleted = false
+              AND i.parentIssue IS NULL
+              AND p.deleted = false
+              AND p.archived = false
+              AND s.sequence BETWEEN 1 AND 17
+              AND (:scopedProjectIds IS NULL OR p.id IN :scopedProjectIds)
+            ORDER BY i.displayKey, i.title
+            """)
+    List<Object[]> listTopLevelRdsForSummary(
             @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds);
 
     @Modifying

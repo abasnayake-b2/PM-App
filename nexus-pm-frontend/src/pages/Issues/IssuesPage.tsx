@@ -13,7 +13,7 @@ import { ListPagination } from '@/components/ListPagination';
 import { MultiStatusFilter } from '@/components/MultiStatusFilter';
 import { fetchProjects } from '@/api/projects.api';
 import { exportBacklogExcel, fetchIssueStatusCounts } from '@/api/issues.api';
-import { fetchPriorities, fetchIssueTypes, fetchIssueStatuses } from '@/api/lookup.api';
+import { fetchPriorities, fetchIssueTypes, fetchIssueStatuses, fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
 import { useIssues, useDeleteIssue } from '@/hooks/useIssues';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -29,6 +29,8 @@ export function IssuesPage() {
 
   const [projectId, setProjectId] = useState('');
   const [issueTypeId, setIssueTypeId] = useState('');
+  const [projectTypeId, setProjectTypeId] = useState('');
+  const [workCategoryId, setWorkCategoryId] = useState('');
   const [priorityId, setPriorityId] = useState('');
   const [statusIds, setStatusIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
@@ -51,6 +53,8 @@ export function IssuesPage() {
   const { data: priorities } = useQuery({ queryKey: ['priorities'], queryFn: fetchPriorities });
   const { data: issueTypes } = useQuery({ queryKey: ['issue-types'], queryFn: fetchIssueTypes });
   const { data: statuses } = useQuery({ queryKey: ['issue-statuses'], queryFn: fetchIssueStatuses });
+  const { data: projectTypes = [] } = useQuery({ queryKey: ['project-types'], queryFn: fetchProjectTypes });
+  const { data: workCategories = [] } = useQuery({ queryKey: ['work-categories'], queryFn: fetchWorkCategories });
 
   const canQuery = can(P.ISSUES_VIEW);
   const searching = deferredSearch.length > 0;
@@ -59,7 +63,7 @@ export function IssuesPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [projectId, issueTypeId, priorityId, statusIds.join(','), deferredSearch, pageSize]);
+  }, [projectId, issueTypeId, projectTypeId, workCategoryId, priorityId, statusIds.join(','), deferredSearch, pageSize]);
 
   // Full-set status counts for RD overview — never tied to grid pagination.
   const { data: statusCounts, isFetching: countsFetching } = useQuery({
@@ -67,12 +71,16 @@ export function IssuesPage() {
       'issue-status-counts',
       projectId || null,
       issueTypeId || null,
+      projectTypeId || null,
+      workCategoryId || null,
       priorityId || null,
     ],
     queryFn: () =>
       fetchIssueStatusCounts({
         projectId: projectId || undefined,
         issueTypeId: issueTypeId || undefined,
+        projectTypeId: projectTypeId || undefined,
+        workCategoryId: workCategoryId || undefined,
         priorityId: priorityId || undefined,
       }),
     enabled: canQuery && trackerTab === 'list',
@@ -82,6 +90,8 @@ export function IssuesPage() {
     {
       projectId: projectId || undefined,
       issueTypeId: issueTypeId || undefined,
+      projectTypeId: projectTypeId || undefined,
+      workCategoryId: workCategoryId || undefined,
       priorityId: priorityId || undefined,
       statusIds: statusFiltering ? statusIds : undefined,
       ...(searching ? { q: deferredSearch } : {}),
@@ -157,6 +167,8 @@ export function IssuesPage() {
       await exportBacklogExcel({
         projectId: projectId || undefined,
         issueTypeId: issueTypeId || undefined,
+        projectTypeId: projectTypeId || undefined,
+        workCategoryId: workCategoryId || undefined,
         priorityId: priorityId || undefined,
         statusIds: statusFiltering ? statusIds : undefined,
         q: deferredSearch || undefined,
@@ -263,6 +275,40 @@ export function IssuesPage() {
           </select>
         </label>
 
+        <label className="text-sm">
+          <span className="text-text2">Project type</span>
+          <select
+            value={projectTypeId}
+            onChange={(e) => setProjectTypeId(e.target.value)}
+            disabled={!canQuery}
+            className="mt-1 block min-w-[140px] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All project types</option>
+            {projectTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
+          <span className="text-text2">Functional unit</span>
+          <select
+            value={workCategoryId}
+            onChange={(e) => setWorkCategoryId(e.target.value)}
+            disabled={!canQuery}
+            className="mt-1 block min-w-[180px] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All functional units</option>
+            {workCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {trackerTab === 'list' && (
           <>
             <label className="text-sm">
@@ -330,6 +376,8 @@ export function IssuesPage() {
       {canQuery && trackerTab === 'matrix' && (
         <EmCrMatrixTab
           projectId={projectId || undefined}
+          projectTypeId={projectTypeId || undefined}
+          workCategoryId={workCategoryId || undefined}
           enabled={canQuery}
           onIssueClick={(issue) => setSelectedIssueId(issue.id)}
         />

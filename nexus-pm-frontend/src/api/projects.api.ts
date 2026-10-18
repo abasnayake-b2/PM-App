@@ -11,6 +11,8 @@ export interface ProjectListParams {
   ragStatus?: string;
   vpManagementId?: string;
   engineeringManagerManagementId?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
   includeArchived?: boolean;
   page?: number;
   size?: number;
@@ -20,6 +22,8 @@ export interface CreateProjectPayload {
   clientId: string;
   name: string;
   product?: string;
+  projectTypeId?: string;
+  workCategoryId?: string;
   jiraProjectKey?: string;
   leadEmployeeId: string;
   architectEmployeeId?: string;
@@ -33,6 +37,8 @@ export interface CreateProjectPayload {
 export interface UpdateProjectPayload {
   name: string;
   product?: string | null;
+  projectTypeId?: string | null;
+  workCategoryId?: string | null;
   jiraProjectKey?: string | null;
   leadEmployeeId?: string;
   architectEmployeeId?: string | null;

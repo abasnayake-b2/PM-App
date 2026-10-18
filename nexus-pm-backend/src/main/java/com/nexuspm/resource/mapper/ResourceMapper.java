@@ -5,6 +5,7 @@ import com.nexuspm.issue.entity.RdIssue;
 import com.nexuspm.issue.entity.RdIssueTask;
 import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
+import com.nexuspm.lookup.entity.WorkCategory;
 import com.nexuspm.project.entity.Project;
 import com.nexuspm.project.entity.ProjectTask;
 import com.nexuspm.resource.dto.AllocationResponse;
@@ -26,6 +27,10 @@ public class ResourceMapper {
         RdIssueTask rdTask = allocation.getRdIssueTask();
         TaskType taskType = allocation.getTaskType();
         TaskCategory taskCategory = allocation.getTaskCategory();
+        WorkCategory workCategory = allocation.getWorkCategory();
+        if (workCategory == null && project != null) {
+            workCategory = project.getWorkCategory();
+        }
         NonProjectTask nonProjectTask = allocation.getNonProjectTask();
 
         String projectTaskKey = projectTask != null && project != null
@@ -42,8 +47,14 @@ public class ResourceMapper {
                 .issueId(issue != null ? issue.getId() : null)
                 .issueTitle(targetTitle(allocation, project, issue, projectTask, rdTask, nonProjectTask, projectTaskKey, rdTaskKey))
                 .issueDisplayKey(issue != null ? issue.getDisplayKey() : null)
+                .issueStatusSequence(issue != null && issue.getStatus() != null ? issue.getStatus().getSequence() : null)
+                .issueStatusName(issue != null && issue.getStatus() != null ? issue.getStatus().getName() : null)
                 .projectId(project != null ? project.getId() : null)
-                .projectName(project != null ? project.getName() : (taskCategory != null ? taskCategory.getName() : "Non-project"))
+                .projectName(project != null ? project.getName()
+                        : (workCategory != null ? workCategory.getName()
+                        : (taskCategory != null ? taskCategory.getName() : "Non-project")))
+                .projectTypeId(project != null && project.getProjectType() != null ? project.getProjectType().getId() : null)
+                .projectTypeName(project != null && project.getProjectType() != null ? project.getProjectType().getName() : null)
                 .projectTaskId(projectTask != null ? projectTask.getId() : null)
                 .projectTaskKey(projectTaskKey)
                 .projectTaskDescription(projectTask != null ? projectTask.getDescription() : null)
@@ -53,7 +64,10 @@ public class ResourceMapper {
                 .taskTypeId(taskType != null ? taskType.getId() : null)
                 .taskTypeName(taskType != null ? taskType.getName() : null)
                 .taskCategoryId(taskCategory != null ? taskCategory.getId() : null)
-                .taskCategoryName(taskCategory != null ? taskCategory.getName() : null)
+                .taskCategoryName(taskCategory != null ? taskCategory.getName()
+                        : (workCategory != null ? workCategory.getName() : null))
+                .workCategoryId(workCategory != null ? workCategory.getId() : null)
+                .workCategoryName(workCategory != null ? workCategory.getName() : null)
                 .nonProjectTaskId(nonProjectTask != null ? nonProjectTask.getId() : null)
                 .nonProjectTaskDescription(nonProjectTask != null ? nonProjectTask.getDescription() : null)
                 .roleOnProject(allocation.getRoleOnProject())

@@ -25,6 +25,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             LEFT JOIN FETCH p.architectEmployee
             LEFT JOIN FETCH p.engineeringManagerManagement em
             LEFT JOIN FETCH em.supervisor
+            LEFT JOIN FETCH p.projectType pt
+            LEFT JOIN FETCH p.workCategory wc
             WHERE p.deleted = FALSE
             AND (:includeArchived = TRUE OR p.archived = FALSE)
             AND (
@@ -49,11 +51,15 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             AND (:ragStatus IS NULL OR p.ragStatus = :ragStatus)
             AND (:filterByVpEms = FALSE OR p.engineeringManagerManagement.id IN :vpFilterEmIds)
             AND (:engineeringManagerManagementId IS NULL OR p.engineeringManagerManagement.id = :engineeringManagerManagementId)
+            AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
+            AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
             """,
             countQuery = """
             SELECT COUNT(DISTINCT p.id) FROM Project p
             JOIN p.client c
             JOIN c.country co
+            LEFT JOIN p.projectType pt
+            LEFT JOIN p.workCategory wc
             WHERE p.deleted = FALSE
             AND (:includeArchived = TRUE OR p.archived = FALSE)
             AND (
@@ -78,6 +84,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             AND (:ragStatus IS NULL OR p.ragStatus = :ragStatus)
             AND (:filterByVpEms = FALSE OR p.engineeringManagerManagement.id IN :vpFilterEmIds)
             AND (:engineeringManagerManagementId IS NULL OR p.engineeringManagerManagement.id = :engineeringManagerManagementId)
+            AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
+            AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
             """)
     Page<Project> findAccessible(
             @Param("employeeId") UUID employeeId,
@@ -96,6 +104,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             @Param("filterByVpEms") boolean filterByVpEms,
             @Param("vpFilterEmIds") List<UUID> vpFilterEmIds,
             @Param("engineeringManagerManagementId") UUID engineeringManagerManagementId,
+            @Param("projectTypeId") UUID projectTypeId,
+            @Param("workCategoryId") UUID workCategoryId,
             Pageable pageable);
 
     @Query("""
@@ -106,6 +116,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             LEFT JOIN FETCH p.architectEmployee
             LEFT JOIN FETCH p.engineeringManagerManagement em
             LEFT JOIN FETCH em.supervisor
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             WHERE p.deleted = FALSE
               AND p.archived = FALSE
               AND (:ids IS NULL OR p.id IN :ids)
@@ -129,6 +141,8 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             LEFT JOIN FETCH p.architectEmployee
             LEFT JOIN FETCH p.engineeringManagerManagement em
             LEFT JOIN FETCH em.supervisor
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             WHERE p.id = :id AND p.deleted = FALSE
             """)
     Optional<Project> findDetailedByIdAndDeletedFalse(@Param("id") UUID id);
@@ -142,11 +156,17 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             LEFT JOIN FETCH p.architectEmployee
             LEFT JOIN FETCH p.engineeringManagerManagement em
             LEFT JOIN FETCH em.supervisor
+            LEFT JOIN FETCH p.projectType
+            LEFT JOIN FETCH p.workCategory
             WHERE p.id = :id
             """)
     Optional<Project> findDetailedById(@Param("id") UUID id);
 
     boolean existsByClientIdAndNameIgnoreCase(UUID clientId, String name);
+
+    boolean existsByProjectType_Id(UUID projectTypeId);
+
+    boolean existsByWorkCategory_Id(UUID workCategoryId);
 
     Optional<Project> findByClientIdAndNameIgnoreCase(UUID clientId, String name);
 

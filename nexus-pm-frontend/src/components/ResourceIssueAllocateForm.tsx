@@ -6,13 +6,14 @@ import { fetchAllocations, type OverAllocationError } from '@/api/resources.api'
 import { fetchProjects } from '@/api/projects.api';
 import { fetchIssues } from '@/api/issues.api';
 import { fetchEngineeringManagers, fetchTeamManagement } from '@/api/teamRoster.api';
-import { fetchTaskTypes, fetchTaskCategories } from '@/api/lookup.api';
+import { fetchTaskTypes, fetchTaskCategories, fetchWorkCategories, fetchIssueStatuses } from '@/api/lookup.api';
 import type { CreateAllocationPayload } from '@/hooks/useResources';
 import type { Capacity, Issue } from '@/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { hasOrgWideVisibility } from '@/utils/orgRoles';
-import { todayLocalIso } from '@/utils/allocationUi';
+import { rdStatusFontColorForIssue, todayLocalIso } from '@/utils/allocationUi';
 import { isNonProjectCategory } from '@/utils/taskCategory';
+import { compareByPriority } from '@/utils/allocationSummary';
 import { isOpenIssueStatus } from '@/utils/issueLifecycle';
 import { issueDisplayKey, formatProjectTaskDisplayKey, formatTaskDisplayKey, projectTaskKeyPrefix } from '@/utils/issueUi';
 import {
@@ -28,6 +29,8 @@ import { MenuSelect } from '@/components/MenuSelect';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm outline-none focus:border-accent';
+
+const OTHER_TASK_CATEGORY_ID = 'b1000001-0000-0000-0000-000000000003';
 
 interface ResourceIssueAllocateFormProps {
   row: Capacity;
@@ -198,6 +201,7 @@ export function ResourceIssueAllocateForm({
   );
   const [taskTypeId, setTaskTypeId] = useState('');
   const [taskCategoryId, setTaskCategoryId] = useState('');
+  const [workCategoryId, setWorkCategoryId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [issueId, setIssueId] = useState('');
   const [issueSearch, setIssueSearch] = useState('');
@@ -227,6 +231,16 @@ export function ResourceIssueAllocateForm({
     queryFn: fetchTaskCategories,
   });
 
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
+  });
+
+  const { data: issueStatuses = [] } = useQuery({
+    queryKey: ['issue-statuses'],
+    queryFn: fetchIssueStatuses,
+  });
+
   const { data: management = [] } = useQuery({
     queryKey: ['team-management'],
     queryFn: () => fetchTeamManagement(),
@@ -245,20 +259,54 @@ export function ResourceIssueAllocateForm({
     return management.find((m) => m.fullName.trim().toLowerCase() === selected)?.id;
   }, [management, engineeringManager]);
 
+  const emWorkCategories = useMemo(() => {
+    const selectedId = selectedEmManagementId;
+    const selectedName = engineeringManager.trim().toLowerCase();
+    return workCategories
+      .filter((category) =>
+        (category.engineeringManagers ?? []).some(
+          (manager) =>
+            (selectedId && manager.id === selectedId) ||
+            (!!selectedName && manager.name.trim().toLowerCase() === selectedName),
+        ),
+      )
+      .sort(compareByPriority);
+  }, [workCategories, selectedEmManagementId, engineeringManager]);
+
   const selectedCategory = useMemo(
     () => taskCategories.find((category) => category.id === taskCategoryId) ?? null,
     [taskCategories, taskCategoryId],
   );
-  const nonProject = isNonProjectCategory(selectedCategory?.name);
+  const nonProject =
+    taskCategoryId === OTHER_TASK_CATEGORY_ID || isNonProjectCategory(selectedCategory?.name);
+
+  const functionalUnits = useMemo(
+    () => (nonProject ? emWorkCategories : [...workCategories].sort(compareByPriority)),
+    [nonProject, emWorkCategories, workCategories],
+  );
+
+  const taskCategoryOptions = useMemo(() => {
+    const options = taskCategories.map((category) => ({ value: category.id, label: category.name }));
+    if (!taskCategories.some((category) => category.name.trim().toLowerCase() === 'other')) {
+      options.push({ value: OTHER_TASK_CATEGORY_ID, label: 'Other' });
+    }
+    return options;
+  }, [taskCategories]);
 
   const { data: projectsPage, isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects', 'allocate', selectedEmManagementId ?? engineeringManager],
+    queryKey: [
+      'projects',
+      'allocate',
+      selectedEmManagementId ?? engineeringManager,
+      workCategoryId,
+    ],
     queryFn: () =>
       fetchProjects({
         size: 200,
         engineeringManagerManagementId: selectedEmManagementId,
+        workCategoryId,
       }),
-    enabled: !!engineeringManager && !nonProject,
+    enabled: !!engineeringManager && !nonProject && !!workCategoryId,
   });
 
   const projects = useMemo(() => {
@@ -352,7 +400,18 @@ export function ResourceIssueAllocateForm({
     setRdTaskId('');
     setAddingProjectTask(false);
     setAddingRdTask(false);
+    setWorkCategoryId('');
   }, [engineeringManager]);
+
+  useEffect(() => {
+    setProjectId('');
+    setIssueId('');
+    setIssueSearch('');
+    setProjectTaskId('');
+    setRdTaskId('');
+    setAddingProjectTask(false);
+    setAddingRdTask(false);
+  }, [workCategoryId]);
 
   useEffect(() => {
     setIssueId('');
@@ -396,6 +455,7 @@ export function ResourceIssueAllocateForm({
   const canSubmit =
     !!taskTypeId &&
     !!taskCategoryId &&
+    (!!workCategoryId || nonProject) &&
     (nonProjectReady || projectRelatedReady) &&
     !!toDate &&
     !datesInvalid &&
@@ -414,6 +474,7 @@ export function ResourceIssueAllocateForm({
             employeeId: row.employeeId,
             taskTypeId,
             taskCategoryId,
+            ...(workCategoryId ? { workCategoryId } : {}),
             nonProjectTaskDescription: nonProjectTaskDescription.trim(),
             nonProjectTaskModule: nonProjectTaskModule.trim() || undefined,
             roleOnProject: row.designationName || undefined,
@@ -429,6 +490,7 @@ export function ResourceIssueAllocateForm({
               : { projectTaskId }),
             taskTypeId,
             taskCategoryId,
+            ...(workCategoryId ? { workCategoryId } : {}),
             roleOnProject: row.designationName || undefined,
             percentage,
             fromDate,
@@ -480,6 +542,30 @@ export function ResourceIssueAllocateForm({
       </label>
 
       <label className="block text-sm">
+        <span className="text-text2">Functional unit</span>
+        <MenuSelect
+          className={inputClass}
+          value={workCategoryId}
+          disabled={!engineeringManager}
+          required={!nonProject}
+          placeholder={
+            !engineeringManager
+              ? 'Select an engineering manager first…'
+              : functionalUnits.length === 0
+                ? nonProject
+                  ? 'No functional units for this manager…'
+                  : 'No functional units configured…'
+                : 'Select functional unit…'
+          }
+          options={[
+            ...(nonProject ? [{ value: '', label: 'None' }] : []),
+            ...functionalUnits.map((category) => ({ value: category.id, label: category.name })),
+          ]}
+          onChange={setWorkCategoryId}
+        />
+      </label>
+
+      <label className="block text-sm">
         <span className="text-text2">Task category</span>
         <MenuSelect
           className={inputClass}
@@ -489,14 +575,11 @@ export function ResourceIssueAllocateForm({
           placeholder={
             taskCategoriesLoading
               ? 'Loading task categories…'
-              : taskCategories.length === 0
+              : taskCategoryOptions.length === 0
                 ? 'No task categories configured…'
                 : 'Select task category…'
           }
-          options={taskCategories.map((category) => ({
-            value: category.id,
-            label: category.name,
-          }))}
+          options={taskCategoryOptions}
           onChange={setTaskCategoryId}
         />
       </label>
@@ -532,7 +615,7 @@ export function ResourceIssueAllocateForm({
               maxLength={4000}
               className={inputClass}
               value={nonProjectTaskDescription}
-              placeholder="Describe the non-project task…"
+              placeholder="Describe the task…"
               onChange={(e) => setNonProjectTaskDescription(e.target.value)}
             />
           </label>
@@ -555,16 +638,18 @@ export function ResourceIssueAllocateForm({
         <MenuSelect
           className={inputClass}
           value={projectId}
-          disabled={!engineeringManager || projectsLoading}
+          disabled={!engineeringManager || !workCategoryId || projectsLoading}
           required
           placeholder={
             !engineeringManager
               ? 'Select an engineering manager first…'
-              : projectsLoading
-                ? 'Loading projects…'
-                : projects.length === 0
-                  ? 'No projects for this manager…'
-                  : 'Select project…'
+              : !workCategoryId
+                ? 'Select a functional unit first…'
+                : projectsLoading
+                  ? 'Loading projects…'
+                  : projects.length === 0
+                    ? 'No projects in this functional unit for this manager…'
+                    : 'Select project…'
           }
           options={projects.map((project) => ({ value: project.id, label: project.name }))}
           onChange={setProjectId}
@@ -617,6 +702,7 @@ export function ResourceIssueAllocateForm({
               ...availableIssues.map((issue) => ({
                 value: issue.id,
                 label: `${issueDisplayKey(issue)} — ${issue.title}`,
+                color: rdStatusFontColorForIssue(issue, issueStatuses),
               })),
             ]}
             onChange={setIssueId}

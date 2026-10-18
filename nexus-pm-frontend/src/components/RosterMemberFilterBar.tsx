@@ -6,6 +6,7 @@ import {
   fetchRosterStreams,
   fetchRosterWorkTypes,
 } from '@/api/rosterLookups.api';
+import { fetchWorkCategories } from '@/api/lookup.api';
 import { fetchEngineeringManagers, fetchTeamManagement, type TeamRosterMember } from '@/api/teamRoster.api';
 import { groupedManagerNames } from '@/utils/managementRoles';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
@@ -73,6 +74,7 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
   const [countryFilter, setCountryFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [emFilter, setEmFilter] = useState('');
+  const [workCategoryId, setWorkCategoryId] = useState('');
   const [workTypeFilter, setWorkTypeFilter] = useState('');
 
   const { data: designations = [] } = useQuery({
@@ -98,6 +100,10 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
   const { data: management = [] } = useQuery({
     queryKey: ['team-management'],
     queryFn: () => fetchTeamManagement(),
+  });
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
   });
 
   const list = rows ?? EMPTY_ROWS;
@@ -133,30 +139,46 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
         workTypes.map((w) => w.name),
         list.map((row) => row.workType),
       ),
+      workCategories,
     };
-  }, [list, designations, streams, countries, engineeringManagers, workTypes, management]);
+  }, [list, designations, streams, countries, engineeringManagers, workTypes, management, workCategories]);
 
-  const filteredRows = useMemo(
-    () =>
-      list.filter(
-        (row) =>
+  const filteredRows = useMemo(() => {
+    const category = workCategories.find((item) => item.id === workCategoryId);
+    const managerIds = new Set((category?.engineeringManagers ?? []).map((manager) => manager.id));
+    const managerNames = new Set(
+      (category?.engineeringManagers ?? []).map((manager) => manager.name.trim().toLowerCase()),
+    );
+    return list.filter((row) => {
+      if (
+        !(
           matchesFilter(row.designation, designationFilter) &&
           matchesFilter(row.teamName, teamFilter) &&
           matchesFilter(row.country, countryFilter) &&
           matchesFilter(row.product, productFilter) &&
           matchesFilter(row.engineeringManagerName, emFilter) &&
-          matchesFilter(row.workType, workTypeFilter),
-      ),
-    [
-      list,
-      designationFilter,
-      teamFilter,
-      countryFilter,
-      productFilter,
-      emFilter,
-      workTypeFilter,
-    ],
-  );
+          matchesFilter(row.workType, workTypeFilter)
+        )
+      ) {
+        return false;
+      }
+      if (!workCategoryId) return true;
+      if (row.engineeringManagerManagementId && managerIds.has(row.engineeringManagerManagementId)) {
+        return true;
+      }
+      return managerNames.has((row.engineeringManagerName ?? '').trim().toLowerCase());
+    });
+  }, [
+    list,
+    designationFilter,
+    teamFilter,
+    countryFilter,
+    productFilter,
+    emFilter,
+    workTypeFilter,
+    workCategoryId,
+    workCategories,
+  ]);
 
   const hasFilters = !!(
     designationFilter ||
@@ -164,6 +186,7 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
     countryFilter ||
     productFilter ||
     emFilter ||
+    workCategoryId ||
     workTypeFilter
   );
 
@@ -180,6 +203,8 @@ export function useRosterMemberFilters(rows: TeamRosterMember[] | undefined) {
     setProductFilter,
     emFilter,
     setEmFilter,
+    workCategoryId,
+    setWorkCategoryId,
     workTypeFilter,
     setWorkTypeFilter,
     options,
@@ -231,6 +256,21 @@ export function RosterMemberFilterBar({
         >
           <option value="">All managers</option>
           <ManagerNameOptGroups groups={filters.options.managerGroups} />
+        </select>
+      </label>
+      <label className="min-w-[9rem] flex-1 text-sm sm:max-w-[16rem]">
+        <span className="text-text2">Functional unit</span>
+        <select
+          value={filters.workCategoryId}
+          onChange={(e) => filters.setWorkCategoryId(e.target.value)}
+          className={filterSelectClass}
+        >
+          <option value="">All functional units</option>
+          {filters.options.workCategories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
         </select>
       </label>
       <FilterSelect
