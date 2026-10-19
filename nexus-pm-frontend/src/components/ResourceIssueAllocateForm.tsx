@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Plus } from 'lucide-react';
@@ -7,8 +7,8 @@ import { fetchProjects } from '@/api/projects.api';
 import { fetchIssues } from '@/api/issues.api';
 import { fetchEngineeringManagers, fetchTeamManagement } from '@/api/teamRoster.api';
 import { fetchTaskTypes, fetchTaskCategories, fetchWorkCategories, fetchIssueStatuses } from '@/api/lookup.api';
-import type { CreateAllocationPayload } from '@/hooks/useResources';
-import type { Capacity, Issue } from '@/types';
+import type { CreateAllocationPayload, UpdateAllocationPayload } from '@/hooks/useResources';
+import type { Allocation, Capacity, Issue, Project } from '@/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { hasOrgWideVisibility } from '@/utils/orgRoles';
 import { rdStatusFontColorForIssue, todayLocalIso } from '@/utils/allocationUi';
@@ -34,10 +34,12 @@ const OTHER_TASK_CATEGORY_ID = 'b1000001-0000-0000-0000-000000000003';
 
 interface ResourceIssueAllocateFormProps {
   row: Capacity;
+  editingAllocation?: Allocation;
   loading?: boolean;
   submitError?: unknown;
   onCancel: () => void;
-  onSubmit: (payload: CreateAllocationPayload) => void;
+  onSubmit?: (payload: CreateAllocationPayload) => void;
+  onUpdate?: (allocationId: string, payload: UpdateAllocationPayload) => void;
 }
 
 function allocationApiErrorMessage(error: unknown): string {
@@ -179,12 +181,35 @@ function issueMatchesSearch(issue: Issue, query: string): boolean {
   return key.includes(q) || title.includes(q) || description.includes(q) || id.includes(q);
 }
 
+function projectOptionFromAllocation(allocation: Allocation): Project {
+  return {
+    id: allocation.projectId ?? '',
+    name: allocation.projectName,
+    status: 'ACTIVE',
+    ragStatus: 'GREEN',
+    clientId: '',
+    workCategoryId: allocation.workCategoryId,
+    workCategoryName: allocation.workCategoryName,
+  };
+}
+
+function taskOptionFromAllocation(id: string, displayKey?: string, description?: string): TaskRecord {
+  return {
+    id,
+    taskNumber: 0,
+    displayKey: displayKey ?? '',
+    description: description ?? '',
+  };
+}
+
 export function ResourceIssueAllocateForm({
   row,
+  editingAllocation,
   loading,
   submitError,
   onCancel,
   onSubmit,
+  onUpdate,
 }: ResourceIssueAllocateFormProps) {
   const role = useAuthStore((s) => s.user?.role);
   const orgWideVisibility = useAuthStore((s) => s.user?.orgWideVisibility);
@@ -195,26 +220,30 @@ export function ResourceIssueAllocateForm({
   const canAddProjectTask = can(P.PROJECTS_UPDATE);
   const canAddRdTask = can(P.ISSUES_UPDATE);
 
+  const isEdit = !!editingAllocation;
   const defaultEm = row.engineeringManagerName?.trim() || '';
   const [engineeringManager, setEngineeringManager] = useState(
     isScopedManager && userName ? userName : defaultEm,
   );
-  const [taskTypeId, setTaskTypeId] = useState('');
-  const [taskCategoryId, setTaskCategoryId] = useState('');
-  const [workCategoryId, setWorkCategoryId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [issueId, setIssueId] = useState('');
+  const [taskTypeId, setTaskTypeId] = useState(editingAllocation?.taskTypeId ?? '');
+  const [taskCategoryId, setTaskCategoryId] = useState(editingAllocation?.taskCategoryId ?? '');
+  const [workCategoryId, setWorkCategoryId] = useState(editingAllocation?.workCategoryId ?? '');
+  const [projectId, setProjectId] = useState(editingAllocation?.projectId ?? '');
+  const [issueId, setIssueId] = useState(editingAllocation?.issueId ?? '');
   const [issueSearch, setIssueSearch] = useState('');
-  const [projectTaskId, setProjectTaskId] = useState('');
-  const [rdTaskId, setRdTaskId] = useState('');
+  const [projectTaskId, setProjectTaskId] = useState(editingAllocation?.projectTaskId ?? '');
+  const [rdTaskId, setRdTaskId] = useState(editingAllocation?.rdIssueTaskId ?? '');
   const [addingProjectTask, setAddingProjectTask] = useState(false);
   const [addingRdTask, setAddingRdTask] = useState(false);
-  const [nonProjectTaskDescription, setNonProjectTaskDescription] = useState('');
+  const [nonProjectTaskDescription, setNonProjectTaskDescription] = useState(
+    editingAllocation?.nonProjectTaskDescription ?? '',
+  );
   const [nonProjectTaskModule, setNonProjectTaskModule] = useState('');
-  const [fromDate, setFromDate] = useState(todayLocalIso());
-  const [toDate, setToDate] = useState('');
-  const [percentage, setPercentage] = useState(50);
+  const [fromDate, setFromDate] = useState(editingAllocation?.fromDate ?? todayLocalIso());
+  const [toDate, setToDate] = useState(editingAllocation?.toDate ?? '');
+  const [percentage, setPercentage] = useState(editingAllocation?.percentage ?? 50);
   const [dismissedError, setDismissedError] = useState(false);
+  const skipCascade = useRef(true);
 
   const { data: engineeringManagers = [] } = useQuery({
     queryKey: ['engineering-managers'],
@@ -280,10 +309,14 @@ export function ResourceIssueAllocateForm({
   const nonProject =
     taskCategoryId === OTHER_TASK_CATEGORY_ID || isNonProjectCategory(selectedCategory?.name);
 
-  const functionalUnits = useMemo(
-    () => (nonProject ? emWorkCategories : [...workCategories].sort(compareByPriority)),
-    [nonProject, emWorkCategories, workCategories],
-  );
+  const functionalUnits = useMemo(() => {
+    const units = nonProject ? emWorkCategories : [...workCategories].sort(compareByPriority);
+    if (workCategoryId && !units.some((category) => category.id === workCategoryId)) {
+      const extra = workCategories.find((category) => category.id === workCategoryId);
+      if (extra) return [extra, ...units];
+    }
+    return units;
+  }, [nonProject, emWorkCategories, workCategories, workCategoryId]);
 
   const taskCategoryOptions = useMemo(() => {
     const options = taskCategories.map((category) => ({ value: category.id, label: category.name }));
@@ -311,13 +344,24 @@ export function ResourceIssueAllocateForm({
 
   const projects = useMemo(() => {
     const content = projectsPage?.content ?? [];
-    if (selectedEmManagementId) return content;
-    const selected = engineeringManager.trim().toLowerCase();
-    if (!selected) return [];
-    return content.filter(
-      (project) => (project.engineeringManagerName ?? '').trim().toLowerCase() === selected,
-    );
-  }, [projectsPage, selectedEmManagementId, engineeringManager]);
+    const filtered = selectedEmManagementId
+      ? content
+      : (() => {
+          const selected = engineeringManager.trim().toLowerCase();
+          if (!selected) return [];
+          return content.filter(
+            (project) => (project.engineeringManagerName ?? '').trim().toLowerCase() === selected,
+          );
+        })();
+    if (
+      isEdit &&
+      editingAllocation?.projectId &&
+      !filtered.some((project) => project.id === editingAllocation.projectId)
+    ) {
+      return [projectOptionFromAllocation(editingAllocation), ...filtered];
+    }
+    return filtered;
+  }, [projectsPage, selectedEmManagementId, engineeringManager, isEdit, editingAllocation]);
 
   const { data: issuesPage, isLoading: issuesLoading } = useQuery({
     queryKey: ['issues', 'allocate', projectId],
@@ -327,8 +371,15 @@ export function ResourceIssueAllocateForm({
 
   const availableIssues = useMemo(() => {
     const open = (issuesPage?.content ?? []).filter((issue) => isOpenIssueStatus(issue.statusName));
-    return open.filter((issue) => issueMatchesSearch(issue, issueSearch));
-  }, [issuesPage, issueSearch]);
+    const filtered = open.filter((issue) => issueMatchesSearch(issue, issueSearch));
+    if (!isEdit || !editingAllocation?.issueId) return filtered;
+    if (filtered.some((issue) => issue.id === editingAllocation.issueId)) return filtered;
+    const existing = (issuesPage?.content ?? []).find((issue) => issue.id === editingAllocation.issueId);
+    if (existing && issueMatchesSearch(existing, issueSearch)) {
+      return [existing, ...filtered];
+    }
+    return filtered;
+  }, [issuesPage, issueSearch, isEdit, editingAllocation]);
 
   const selectedIssue = useMemo(
     () => availableIssues.find((issue) => issue.id === issueId) ?? null,
@@ -348,6 +399,40 @@ export function ResourceIssueAllocateForm({
     issueId || undefined,
     !!issueId,
   );
+  const visibleProjectTasks = useMemo(() => {
+    if (
+      isEdit &&
+      editingAllocation?.projectTaskId &&
+      !projectTasks.some((task) => task.id === editingAllocation.projectTaskId)
+    ) {
+      return [
+        taskOptionFromAllocation(
+          editingAllocation.projectTaskId,
+          editingAllocation.projectTaskKey,
+          editingAllocation.projectTaskDescription,
+        ),
+        ...projectTasks,
+      ];
+    }
+    return projectTasks;
+  }, [isEdit, editingAllocation, projectTasks]);
+  const visibleRdTasks = useMemo(() => {
+    if (
+      isEdit &&
+      editingAllocation?.rdIssueTaskId &&
+      !rdTasks.some((task) => task.id === editingAllocation.rdIssueTaskId)
+    ) {
+      return [
+        taskOptionFromAllocation(
+          editingAllocation.rdIssueTaskId,
+          editingAllocation.rdIssueTaskKey,
+          editingAllocation.rdIssueTaskDescription,
+        ),
+        ...rdTasks,
+      ];
+    }
+    return rdTasks;
+  }, [isEdit, editingAllocation, rdTasks]);
   const createProjectTask = useCreateProjectTask(projectId);
   const createIssueTask = useCreateIssueTask(issueId);
 
@@ -355,7 +440,14 @@ export function ResourceIssueAllocateForm({
   const rdTaskPrefix = selectedIssue ? issueDisplayKey(selectedIssue) : undefined;
 
   const { data: overlapping, isLoading: overlapLoading } = useQuery({
-    queryKey: ['allocations', 'overlap', row.employeeId, fromDate, toDate || 'ongoing'],
+    queryKey: [
+      'allocations',
+      'overlap',
+      row.employeeId,
+      fromDate,
+      toDate || 'ongoing',
+      editingAllocation?.id ?? '',
+    ],
     queryFn: () =>
       fetchAllocations({
         employeeId: row.employeeId,
@@ -365,22 +457,27 @@ export function ResourceIssueAllocateForm({
     enabled: !!row.employeeId && !!fromDate,
   });
 
-  const existingTotal = useMemo(
-    () => (overlapping ?? []).reduce((sum, allocation) => sum + allocation.percentage, 0),
-    [overlapping],
-  );
+  const existingTotal = useMemo(() => {
+    const list = overlapping ?? [];
+    const filtered = editingAllocation
+      ? list.filter((allocation) => allocation.id !== editingAllocation.id)
+      : list;
+    return filtered.reduce((sum, allocation) => sum + allocation.percentage, 0);
+  }, [overlapping, editingAllocation]);
   const available = Math.max(0, 100 - existingTotal);
   const overAllocation = submitError && !dismissedError ? parseOverAllocationError(submitError) : null;
 
   useEffect(() => {
+    if (isEdit) return;
     if (isScopedManager && userName) {
       setEngineeringManager(userName);
     } else if (defaultEm) {
       setEngineeringManager(defaultEm);
     }
-  }, [isScopedManager, userName, defaultEm, row.employeeId]);
+  }, [isEdit, isScopedManager, userName, defaultEm, row.employeeId]);
 
   useEffect(() => {
+    if (skipCascade.current) return;
     setProjectId('');
     setIssueId('');
     setIssueSearch('');
@@ -393,6 +490,7 @@ export function ResourceIssueAllocateForm({
   }, [taskCategoryId]);
 
   useEffect(() => {
+    if (skipCascade.current) return;
     setProjectId('');
     setIssueId('');
     setIssueSearch('');
@@ -404,6 +502,7 @@ export function ResourceIssueAllocateForm({
   }, [engineeringManager]);
 
   useEffect(() => {
+    if (skipCascade.current) return;
     setProjectId('');
     setIssueId('');
     setIssueSearch('');
@@ -414,6 +513,7 @@ export function ResourceIssueAllocateForm({
   }, [workCategoryId]);
 
   useEffect(() => {
+    if (skipCascade.current) return;
     setIssueId('');
     setIssueSearch('');
     setProjectTaskId('');
@@ -423,6 +523,7 @@ export function ResourceIssueAllocateForm({
   }, [projectId]);
 
   useEffect(() => {
+    if (skipCascade.current) return;
     setRdTaskId('');
     setProjectTaskId('');
     setAddingProjectTask(false);
@@ -430,20 +531,26 @@ export function ResourceIssueAllocateForm({
   }, [issueId]);
 
   useEffect(() => {
+    skipCascade.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (isEdit && issueId === editingAllocation?.issueId) return;
     if (issueId && !availableIssues.some((issue) => issue.id === issueId)) {
       setIssueId('');
     }
-  }, [availableIssues, issueId]);
+  }, [availableIssues, issueId, isEdit, editingAllocation?.issueId]);
 
   useEffect(() => {
     if (overlapLoading) return;
     setPercentage((current) => {
       if (available <= 0) return 0;
       if (current > available) return available;
+      if (isEdit) return current;
       if (current < 1) return defaultPercentage(available);
       return current;
     });
-  }, [fromDate, toDate, available, overlapLoading, row.employeeId]);
+  }, [fromDate, toDate, available, overlapLoading, row.employeeId, isEdit]);
 
   const datesInvalid = !!fromDate && !!toDate && fromDate > toDate;
 
@@ -468,41 +575,38 @@ export function ResourceIssueAllocateForm({
     e.preventDefault();
     if (!canSubmit) return;
     setDismissedError(false);
-    onSubmit(
-      nonProject
-        ? {
-            employeeId: row.employeeId,
-            taskTypeId,
-            taskCategoryId,
-            ...(workCategoryId ? { workCategoryId } : {}),
-            nonProjectTaskDescription: nonProjectTaskDescription.trim(),
-            nonProjectTaskModule: nonProjectTaskModule.trim() || undefined,
-            roleOnProject: row.designationName || undefined,
-            percentage,
-            fromDate,
-            toDate,
-            billable: true,
-          }
-        : {
-            employeeId: row.employeeId,
-            ...(issueId
-              ? { issueId, ...(rdTaskId ? { rdIssueTaskId: rdTaskId } : {}) }
-              : { projectTaskId }),
-            taskTypeId,
-            taskCategoryId,
-            ...(workCategoryId ? { workCategoryId } : {}),
-            roleOnProject: row.designationName || undefined,
-            percentage,
-            fromDate,
-            toDate,
-            billable: true,
-          },
-    );
+    const shared = {
+      taskTypeId,
+      taskCategoryId,
+      ...(workCategoryId ? { workCategoryId } : {}),
+      roleOnProject: row.designationName || undefined,
+      percentage,
+      fromDate,
+      toDate,
+      billable: editingAllocation?.billable ?? true,
+    };
+    const target = nonProject
+      ? {
+          nonProjectTaskDescription: nonProjectTaskDescription.trim(),
+          nonProjectTaskModule: nonProjectTaskModule.trim() || undefined,
+        }
+      : issueId
+        ? { issueId, ...(rdTaskId ? { rdIssueTaskId: rdTaskId } : {}) }
+        : { projectTaskId };
+    if (isEdit && editingAllocation && onUpdate) {
+      onUpdate(editingAllocation.id, { ...shared, ...target });
+      return;
+    }
+    onSubmit?.({
+      employeeId: row.employeeId,
+      ...shared,
+      ...target,
+    });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-bg3 p-4">
-      <h3 className="font-semibold">Allocation</h3>
+      <h3 className="font-semibold">{isEdit ? 'Edit allocation' : 'Allocation'}</h3>
 
       {overAllocation && (
         <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm">
@@ -732,7 +836,7 @@ export function ResourceIssueAllocateForm({
                         ? 'No project-level tasks…'
                         : 'Select project task…'
                 }
-                options={projectTasks.map((task) => ({
+                options={visibleProjectTasks.map((task) => ({
                   value: task.id,
                   label: taskOptionLabel(task, 'project', projectTaskPrefix),
                 }))}
@@ -805,7 +909,7 @@ export function ResourceIssueAllocateForm({
                         ? 'None — allocate to this RD'
                         : 'Optional — or allocate to this RD',
                   },
-                  ...rdTasks.map((task) => ({
+                  ...visibleRdTasks.map((task) => ({
                     value: task.id,
                     label: taskOptionLabel(task, 'rd', rdTaskPrefix),
                   })),
@@ -922,7 +1026,7 @@ export function ResourceIssueAllocateForm({
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50"
           style={{ color: 'var(--accent-fg)' }}
         >
-          {loading ? 'Saving…' : 'Save allocation'}
+          {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Save allocation'}
         </button>
         <button
           type="button"

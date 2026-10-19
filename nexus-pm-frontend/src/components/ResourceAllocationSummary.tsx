@@ -283,6 +283,48 @@ function indentClass(level: 0 | 1 | 2): string {
   return '';
 }
 
+function emptyManagerNode(categoryId: string, managerId: string, managerName: string): WorkCategoryManagerNode {
+  return {
+    key: `${categoryId}:${managerId}`,
+    managerId,
+    managerName,
+    team: [],
+    projects: [],
+    teamSize: 0,
+    allocatedCount: 0,
+    projectCount: 0,
+    allocatedFte: 0,
+    availableFte: 0,
+  };
+}
+
+/** Always list the managers assigned to the functional unit, even when nobody is allocated yet. */
+function managersForFunctionalUnit(
+  tree: { id: string; managers: WorkCategoryManagerNode[] },
+  category: WorkCategory | undefined,
+): WorkCategoryManagerNode[] {
+  const assigned = category?.engineeringManagers ?? [];
+  if (assigned.length === 0) return tree.managers;
+  const byId = new Map(tree.managers.map((node) => [node.managerId, node]));
+  const byName = new Map(
+    tree.managers.map((node) => [node.managerName.trim().toLowerCase(), node]),
+  );
+  const used = new Set<string>();
+  const rows = assigned.map((manager) => {
+    const existing =
+      byId.get(manager.id) ?? byName.get(manager.name.trim().toLowerCase());
+    if (!existing) return emptyManagerNode(tree.id, manager.id, manager.name);
+    used.add(existing.key);
+    return { ...existing, managerId: manager.id, managerName: manager.name };
+  });
+  for (const node of tree.managers) {
+    if (!used.has(node.key)) rows.push(node);
+  }
+  return rows.sort((a, b) =>
+    a.managerName.localeCompare(b.managerName, undefined, { sensitivity: 'base' }),
+  );
+}
+
 export function ResourceAllocationSummary({
   rows,
   rangeFrom,
@@ -456,7 +498,7 @@ export function ResourceAllocationSummary({
 
       <SummaryTable
         title="By functional unit → manager → team"
-        description="People allocated to each functional unit, grouped under the relevant engineering manager."
+        description="People allocated to each functional unit, grouped under the manager assigned to that functional unit."
         headers={[
           { label: 'Priority', align: 'right' },
           { label: 'Functional unit' },
@@ -471,7 +513,11 @@ export function ResourceAllocationSummary({
         emptyMessage="No functional units."
       >
         {categoryTrees.flatMap((tree) => {
-          if (tree.managers.length === 0) {
+          const managers = managersForFunctionalUnit(
+            tree,
+            scopedWorkCategories.find((category) => category.id === tree.id),
+          );
+          if (managers.length === 0) {
             return [
               <tr key={tree.id} className="border-t border-border hover:bg-bg2/50">
                 <td className={`${cell} text-right tabular-nums text-text2`}>
@@ -487,7 +533,7 @@ export function ResourceAllocationSummary({
               </tr>,
             ];
           }
-          return tree.managers.flatMap((node, managerIndex) => {
+          return managers.flatMap((node, managerIndex) => {
             const managerOpen = openManagers.has(node.key);
             const rows = [
               <tr key={node.key} className="border-t border-border hover:bg-bg2/50">

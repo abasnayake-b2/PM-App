@@ -458,9 +458,52 @@ public class AllocationService {
         if (request.getTaskTypeId() != null) {
             allocation.setTaskType(resolveTaskType(request.getTaskTypeId()));
         }
+
+        TaskCategory category = request.getTaskCategoryId() != null
+                ? resolveTaskCategory(request.getTaskCategoryId())
+                : allocation.getTaskCategory();
         if (request.getTaskCategoryId() != null) {
-            allocation.setTaskCategory(resolveTaskCategory(request.getTaskCategoryId()));
+            allocation.setTaskCategory(category);
         }
+
+        WorkCategory requestedWorkCategory = request.getWorkCategoryId() != null
+                ? workCategoryRepository.findById(request.getWorkCategoryId())
+                        .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit not found", 404))
+                : null;
+
+        boolean retargetRequested = request.getIssueId() != null
+                || request.getProjectTaskId() != null
+                || request.getRdIssueTaskId() != null
+                || (request.getNonProjectTaskDescription() != null
+                        && !request.getNonProjectTaskDescription().isBlank());
+
+        if (retargetRequested) {
+            boolean nonProject = isNonProjectAllocation(
+                    request.getIssueId(),
+                    request.getProjectTaskId(),
+                    request.getRdIssueTaskId(),
+                    category,
+                    requestedWorkCategory != null ? requestedWorkCategory : allocation.getWorkCategory(),
+                    request.getNonProjectTaskDescription());
+            ResolvedTarget target = nonProject
+                    ? resolveNonProjectTarget(
+                            request.getNonProjectTaskDescription(),
+                            request.getNonProjectTaskModule(),
+                            allocation.getNonProjectTask())
+                    : resolveTarget(request.getIssueId(), request.getProjectTaskId(), request.getRdIssueTaskId());
+            if (target.project() != null) {
+                projectService.getProject(target.project().getId());
+            }
+            applyTarget(allocation, target);
+        }
+
+        WorkCategory selectedWorkCategory = requestedWorkCategory != null
+                ? requestedWorkCategory
+                : allocation.getWorkCategory();
+        if (request.getWorkCategoryId() == null && retargetRequested && allocation.getProject() == null) {
+            selectedWorkCategory = null;
+        }
+        allocation.setWorkCategory(resolveAllocationWorkCategory(selectedWorkCategory, allocation.getProject()));
 
         allocationRepository.save(allocation);
         auditLogService.log(SecurityUtils.currentUserId(), "UPDATE", "ALLOCATION", id,
@@ -518,19 +561,39 @@ public class AllocationService {
 
     private boolean isNonProjectAllocation(
             CreateAllocationRequest request, TaskCategory category, WorkCategory workCategory) {
-        boolean hasProjectTarget = request.getIssueId() != null
-                || request.getProjectTaskId() != null
-                || request.getRdIssueTaskId() != null;
+        return isNonProjectAllocation(
+                request.getIssueId(),
+                request.getProjectTaskId(),
+                request.getRdIssueTaskId(),
+                category,
+                workCategory,
+                request.getNonProjectTaskDescription());
+    }
+
+    private boolean isNonProjectAllocation(
+            UUID issueId,
+            UUID projectTaskId,
+            UUID rdIssueTaskId,
+            TaskCategory category,
+            WorkCategory workCategory,
+            String nonProjectTaskDescription) {
+        boolean hasProjectTarget = issueId != null || projectTaskId != null || rdIssueTaskId != null;
         if (hasProjectTarget) {
             return false;
         }
         if (TaskCategoryKind.isNonProjectRelated(category)) {
             return true;
         }
-        String description = request.getNonProjectTaskDescription() != null
-                ? request.getNonProjectTaskDescription().trim()
-                : "";
+        String description = nonProjectTaskDescription != null ? nonProjectTaskDescription.trim() : "";
         return workCategory != null || !description.isEmpty();
+    }
+
+    private void applyTarget(Allocation allocation, ResolvedTarget target) {
+        allocation.setProject(target.project());
+        allocation.setIssue(target.issue());
+        allocation.setProjectTask(target.projectTask());
+        allocation.setRdIssueTask(target.rdIssueTask());
+        allocation.setNonProjectTask(target.nonProjectTask());
     }
 
     private WorkCategory resolveAllocationWorkCategory(WorkCategory selected, Project project) {
@@ -696,16 +759,22 @@ public class AllocationService {
                     "Non-project allocations cannot be linked to a project, RD, or project task",
                     400);
         }
-        String description = request.getNonProjectTaskDescription() != null
-                ? request.getNonProjectTaskDescription().trim()
-                : "";
+        return resolveNonProjectTarget(
+                request.getNonProjectTaskDescription(), request.getNonProjectTaskModule(), null);
+    }
+
+    private ResolvedTarget resolveNonProjectTarget(
+            String nonProjectTaskDescription, String nonProjectTaskModule, NonProjectTask existing) {
+        String description = nonProjectTaskDescription != null ? nonProjectTaskDescription.trim() : "";
         if (description.isEmpty()) {
             throw new BusinessException("VALIDATION", "Task description is required for non-project allocations", 400);
         }
-        NonProjectTask task = new NonProjectTask();
-        task.setId(UUID.randomUUID());
+        NonProjectTask task = existing != null ? existing : new NonProjectTask();
+        if (task.getId() == null) {
+            task.setId(UUID.randomUUID());
+        }
         task.setDescription(description);
-        String module = request.getNonProjectTaskModule() != null ? request.getNonProjectTaskModule().trim() : "";
+        String module = nonProjectTaskModule != null ? nonProjectTaskModule.trim() : "";
         task.setModule(module.isEmpty() ? null : module);
         return new ResolvedTarget(null, null, null, null, nonProjectTaskRepository.save(task));
     }

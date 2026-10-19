@@ -2,13 +2,17 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllocations, type OverAllocationError } from '@/api/resources.api';
 import { fetchEngineeringManagers } from '@/api/teamRoster.api';
-import { fetchTaskTypes, fetchTaskCategories } from '@/api/lookup.api';
+import { fetchTaskTypes, fetchTaskCategories, fetchWorkCategories } from '@/api/lookup.api';
+import { fetchTeamManagement } from '@/api/teamRoster.api';
 import type { CreateAllocationPayload, UpdateAllocationPayload } from '@/hooks/useResources';
 import type { Allocation } from '@/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { hasOrgWideVisibility } from '@/utils/orgRoles';
 import { todayLocalIso } from '@/utils/allocationUi';
+import { isNonProjectCategory } from '@/utils/taskCategory';
+import { compareByPriority } from '@/utils/allocationSummary';
 import { isAxiosError } from 'axios';
+import { MenuSelect } from '@/components/MenuSelect';
 
 export interface AllocationFormOption {
   id: string;
@@ -93,6 +97,7 @@ export function AllocationForm({
   const [billable, setBillable] = useState(editingAllocation?.billable ?? true);
   const [taskTypeId, setTaskTypeId] = useState(editingAllocation?.taskTypeId ?? '');
   const [taskCategoryId, setTaskCategoryId] = useState(editingAllocation?.taskCategoryId ?? '');
+  const [workCategoryId, setWorkCategoryId] = useState(editingAllocation?.workCategoryId ?? '');
 
   const formTitle = title ?? (isEdit ? 'Edit allocation' : 'Allocate resource');
   const excludeAllocationId = editingAllocation?.id;
@@ -113,10 +118,64 @@ export function AllocationForm({
     queryFn: fetchTaskCategories,
   });
 
+  const { data: workCategories = [] } = useQuery({
+    queryKey: ['work-categories'],
+    queryFn: fetchWorkCategories,
+  });
+
+  const { data: management = [] } = useQuery({
+    queryKey: ['team-management'],
+    queryFn: () => fetchTeamManagement(),
+  });
+
   const filteredEmployees = useMemo(() => {
     if (!showEngineeringManagerFilter || !engineeringManager) return employees;
     return employees.filter((employee) => matchesEngineeringManager(employee, engineeringManager));
   }, [employees, engineeringManager, showEngineeringManagerFilter]);
+
+  const selectedEmployee = useMemo(
+    () => employees.find((employee) => employee.id === employeeId) ?? null,
+    [employees, employeeId],
+  );
+  const selectedEmName = (
+    engineeringManager ||
+    selectedEmployee?.engineeringManagerName ||
+    ''
+  ).trim();
+  const selectedEmManagementId = useMemo(() => {
+    const selected = selectedEmName.toLowerCase();
+    if (!selected) return undefined;
+    return management.find((m) => m.fullName.trim().toLowerCase() === selected)?.id;
+  }, [management, selectedEmName]);
+
+  const selectedCategory = useMemo(
+    () => taskCategories.find((category) => category.id === taskCategoryId) ?? null,
+    [taskCategories, taskCategoryId],
+  );
+  const nonProject = isNonProjectCategory(selectedCategory?.name);
+
+  const emWorkCategories = useMemo(() => {
+    const selectedId = selectedEmManagementId;
+    const selectedName = selectedEmName.toLowerCase();
+    return workCategories
+      .filter((category) =>
+        (category.engineeringManagers ?? []).some(
+          (manager) =>
+            (selectedId && manager.id === selectedId) ||
+            (!!selectedName && manager.name.trim().toLowerCase() === selectedName),
+        ),
+      )
+      .sort(compareByPriority);
+  }, [workCategories, selectedEmManagementId, selectedEmName]);
+
+  const functionalUnits = useMemo(() => {
+    const units = nonProject ? emWorkCategories : [...workCategories].sort(compareByPriority);
+    if (workCategoryId && !units.some((category) => category.id === workCategoryId)) {
+      const extra = workCategories.find((category) => category.id === workCategoryId);
+      if (extra) return [extra, ...units];
+    }
+    return units;
+  }, [nonProject, emWorkCategories, workCategories, workCategoryId]);
 
   const overAllocation = submitError && !dismissedError ? parseOverAllocationError(submitError) : null;
 
@@ -148,6 +207,9 @@ export function AllocationForm({
       setToDate(editingAllocation.toDate ?? '');
       setPercentage(editingAllocation.percentage);
       setBillable(editingAllocation.billable);
+      setTaskTypeId(editingAllocation.taskTypeId ?? '');
+      setTaskCategoryId(editingAllocation.taskCategoryId ?? '');
+      setWorkCategoryId(editingAllocation.workCategoryId ?? '');
     }
   }, [editingAllocation]);
 
@@ -204,6 +266,7 @@ export function AllocationForm({
       !employeeId ||
       !taskTypeId ||
       !taskCategoryId ||
+      (!workCategoryId && !nonProject) ||
       !toDate ||
       datesInvalid ||
       percentage < 1 ||
@@ -223,6 +286,7 @@ export function AllocationForm({
         billable,
         taskTypeId: taskTypeId || undefined,
         taskCategoryId: taskCategoryId || undefined,
+        ...(workCategoryId ? { workCategoryId } : {}),
       });
       return;
     }
@@ -232,6 +296,7 @@ export function AllocationForm({
       issueId: resolvedIssueId,
       taskTypeId: taskTypeId || undefined,
       taskCategoryId: taskCategoryId || undefined,
+      ...(workCategoryId ? { workCategoryId } : {}),
       roleOnProject: roleOnProject.trim() || undefined,
       percentage,
       fromDate,
@@ -245,6 +310,7 @@ export function AllocationForm({
     !!employeeId &&
     !!taskTypeId &&
     !!taskCategoryId &&
+    (!!workCategoryId || nonProject) &&
     !!toDate &&
     !datesInvalid &&
     percentage >= 1 &&
@@ -364,6 +430,30 @@ export function AllocationForm({
           </label>
         </>
       )}
+
+      <label className="block text-sm">
+        <span className="text-text2">Functional unit</span>
+        <MenuSelect
+          className={inputClass}
+          value={workCategoryId}
+          disabled={!selectedEmName && nonProject}
+          required={!nonProject}
+          placeholder={
+            !selectedEmName && nonProject
+              ? 'Select an engineering manager first…'
+              : functionalUnits.length === 0
+                ? nonProject
+                  ? 'No functional units for this manager…'
+                  : 'No functional units configured…'
+                : 'Select functional unit…'
+          }
+          options={[
+            ...(nonProject ? [{ value: '', label: 'None' }] : []),
+            ...functionalUnits.map((category) => ({ value: category.id, label: category.name })),
+          ]}
+          onChange={setWorkCategoryId}
+        />
+      </label>
 
       <label className="block text-sm">
         <span className="text-text2">Task category</span>

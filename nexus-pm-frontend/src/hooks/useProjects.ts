@@ -31,6 +31,7 @@ export function useProjects(
     engineeringManagerManagementId?: string;
     projectTypeId?: string;
     workCategoryId?: string;
+    q?: string;
     includeArchived?: boolean;
     size?: number;
   } = {},

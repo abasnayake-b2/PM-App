@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -67,6 +68,7 @@ public class ProjectService {
             UUID engineeringManagerManagementId,
             UUID projectTypeId,
             UUID workCategoryId,
+            String q,
             boolean includeArchived,
             Pageable pageable) {
         UUID userId = SecurityUtils.currentUserId();
@@ -100,6 +102,7 @@ public class ProjectService {
                 engineeringManagerManagementId,
                 projectTypeId,
                 workCategoryId,
+                searchPattern(q),
                 pageable);
         Map<UUID, ProjectProgressService.ProgressResult> progressByProject =
                 projectProgressService.calculateBatch(page.getContent());
@@ -342,6 +345,13 @@ public class ProjectService {
     private Employee loadEmployee(UUID id, String label) {
         return employeeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", label + " not found", 404));
+    }
+
+    private static String searchPattern(String q) {
+        if (q == null || q.isBlank()) {
+            return null;
+        }
+        return "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
     }
 
     private TeamManagement loadManagement(UUID id, String label) {

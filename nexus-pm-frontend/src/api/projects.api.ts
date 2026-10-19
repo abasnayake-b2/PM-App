@@ -13,6 +13,7 @@ export interface ProjectListParams {
   engineeringManagerManagementId?: string;
   projectTypeId?: string;
   workCategoryId?: string;
+  q?: string;
   includeArchived?: boolean;
   page?: number;
   size?: number;

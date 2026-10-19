@@ -1,11 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Capacity } from '@/types';
 import { fetchProjects } from '@/api/projects.api';
 import { availabilityLabel, capacityPeriodView } from '@/utils/allocationUi';
 import {
+  functionalUnitProjects,
   groupCapacityByFuManagerProject,
+  splitPersonName,
   type CapacityProjectHint,
+  type FunctionalUnitAssignment,
 } from '@/utils/capacityGroups';
 
 interface ResourceAllocationGridProps {
@@ -13,6 +17,7 @@ interface ResourceAllocationGridProps {
   rangeFrom: string;
   rangeTo: string;
   workCategoryId?: string;
+  functionalUnits?: FunctionalUnitAssignment[];
   onSelect?: (row: Capacity) => void;
 }
 
@@ -21,9 +26,11 @@ export function ResourceAllocationGrid({
   rangeFrom,
   rangeTo,
   workCategoryId,
+  functionalUnits = [],
   onSelect,
 }: ResourceAllocationGridProps) {
   const cellClass = 'whitespace-nowrap px-4 py-2';
+  const [showDetails, setShowDetails] = useState(true);
   const { data: projectsPage } = useQuery({
     queryKey: ['projects', 'utilization-hints', workCategoryId ?? 'all'],
     queryFn: () =>
@@ -44,24 +51,35 @@ export function ResourceAllocationGrid({
         })),
     [projectsPage],
   );
-  const groups = groupCapacityByFuManagerProject(rows, projectHints);
+  const groups = groupCapacityByFuManagerProject(rows, projectHints, functionalUnits);
 
   let index = 0;
 
   return (
     <div className="rounded-xl border border-border">
+      <div className="flex items-center justify-end border-b border-border px-3 py-1.5">
+        <button
+          type="button"
+          onClick={() => setShowDetails((current) => !current)}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-text2 hover:bg-bg3 hover:text-accent"
+        >
+          {showDetails ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+          {showDetails ? 'Collapse designation' : 'Show designation'}
+        </button>
+      </div>
       <div className="max-h-[min(70vh,720px)] overflow-auto">
         <table className="w-max min-w-full border-collapse text-left text-sm">
           <thead className="sticky top-0 z-10 bg-bg2 text-xs font-semibold uppercase tracking-wide text-text2 shadow-[0_1px_0_var(--border)]">
             <tr className="whitespace-nowrap">
-              <th className="sticky left-0 z-20 min-w-[12rem] border-b border-r border-border bg-bg2 px-4 py-2">
+              <th className="sticky left-0 z-20 min-w-[16rem] border-b border-r border-border bg-bg2 px-4 py-2">
                 Functional unit
               </th>
               <th className="min-w-[10rem] border-b border-r border-border px-4 py-2">Manager</th>
               <th className="w-12 border-b border-border px-3 py-2 text-center">#</th>
               <th className="border-b border-border px-4 py-2">Engineer</th>
-              <th className="border-b border-border px-4 py-2">Designation</th>
-              <th className="border-b border-border px-4 py-2">Team</th>
+              {showDetails && (
+                <th className="min-w-[14rem] border-b border-border px-4 py-2">Designation</th>
+              )}
               <th className="border-b border-border px-4 py-2">VP</th>
               <th className="border-b border-border px-4 py-2 text-right">Allocated</th>
               <th className="border-b border-border px-4 py-2 text-right">Available</th>
@@ -70,6 +88,7 @@ export function ResourceAllocationGrid({
           </thead>
           <tbody>
             {groups.flatMap((fu) => {
+              const fuProjects = functionalUnitProjects(fu.functionalUnit, projectHints);
               const managers = fu.managers
                 .map((manager) => {
                   const byId = new Map<string, (typeof manager.projects)[0]['leaves'][0]>();
@@ -96,6 +115,7 @@ export function ResourceAllocationGrid({
               let fuStarted = false;
               return managers.flatMap((manager) => {
                 let managerStarted = false;
+                const { firstName, lastName } = splitPersonName(manager.manager);
                 return manager.leaves.map((leaf) => {
                   const row = leaf.row;
                   const scoped = {
@@ -125,9 +145,14 @@ export function ResourceAllocationGrid({
                       {showFu && (
                         <td
                           rowSpan={fuRowSpan}
-                          className="sticky left-0 z-[1] min-w-[12rem] border-r border-border bg-bg px-4 py-2 align-top font-semibold"
+                          className="sticky left-0 z-[1] min-w-[16rem] max-w-[22rem] border-r border-border bg-bg px-4 py-2 align-top font-semibold"
                         >
-                          {fu.functionalUnit}
+                          <div>
+                            <p>{fu.functionalUnit}</p>
+                            {fuProjects.length > 0 && (
+                              <p className="mt-0.5 text-xs font-medium text-text2">({fuProjects.join(', ')})</p>
+                            )}
+                          </div>
                         </td>
                       )}
                       {showManager && (
@@ -135,7 +160,11 @@ export function ResourceAllocationGrid({
                           rowSpan={manager.leaves.length}
                           className="min-w-[10rem] border-r border-border px-4 py-2 align-top font-semibold"
                         >
-                          {manager.manager}
+                          <div>
+                            <p>{firstName}</p>
+                            {lastName ? <p>{lastName}</p> : null}
+                            <p className="mt-0.5 text-xs font-medium text-text2">({manager.leaves.length})</p>
+                          </div>
                         </td>
                       )}
                       <td className={`${cellClass} text-center text-xs tabular-nums text-text2`}>{n}</td>
@@ -152,8 +181,9 @@ export function ResourceAllocationGrid({
                           {inactive ? ' (Inactive)' : ''}
                         </button>
                       </td>
-                      <td className={`${cellClass} text-text2`}>{row.designationName ?? '—'}</td>
-                      <td className={`${cellClass} text-text2`}>{row.departmentName ?? '—'}</td>
+                      {showDetails && (
+                        <td className={`${cellClass} text-text2`}>{row.designationName ?? '—'}</td>
+                      )}
                       <td className={`${cellClass} text-text2`}>{row.vpName ?? '—'}</td>
                       <td
                         className={`${cellClass} text-right font-semibold tabular-nums ${

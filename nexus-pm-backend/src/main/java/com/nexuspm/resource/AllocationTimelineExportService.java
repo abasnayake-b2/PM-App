@@ -1,5 +1,7 @@
 package com.nexuspm.resource;
 
+import com.nexuspm.project.entity.Project;
+import com.nexuspm.project.repository.ProjectRepository;
 import com.nexuspm.resource.dto.AllocationResponse;
 import com.nexuspm.resource.dto.CapacityResponse;
 import lombok.RequiredArgsConstructor;
@@ -36,22 +38,26 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
 public class AllocationTimelineExportService {
 
-    private static final int COL_EM = 0;
-    private static final int COL_RESOURCE = 1;
-    private static final int COL_DESIGNATION = 2;
-    private static final int COL_TEAM = 3;
-    private static final int COL_ROLE = 4;
-    private static final int FIRST_WEEK_COL = 5;
+    private static final int COL_FU = 0;
+    private static final int COL_EM = 1;
+    private static final int COL_RESOURCE = 2;
+    private static final int COL_DESIGNATION = 3;
+    private static final int COL_TEAM = 4;
+    private static final int COL_ROLE = 5;
+    private static final int FIRST_WEEK_COL = 6;
     private static final int HEADER_ROWS = 2;
+    private static final String UNASSIGNED_FUNCTIONAL_UNIT = "No functional unit";
 
     private static final IndexedColors[] BAR_COLORS = {
             IndexedColors.ROYAL_BLUE,
@@ -66,6 +72,7 @@ public class AllocationTimelineExportService {
     };
 
     private final AllocationService allocationService;
+    private final ProjectRepository projectRepository;
 
     @Transactional(readOnly = true)
     public byte[] exportTimeline(
@@ -86,10 +93,13 @@ public class AllocationTimelineExportService {
 
         List<CapacityResponse> capacity = allocationService.getCapacity(
                 rangeStart, rangeEnd, asOf, team, department, designationCode, engineeringManager, name, workCategoryId);
+        Map<String, List<String>> projectsByFunctionalUnit = projectsByFunctionalUnit();
 
         List<CapacityResponse> sorted = capacity.stream()
                 .sorted(Comparator
-                        .comparing((CapacityResponse r) -> nullToEmpty(r.getVpName()).toUpperCase(Locale.ROOT))
+                        .comparing((CapacityResponse r) -> formatFunctionalUnit(
+                                periodAllocations(r), projectsByFunctionalUnit)
+                                .toUpperCase(Locale.ROOT))
                         .thenComparing(r -> nullToEmpty(r.getEngineeringManagerName()).toUpperCase(Locale.ROOT))
                         .thenComparing(r -> nullToEmpty(r.getEmployeeName()), String.CASE_INSENSITIVE_ORDER))
                 .toList();
@@ -98,8 +108,8 @@ public class AllocationTimelineExportService {
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            writeGanttSheet((XSSFWorkbook) workbook, sorted, weeks, rangeStart, rangeEnd);
-            writeDetailSheet(workbook, sorted);
+            writeGanttSheet((XSSFWorkbook) workbook, sorted, weeks, rangeStart, rangeEnd, projectsByFunctionalUnit);
+            writeDetailSheet(workbook, sorted, projectsByFunctionalUnit);
             workbook.write(out);
             return out.toByteArray();
         }
@@ -110,7 +120,8 @@ public class AllocationTimelineExportService {
             List<CapacityResponse> capacity,
             List<WeekColumn> weeks,
             LocalDate rangeStart,
-            LocalDate rangeEnd) {
+            LocalDate rangeEnd,
+            Map<String, List<String>> projectsByFunctionalUnit) {
 
         Sheet sheet = workbook.createSheet("Timeline");
         Styles styles = new Styles(workbook);
@@ -118,9 +129,9 @@ public class AllocationTimelineExportService {
         writeMonthAndWeekHeaders(sheet, weeks, styles);
         Drawing<?> drawing = sheet.createDrawingPatriarch();
         CreationHelper creationHelper = workbook.getCreationHelper();
-        writeDataRows(sheet, capacity, weeks, rangeStart, rangeEnd, styles, drawing, creationHelper);
 
-        sheet.setColumnWidth(COL_EM, 16 * 256);
+        sheet.setColumnWidth(COL_FU, 48 * 256);
+        sheet.setColumnWidth(COL_EM, 22 * 256);
         sheet.setColumnWidth(COL_RESOURCE, 28 * 256);
         sheet.setColumnWidth(COL_DESIGNATION, 24 * 256);
         sheet.setColumnWidth(COL_TEAM, 10 * 256);
@@ -131,7 +142,15 @@ public class AllocationTimelineExportService {
 
         sheet.createFreezePane(FIRST_WEEK_COL, HEADER_ROWS);
         List<PersonRowBlock> blocks = writeDataRows(
-                sheet, capacity, weeks, rangeStart, rangeEnd, styles, drawing, creationHelper);
+                sheet,
+                capacity,
+                weeks,
+                rangeStart,
+                rangeEnd,
+                styles,
+                drawing,
+                creationHelper,
+                projectsByFunctionalUnit);
         mergeIdentityColumns(sheet, blocks);
     }
 
@@ -141,7 +160,7 @@ public class AllocationTimelineExportService {
         monthRow.setHeightInPoints(22);
         weekRow.setHeightInPoints(28);
 
-        String[] leftHeaders = {"EM Unit", "Resource", "Designation", "Team", "Role"};
+        String[] leftHeaders = {"Functional Unit", "EM Unit", "Resource", "Designation", "Team", "Role"};
         for (int i = 0; i < leftHeaders.length; i++) {
             Cell monthCell = monthRow.createCell(i);
             monthCell.setCellValue(leftHeaders[i]);
@@ -193,33 +212,37 @@ public class AllocationTimelineExportService {
             LocalDate rangeEnd,
             Styles styles,
             Drawing<?> drawing,
-            CreationHelper creationHelper) {
+            CreationHelper creationHelper,
+            Map<String, List<String>> projectsByFunctionalUnit) {
 
         List<PersonRowBlock> blocks = new ArrayList<>();
         int rowIdx = HEADER_ROWS;
+        int[] engineerCounts = engineerCountsByPerson(capacity, projectsByFunctionalUnit);
 
-        for (CapacityResponse person : capacity) {
+        for (int personIndex = 0; personIndex < capacity.size(); personIndex++) {
+            CapacityResponse person = capacity.get(personIndex);
             List<AllocationResponse> period = periodAllocations(person);
             List<LaneBar> laneBars = packAllocationLanes(period, weeks, rangeStart, rangeEnd);
             int laneCount = Math.max(1, laneBars.stream().mapToInt(LaneBar::lane).max().orElse(-1) + 1);
             int firstRow = rowIdx;
             int lastRow = rowIdx + laneCount - 1;
+            String fuLabel = formatFunctionalUnit(period, projectsByFunctionalUnit);
+            String emName = nullToEmpty(person.getEngineeringManagerName()).toUpperCase(Locale.ROOT);
+            String emLabel = formatEmLabel(person.getEngineeringManagerName(), engineerCounts[personIndex]);
 
             for (int lane = 0; lane < laneCount; lane++) {
                 Row row = sheet.createRow(rowIdx);
-                row.setHeightInPoints(24);
+                row.setHeightInPoints(36);
 
                 if (lane == 0) {
-                    setStyledString(
-                            row,
-                            COL_EM,
-                            nullToEmpty(person.getEngineeringManagerName()).toUpperCase(Locale.ROOT),
-                            styles.emCell);
+                    setStyledString(row, COL_FU, fuLabel, styles.fuCell);
+                    setStyledString(row, COL_EM, emLabel, styles.emCell);
                     setStyledString(row, COL_RESOURCE, person.getEmployeeName(), styles.resourceCell);
                     setStyledString(row, COL_DESIGNATION, nullToEmpty(person.getDesignationName()), styles.textCell);
                     setStyledString(row, COL_TEAM, shortTeam(person.getDepartmentName()), styles.textCell);
                     setStyledString(row, COL_ROLE, primaryRole(period), styles.textCell);
                 } else {
+                    setStyledString(row, COL_FU, "", styles.fuCell);
                     setStyledString(row, COL_EM, "", styles.emCell);
                     setStyledString(row, COL_RESOURCE, "", styles.resourceCell);
                     setStyledString(row, COL_DESIGNATION, "", styles.textCell);
@@ -257,10 +280,7 @@ public class AllocationTimelineExportService {
                 }
             }
 
-            blocks.add(new PersonRowBlock(
-                    nullToEmpty(person.getEngineeringManagerName()).toUpperCase(Locale.ROOT),
-                    firstRow,
-                    lastRow));
+            blocks.add(new PersonRowBlock(fuLabel, emName, firstRow, lastRow));
         }
 
         return blocks;
@@ -447,17 +467,26 @@ public class AllocationTimelineExportService {
             }
         }
 
+        mergeConsecutive(sheet, blocks, PersonRowBlock::fuLabel, COL_FU);
+        mergeConsecutive(sheet, blocks, PersonRowBlock::emName, COL_EM);
+    }
+
+    private static void mergeConsecutive(
+            Sheet sheet,
+            List<PersonRowBlock> blocks,
+            Function<PersonRowBlock, String> key,
+            int col) {
         int start = 0;
         while (start < blocks.size()) {
-            String em = blocks.get(start).emName();
+            String value = key.apply(blocks.get(start));
             int end = start;
-            while (end + 1 < blocks.size() && blocks.get(end + 1).emName().equals(em)) {
+            while (end + 1 < blocks.size() && key.apply(blocks.get(end + 1)).equals(value)) {
                 end++;
             }
             int firstRow = blocks.get(start).firstRow();
             int lastRow = blocks.get(end).lastRow();
             if (lastRow > firstRow) {
-                mergeColumn(sheet, firstRow, lastRow, COL_EM);
+                mergeColumn(sheet, firstRow, lastRow, col);
             }
             start = end + 1;
         }
@@ -491,7 +520,10 @@ public class AllocationTimelineExportService {
         return null;
     }
 
-    private void writeDetailSheet(Workbook workbook, List<CapacityResponse> capacity) {
+    private void writeDetailSheet(
+            Workbook workbook,
+            List<CapacityResponse> capacity,
+            Map<String, List<String>> projectsByFunctionalUnit) {
         Sheet sheet = workbook.createSheet("Allocations Detail");
         CellStyle headerStyle = workbook.createCellStyle();
         Font font = workbook.createFont();
@@ -499,7 +531,7 @@ public class AllocationTimelineExportService {
         headerStyle.setFont(font);
 
         String[] headers = {
-                "EM Unit", "Resource", "Designation", "Team", "Project", "Issue",
+                "Functional Unit", "EM Unit", "Resource", "Designation", "Team", "Project", "Issue",
                 "Role", "Allocated %", "From", "To", "Billable"
         };
         Row header = sheet.createRow(0);
@@ -514,27 +546,29 @@ public class AllocationTimelineExportService {
             List<AllocationResponse> period = periodAllocations(person);
             if (period.isEmpty()) {
                 Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(nullToEmpty(person.getEngineeringManagerName()));
-                row.createCell(1).setCellValue(person.getEmployeeName());
-                row.createCell(2).setCellValue(nullToEmpty(person.getDesignationName()));
-                row.createCell(3).setCellValue(nullToEmpty(person.getDepartmentName()));
-                row.createCell(4).setCellValue("— on bench —");
+                row.createCell(0).setCellValue(UNASSIGNED_FUNCTIONAL_UNIT);
+                row.createCell(1).setCellValue(nullToEmpty(person.getEngineeringManagerName()));
+                row.createCell(2).setCellValue(person.getEmployeeName());
+                row.createCell(3).setCellValue(nullToEmpty(person.getDesignationName()));
+                row.createCell(4).setCellValue(nullToEmpty(person.getDepartmentName()));
+                row.createCell(5).setCellValue("— on bench —");
                 continue;
             }
             for (AllocationResponse allocation : period) {
                 Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(nullToEmpty(person.getEngineeringManagerName()));
-                row.createCell(1).setCellValue(person.getEmployeeName());
-                row.createCell(2).setCellValue(nullToEmpty(person.getDesignationName()));
-                row.createCell(3).setCellValue(nullToEmpty(person.getDepartmentName()));
-                row.createCell(4).setCellValue(nullToEmpty(allocation.getProjectName()));
-                row.createCell(5).setCellValue(nullToEmpty(allocation.getIssueTitle()));
-                row.createCell(6).setCellValue(nullToEmpty(allocation.getRoleOnProject()));
-                row.createCell(7).setCellValue(allocationPct(allocation));
-                row.createCell(8).setCellValue(allocation.getFromDate() != null ? allocation.getFromDate().toString() : "");
-                row.createCell(9).setCellValue(
+                row.createCell(0).setCellValue(formatFunctionalUnit(List.of(allocation), projectsByFunctionalUnit));
+                row.createCell(1).setCellValue(nullToEmpty(person.getEngineeringManagerName()));
+                row.createCell(2).setCellValue(person.getEmployeeName());
+                row.createCell(3).setCellValue(nullToEmpty(person.getDesignationName()));
+                row.createCell(4).setCellValue(nullToEmpty(person.getDepartmentName()));
+                row.createCell(5).setCellValue(nullToEmpty(allocation.getProjectName()));
+                row.createCell(6).setCellValue(nullToEmpty(allocation.getIssueTitle()));
+                row.createCell(7).setCellValue(nullToEmpty(allocation.getRoleOnProject()));
+                row.createCell(8).setCellValue(allocationPct(allocation));
+                row.createCell(9).setCellValue(allocation.getFromDate() != null ? allocation.getFromDate().toString() : "");
+                row.createCell(10).setCellValue(
                         allocation.getToDate() != null ? allocation.getToDate().toString() : "ongoing");
-                row.createCell(10).setCellValue(allocation.isBillable() ? "Yes" : "No");
+                row.createCell(11).setCellValue(allocation.isBillable() ? "Yes" : "No");
             }
         }
         for (int i = 0; i < headers.length; i++) {
@@ -582,6 +616,111 @@ public class AllocationTimelineExportService {
             return project + " — " + issue + " (" + pct + "%)";
         }
         return project + " (" + pct + "%)";
+    }
+
+    private Map<String, List<String>> projectsByFunctionalUnit() {
+        Map<String, LinkedHashSet<String>> grouped = new LinkedHashMap<>();
+        for (Project project : projectRepository.findActiveWithWorkCategory()) {
+            if (project.getWorkCategory() == null || project.getName() == null) {
+                continue;
+            }
+            String fu = project.getWorkCategory().getName().trim();
+            String name = project.getName().trim();
+            if (fu.isBlank() || name.isBlank() || name.equalsIgnoreCase(fu)) {
+                continue;
+            }
+            grouped.computeIfAbsent(fu.toLowerCase(Locale.ROOT), key -> new LinkedHashSet<>()).add(name);
+        }
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        for (Map.Entry<String, LinkedHashSet<String>> entry : grouped.entrySet()) {
+            result.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return result;
+    }
+
+    private static String formatFunctionalUnit(
+            List<AllocationResponse> period,
+            Map<String, List<String>> projectsByFunctionalUnit) {
+        if (period == null || period.isEmpty()) {
+            return UNASSIGNED_FUNCTIONAL_UNIT;
+        }
+        LinkedHashSet<String> units = new LinkedHashSet<>();
+        for (AllocationResponse allocation : period) {
+            units.add(allocationFuName(allocation));
+        }
+        List<String> parts = new ArrayList<>();
+        for (String fu : units) {
+            List<String> projects = projectsByFunctionalUnit.getOrDefault(
+                    fu.toLowerCase(Locale.ROOT), List.of());
+            if (projects.isEmpty()) {
+                parts.add(fu);
+            } else {
+                parts.add(fu + "\n(" + String.join(", ", projects) + ")");
+            }
+        }
+        return parts.isEmpty() ? UNASSIGNED_FUNCTIONAL_UNIT : String.join("; ", parts);
+    }
+
+    private int[] engineerCountsByPerson(
+            List<CapacityResponse> capacity,
+            Map<String, List<String>> projectsByFunctionalUnit) {
+        int n = capacity.size();
+        int[] counts = new int[n];
+        int start = 0;
+        while (start < n) {
+            String fu = formatFunctionalUnit(periodAllocations(capacity.get(start)), projectsByFunctionalUnit);
+            String em = nullToEmpty(capacity.get(start).getEngineeringManagerName()).toUpperCase(Locale.ROOT);
+            int end = start;
+            while (end + 1 < n) {
+                String nextFu = formatFunctionalUnit(
+                        periodAllocations(capacity.get(end + 1)), projectsByFunctionalUnit);
+                String nextEm = nullToEmpty(capacity.get(end + 1).getEngineeringManagerName())
+                        .toUpperCase(Locale.ROOT);
+                if (!fu.equals(nextFu) || !em.equals(nextEm)) {
+                    break;
+                }
+                end++;
+            }
+            int count = end - start + 1;
+            for (int i = start; i <= end; i++) {
+                counts[i] = count;
+            }
+            start = end + 1;
+        }
+        return counts;
+    }
+
+    private static String formatEmLabel(String fullName, int engineerCount) {
+        String trimmed = nullToEmpty(fullName).trim();
+        String firstName;
+        String lastName;
+        if (trimmed.isBlank()) {
+            firstName = "UNASSIGNED";
+            lastName = "";
+        } else {
+            int split = trimmed.lastIndexOf(' ');
+            if (split < 0) {
+                firstName = trimmed;
+                lastName = "";
+            } else {
+                firstName = trimmed.substring(0, split).trim();
+                lastName = trimmed.substring(split + 1).trim();
+            }
+        }
+        StringBuilder label = new StringBuilder();
+        label.append(firstName.toUpperCase(Locale.ROOT));
+        if (!lastName.isBlank()) {
+            label.append('\n').append(lastName.toUpperCase(Locale.ROOT));
+        }
+        label.append('\n').append('(').append(engineerCount).append(')');
+        return label.toString();
+    }
+
+    private static String allocationFuName(AllocationResponse allocation) {
+        if (allocation.getWorkCategoryName() != null && !allocation.getWorkCategoryName().isBlank()) {
+            return allocation.getWorkCategoryName().trim();
+        }
+        return UNASSIGNED_FUNCTIONAL_UNIT;
     }
 
     private static String primaryRole(List<AllocationResponse> period) {
@@ -660,7 +799,7 @@ public class AllocationTimelineExportService {
     private record LaneBar(AllocationResponse allocation, int startWeek, int endWeek, int lane) {
     }
 
-    private record PersonRowBlock(String emName, int firstRow, int lastRow) {
+    private record PersonRowBlock(String fuLabel, String emName, int firstRow, int lastRow) {
     }
 
     private static final class Styles {
@@ -668,6 +807,7 @@ public class AllocationTimelineExportService {
         private final CellStyle leftHeader;
         private final CellStyle monthHeader;
         private final CellStyle weekHeader;
+        private final CellStyle fuCell;
         private final CellStyle emCell;
         private final CellStyle resourceCell;
         private final CellStyle textCell;
@@ -704,11 +844,18 @@ public class AllocationTimelineExportService {
             weekHeader.setWrapText(true);
             applyThinBorder(weekHeader);
 
+            fuCell = workbook.createCellStyle();
+            fuCell.setFont(bold);
+            fuCell.setAlignment(HorizontalAlignment.CENTER);
+            fuCell.setVerticalAlignment(VerticalAlignment.CENTER);
+            fuCell.setWrapText(true);
+            applyThinBorder(fuCell);
+
             emCell = workbook.createCellStyle();
             emCell.setFont(bold);
             emCell.setAlignment(HorizontalAlignment.CENTER);
             emCell.setVerticalAlignment(VerticalAlignment.CENTER);
-            emCell.setRotation((short) 90);
+            emCell.setWrapText(true);
             applyThinBorder(emCell);
 
             resourceCell = workbook.createCellStyle();

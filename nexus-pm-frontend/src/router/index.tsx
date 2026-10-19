@@ -16,6 +16,7 @@ import { ResourcesLayout } from '@/pages/Resources/ResourcesLayout';
 import { ResourcesPage } from '@/pages/Resources/ResourcesPage';
 import { UtilizationTimelinePage } from '@/pages/Resources/UtilizationTimelinePage';
 import { UtilizationSummaryPage } from '@/pages/Resources/UtilizationSummaryPage';
+import { UtilizationChartsPage } from '@/pages/Resources/UtilizationChartsPage';
 import { AllocationHistoryPage } from '@/pages/Resources/AllocationHistoryPage';
 import { TeamPage } from '@/pages/Team/TeamPage';
 import { TeamLayout } from '@/pages/Team/TeamLayout';
@@ -59,6 +60,7 @@ export function AppRouter() {
               <Route index element={<ResourcesPage />} />
               <Route path="timeline" element={<UtilizationTimelinePage />} />
               <Route path="summary" element={<UtilizationSummaryPage />} />
+              <Route path="charts" element={<UtilizationChartsPage />} />
               <Route path="history" element={<AllocationHistoryPage />} />
             </Route>
             <Route path="/reports" element={<Navigate to="/" replace />} />

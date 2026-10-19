@@ -53,6 +53,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             AND (:engineeringManagerManagementId IS NULL OR p.engineeringManagerManagement.id = :engineeringManagerManagementId)
             AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
             AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
+            AND (:q IS NULL OR LOWER(p.name) LIKE :q OR LOWER(COALESCE(p.product, '')) LIKE :q)
             """,
             countQuery = """
             SELECT COUNT(DISTINCT p.id) FROM Project p
@@ -86,6 +87,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             AND (:engineeringManagerManagementId IS NULL OR p.engineeringManagerManagement.id = :engineeringManagerManagementId)
             AND (:projectTypeId IS NULL OR pt.id = :projectTypeId)
             AND (:workCategoryId IS NULL OR wc.id = :workCategoryId)
+            AND (:q IS NULL OR LOWER(p.name) LIKE :q OR LOWER(COALESCE(p.product, '')) LIKE :q)
             """)
     Page<Project> findAccessible(
             @Param("employeeId") UUID employeeId,
@@ -106,6 +108,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             @Param("engineeringManagerManagementId") UUID engineeringManagerManagementId,
             @Param("projectTypeId") UUID projectTypeId,
             @Param("workCategoryId") UUID workCategoryId,
+            @Param("q") String q,
             Pageable pageable);
 
     @Query("""
@@ -278,6 +281,15 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             """)
     List<OrgBreakdownProjectItem> findBreakdownProjectsByEngineeringManagerManagementId(
             @Param("emId") UUID emId);
+
+    @Query("""
+            SELECT p FROM Project p
+            JOIN FETCH p.workCategory
+            WHERE p.deleted = false
+              AND p.archived = false
+            ORDER BY LOWER(p.workCategory.name), LOWER(p.name)
+            """)
+    List<Project> findActiveWithWorkCategory();
 
     @Modifying
     @Query("UPDATE Project p SET p.engineeringManagerManagement = NULL WHERE p.engineeringManagerManagement.id = :managementId")

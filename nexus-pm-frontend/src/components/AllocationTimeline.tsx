@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, CalendarDays, CalendarRange, ChevronRight } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Capacity, Allocation } from '@/types';
 import { ResourceAvatar } from '@/components/ResourceAvatar';
 import {
@@ -13,8 +13,11 @@ import { fetchEmProjectRdSummary } from '@/api/issues.api';
 import { fetchProjects } from '@/api/projects.api';
 import {
   UNASSIGNED_FUNCTIONAL_UNIT,
+  functionalUnitProjects,
   groupCapacityByFuManagerProject,
+  splitPersonName,
   type CapacityProjectHint,
+  type FunctionalUnitAssignment,
 } from '@/utils/capacityGroups';
 import {
   GANTT_BAR_FILL,
@@ -40,9 +43,11 @@ import {
   type TimelineWeek,
 } from '@/utils/allocationUi';
 
-const FU_LABEL_WIDTH = 132;
-const EM_LABEL_WIDTH = 112;
-const MEMBER_LABEL_WIDTH = 200;
+const FU_LABEL_WIDTH = 196;
+const EM_LABEL_WIDTH = 128;
+const MEMBER_LABEL_WIDTH = 260;
+const DESIGNATION_COL_WIDTH = 220;
+const DETAILS_RAIL_WIDTH = 28;
 const RD_GRID_RAIL_WIDTH = 28;
 const HEADER_HEIGHT_MONTHLY = '3rem';
 const HEADER_HEIGHT_WITH_GRID = '5rem';
@@ -73,6 +78,7 @@ interface AllocationTimelineProps {
     next: AllocationDateChange,
   ) => void;
   datesSaving?: boolean;
+  functionalUnits?: FunctionalUnitAssignment[];
 }
 
 function allocationTooltip(allocation: Allocation, showDates: boolean): string {
@@ -390,10 +396,12 @@ export function AllocationTimeline({
   onAllocationEdit,
   onAllocationDatesChange,
   datesSaving = false,
+  functionalUnits = [],
 }: AllocationTimelineProps) {
   const [granularity, setGranularity] = useState<TimelineGranularity>('daily');
   const [showDates, setShowDates] = useState(true);
   const [showRdGrid, setShowRdGrid] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const { data: rdSummary } = useQuery({
     queryKey: ['em-project-rd-summary'],
@@ -496,7 +504,7 @@ export function AllocationTimeline({
     granularity === 'monthly' ? getMonthSpan : granularity === 'weekly' ? getWeekSpan : getDaySpan;
 
   const fuGroups = useMemo(() => {
-    return groupCapacityByFuManagerProject(rows, projectHints).map((fu) => {
+    return groupCapacityByFuManagerProject(rows, projectHints, functionalUnits).map((fu) => {
       const managers = fu.managers.map((mgr) => {
         const rdProjects =
           rdProjectsByFuEm.get(`${fu.functionalUnit.toLowerCase()}|${mgr.manager.toLowerCase()}`) ??
@@ -544,7 +552,7 @@ export function AllocationTimeline({
         height: managers.reduce((sum, manager) => sum + manager.height, 0),
       };
     }).filter((fu): fu is NonNullable<typeof fu> => fu != null);
-  }, [rows, getSpan, projectHints, rdProjectsByFuEm, showRdGrid]);
+  }, [rows, getSpan, projectHints, functionalUnits, rdProjectsByFuEm, showRdGrid]);
 
   const rowLayouts = useMemo(
     () =>
@@ -569,11 +577,13 @@ export function AllocationTimeline({
     : granularity === 'daily'
       ? HEADER_HEIGHT_DAILY
       : HEADER_HEIGHT_MONTHLY;
+  const detailsWidth = showDetails ? DESIGNATION_COL_WIDTH : DETAILS_RAIL_WIDTH;
   const leftWidth =
     (showRdGrid ? PROJECT_RD_GRID_WIDTH : RD_GRID_RAIL_WIDTH) +
     FU_LABEL_WIDTH +
     EM_LABEL_WIDTH +
-    MEMBER_LABEL_WIDTH;
+    MEMBER_LABEL_WIDTH +
+    detailsWidth;
 
   const syncScroll = useCallback((source: 'left' | 'right') => {
     if (syncingScroll.current) return;
@@ -629,6 +639,15 @@ export function AllocationTimeline({
             className="rounded border-border"
           />
           Show dates
+        </label>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text2">
+          <input
+            type="checkbox"
+            checked={showDetails}
+            onChange={(e) => setShowDetails(e.target.checked)}
+            className="rounded border-border"
+          />
+          Designation
         </label>
         {canEdit && (
           <span className="text-xs text-text2">
@@ -687,16 +706,49 @@ export function AllocationTimeline({
             >
               Manager
             </div>
-            <div className="flex items-center px-3" style={{ width: MEMBER_LABEL_WIDTH }}>
+            <div
+              className="flex items-center border-r border-border px-3"
+              style={{ width: MEMBER_LABEL_WIDTH }}
+            >
               Engineer
             </div>
+            {showDetails ? (
+              <div
+                className="flex items-center justify-between gap-1 px-2"
+                style={{ width: DESIGNATION_COL_WIDTH }}
+              >
+                <span>Designation</span>
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(false)}
+                  className="rounded p-0.5 text-text2 hover:bg-bg3 hover:text-accent"
+                  title="Collapse designation"
+                  aria-label="Collapse designation"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDetails(true)}
+                className="flex h-full flex-col items-center justify-start gap-1 pt-2 text-text2 hover:bg-bg3 hover:text-accent"
+                style={{ width: DETAILS_RAIL_WIDTH }}
+                title="Show designation"
+                aria-label="Show designation"
+              >
+                <ChevronRight size={14} />
+              </button>
+            )}
           </div>
           <div
             ref={leftBodyRef}
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
             onScroll={() => syncScroll('left')}
           >
-            {fuGroups.map((fu) => (
+            {fuGroups.map((fu) => {
+              const fuProjects = functionalUnitProjects(fu.functionalUnit, projectHints);
+              return (
               <div key={`fu:${fu.functionalUnit}`} className="flex border-b border-border">
                 {showRdGrid && (
                   <div
@@ -718,23 +770,35 @@ export function AllocationTimeline({
                   className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
                   style={{ width: FU_LABEL_WIDTH, minHeight: fu.height }}
                 >
-                  <p className="text-sm font-semibold leading-snug break-words">{fu.functionalUnit}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-snug break-words">{fu.functionalUnit}</p>
+                    {fuProjects.length > 0 && (
+                      <p className="mt-0.5 text-[10px] font-medium leading-snug text-text2">
+                        ({fuProjects.join(', ')})
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="min-w-0 flex-1">
-                  {fu.managers.map((manager) => (
+                  {fu.managers.map((manager) => {
+                    const { firstName, lastName } = splitPersonName(manager.manager);
+                    return (
                     <div key={`em:${fu.functionalUnit}:${manager.manager}`} className="flex">
                       <div
                         className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
                         style={{ width: EM_LABEL_WIDTH, minHeight: manager.height }}
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold leading-snug break-words">{manager.manager}</p>
-                          <p className="text-[10px] text-text2">
-                            {manager.members.length} engineer{manager.members.length !== 1 ? 's' : ''}
+                          <p className="text-sm font-semibold leading-snug break-words">{firstName}</p>
+                          {lastName ? (
+                            <p className="text-sm font-semibold leading-snug break-words">{lastName}</p>
+                          ) : null}
+                          <p className="mt-0.5 text-[10px] font-medium text-text2">
+                            ({manager.members.length})
                           </p>
                         </div>
                       </div>
-                      <div className="shrink-0" style={{ width: MEMBER_LABEL_WIDTH }}>
+                      <div className="shrink-0 border-r border-border" style={{ width: MEMBER_LABEL_WIDTH }}>
                         {manager.members.map(({ row, height }) => {
                           const inactive = (row.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE';
                           return (
@@ -756,11 +820,41 @@ export function AllocationTimeline({
                           );
                         })}
                       </div>
+                      {showDetails ? (
+                        <div
+                          className="shrink-0"
+                          style={{ width: DESIGNATION_COL_WIDTH }}
+                        >
+                          {manager.members.map(({ row, height }) => (
+                            <div
+                              key={`${fu.functionalUnit}:${manager.manager}:${row.employeeId}:designation`}
+                              className="flex items-center border-b border-border px-2 last:border-b-0"
+                              style={{ height }}
+                              title={row.designationName ?? undefined}
+                            >
+                              <span className="truncate text-xs text-text2">
+                                {row.designationName?.trim() || '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowDetails(true)}
+                          className="shrink-0 border-b border-border text-text2 hover:bg-bg3 hover:text-accent"
+                          style={{ width: DETAILS_RAIL_WIDTH, minHeight: manager.height }}
+                          title="Show designation"
+                          aria-label="Show designation"
+                        />
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           </div>
         </div>

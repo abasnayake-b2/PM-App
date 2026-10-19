@@ -70,6 +70,12 @@ export interface UpdateAllocationPayload {
   billable?: boolean;
   taskTypeId?: string;
   taskCategoryId?: string;
+  workCategoryId?: string;
+  issueId?: string;
+  projectTaskId?: string;
+  rdIssueTaskId?: string;
+  nonProjectTaskDescription?: string;
+  nonProjectTaskModule?: string;
 }
 
 export async function createAllocation(payload: CreateAllocationPayload): Promise<Allocation> {

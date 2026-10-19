@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Trash2, X } from 'lucide-react';
 import type { Allocation, Capacity, Issue } from '@/types';
-import { AllocationForm } from '@/components/AllocationForm';
 import { ResourceIssueAllocateForm } from '@/components/ResourceIssueAllocateForm';
 import { ResourceAvatar } from '@/components/ResourceAvatar';
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
@@ -80,17 +79,6 @@ export function TeamMemberPanel({
   }, [initialEditingAllocationId, allocations, canMutateAllocations, row.employeeId]);
 
   const openIssues = issues.filter((i) => isOpenIssueStatus(i.statusName));
-
-  const employeeOption = useMemo(
-    () => [
-      {
-        id: row.employeeId,
-        label: row.employeeName,
-        designationName: row.designationName,
-      },
-    ],
-    [row],
-  );
 
   const handleRemoveAllocation = (allocation: Allocation) => {
     if (!window.confirm(`Remove ${row.employeeName} from "${allocationTargetLabel(allocation)}"?`)) return;
@@ -189,11 +177,10 @@ export function TeamMemberPanel({
             <h3 className="text-sm font-semibold">Allocations</h3>
             {canMutateAllocations && editingAllocation && (
               <div className="mt-3">
-                <AllocationForm
-                  title="Edit allocation"
+                <ResourceIssueAllocateForm
+                  key={editingAllocation.id}
+                  row={row}
                   editingAllocation={editingAllocation}
-                  employees={employeeOption}
-                  enableEngineeringManagerFilter={false}
                   loading={updateAllocation.isPending}
                   submitError={updateAllocation.error}
                   onCancel={() => {
@@ -201,7 +188,6 @@ export function TeamMemberPanel({
                     updateAllocation.reset();
                     onEditAllocationClosed?.();
                   }}
-                  onSubmit={() => {}}
                   onUpdate={(allocationId, payload) => {
                     updateAllocation.mutate(
                       { id: allocationId, payload },

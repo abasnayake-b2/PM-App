@@ -27,10 +27,9 @@ public class ResourceMapper {
         RdIssueTask rdTask = allocation.getRdIssueTask();
         TaskType taskType = allocation.getTaskType();
         TaskCategory taskCategory = allocation.getTaskCategory();
-        WorkCategory workCategory = allocation.getWorkCategory();
-        if (workCategory == null && project != null) {
-            workCategory = project.getWorkCategory();
-        }
+        WorkCategory workCategory = project != null && project.getWorkCategory() != null
+                ? project.getWorkCategory()
+                : allocation.getWorkCategory();
         NonProjectTask nonProjectTask = allocation.getNonProjectTask();
 
         String projectTaskKey = projectTask != null && project != null

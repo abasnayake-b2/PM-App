@@ -108,6 +108,7 @@ export function UtilizationSummaryPage() {
     queryKey: ['work-categories'],
     queryFn: fetchWorkCategories,
     enabled: showTeamCapacity,
+    refetchOnMount: 'always',
   });
   const managerGroups = useMemo(
     () => groupedManagerNames(management, engineeringManagers),

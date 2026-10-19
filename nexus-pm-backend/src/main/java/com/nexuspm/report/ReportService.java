@@ -107,6 +107,7 @@ public class ReportService {
                 null,
                 null,
                 null,
+                null,
                 PageRequest.of(0, 8, Sort.by("name"))).getContent();
 
         Map<UUID, Long> openIssuesByProject = loadOpenIssueCounts(activeProjects);

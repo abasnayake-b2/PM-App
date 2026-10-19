@@ -403,6 +403,68 @@ function managerNodeFromTeam(
   };
 }
 
+function addPersonToManagerBucket(
+  byManager: Map<string, { id: string; name: string; team: SummaryPerson[] }>,
+  managerId: string,
+  managerName: string,
+  person: SummaryPerson,
+) {
+  const existing = byManager.get(managerId);
+  if (existing) {
+    existing.team.push(person);
+    return;
+  }
+  byManager.set(managerId, { id: managerId, name: managerName, team: [person] });
+}
+
+/** Manager rows follow the functional unit's assigned managers. People allocated to the unit are placed under the assigned manager they report to. */
+function managerBucketsForCategory(
+  category: WorkCategory,
+  scopedPeople: SummaryPerson[],
+): Map<string, { id: string; name: string; team: SummaryPerson[] }> {
+  const assigned = category.engineeringManagers ?? [];
+  const byManager = new Map<string, { id: string; name: string; team: SummaryPerson[] }>();
+  if (assigned.length === 0) {
+    for (const person of scopedPeople) {
+      const managerId =
+        person.engineeringManagerManagementId ||
+        normName(person.engineeringManagerName) ||
+        'unassigned';
+      const managerName = person.engineeringManagerName?.trim() || 'Unassigned';
+      addPersonToManagerBucket(byManager, managerId, managerName, person);
+    }
+    return byManager;
+  }
+
+  const assignedIds = new Set(assigned.map((manager) => manager.id));
+  const assignedIdByName = new Map(assigned.map((manager) => [normName(manager.name), manager.id]));
+  for (const manager of assigned) {
+    byManager.set(manager.id, { id: manager.id, name: manager.name, team: [] });
+  }
+  for (const person of scopedPeople) {
+    const matchedId =
+      (person.engineeringManagerManagementId &&
+        assignedIds.has(person.engineeringManagerManagementId) &&
+        person.engineeringManagerManagementId) ||
+      assignedIdByName.get(normName(person.engineeringManagerName));
+    if (matchedId && byManager.has(matchedId)) {
+      byManager.get(matchedId)!.team.push(person);
+      continue;
+    }
+    if (assigned.length === 1) {
+      byManager.get(assigned[0].id)!.team.push(person);
+      continue;
+    }
+    const managerId =
+      person.engineeringManagerManagementId ||
+      normName(person.engineeringManagerName) ||
+      'unassigned';
+    const managerName = person.engineeringManagerName?.trim() || 'Unassigned';
+    addPersonToManagerBucket(byManager, managerId, managerName, person);
+  }
+  return byManager;
+}
+
 export function buildWorkCategoryTrees(
   people: SummaryPerson[],
   managers: ManagerAllocationSummary[],
@@ -420,20 +482,7 @@ export function buildWorkCategoryTrees(
           personScopedToWorkCategory(person, category.id, rangeFrom, rangeTo, rangeDays),
         )
         .filter((person): person is SummaryPerson => person != null);
-      const byManager = new Map<string, { id: string; name: string; team: SummaryPerson[] }>();
-      for (const person of scopedPeople) {
-        const managerId =
-          person.engineeringManagerManagementId ||
-          normName(person.engineeringManagerName) ||
-          'unassigned';
-        const managerName = person.engineeringManagerName?.trim() || 'Unassigned';
-        const existing = byManager.get(managerId);
-        if (existing) {
-          existing.team.push(person);
-        } else {
-          byManager.set(managerId, { id: managerId, name: managerName, team: [person] });
-        }
-      }
+      const byManager = managerBucketsForCategory(category, scopedPeople);
       const managerNodes = [...byManager.values()]
         .map((group) =>
           managerNodeFromTeam(

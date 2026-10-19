@@ -41,6 +41,7 @@ public class ProjectController {
             @RequestParam(required = false) UUID engineeringManagerManagementId,
             @RequestParam(required = false) UUID projectTypeId,
             @RequestParam(required = false) UUID workCategoryId,
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "false") boolean includeArchived,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
         return projectService.listProjects(
@@ -53,6 +54,7 @@ public class ProjectController {
                 engineeringManagerManagementId,
                 projectTypeId,
                 workCategoryId,
+                q,
                 includeArchived,
                 pageable);
     }

@@ -29,4 +29,16 @@ public class UpdateAllocationRequest {
     private UUID taskTypeId;
 
     private UUID taskCategoryId;
+
+    private UUID workCategoryId;
+
+    private UUID issueId;
+
+    private UUID projectTaskId;
+
+    private UUID rdIssueTaskId;
+
+    private String nonProjectTaskDescription;
+
+    private String nonProjectTaskModule;
 }

@@ -16,6 +16,7 @@ interface OrganisationTreeProps {
   onNavigate?: (params: { regionId?: string; countryId?: string; clientId?: string }) => void;
   selection?: { regionId?: string; countryId?: string; clientId?: string };
   compact?: boolean;
+  projectQuery?: string;
 }
 
 type TreeKind = 'region' | 'country' | 'client' | 'project';
@@ -86,7 +87,22 @@ function TreeRow({
   );
 }
 
-export function OrganisationTree({ onNavigate, selection, compact = false }: OrganisationTreeProps) {
+function matchesProjectQuery(project: Project, query: string): boolean {
+  if (!query) return true;
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    project.name.toLowerCase().includes(needle) ||
+    (project.product ?? '').toLowerCase().includes(needle)
+  );
+}
+
+export function OrganisationTree({
+  onNavigate,
+  selection,
+  compact = false,
+  projectQuery = '',
+}: OrganisationTreeProps) {
   const { data: regions, isLoading: regionsLoading } = useRegions();
   const { data: countries, isLoading: countriesLoading } = useCountries(undefined, true);
   const { data: clients, isLoading: clientsLoading } = useClients(undefined, true);
@@ -118,14 +134,16 @@ export function OrganisationTree({ onNavigate, selection, compact = false }: Org
   const projectsByClient = useMemo(() => {
     const map = new Map<string, Project[]>();
     for (const project of projectsData?.content ?? []) {
+      if (!matchesProjectQuery(project, projectQuery)) continue;
       const list = map.get(project.clientId) ?? [];
       list.push(project);
       map.set(project.clientId, list);
     }
     return map;
-  }, [projectsData]);
+  }, [projectsData, projectQuery]);
 
   const isLoading = regionsLoading || countriesLoading || clientsLoading || projectsLoading;
+  const searching = !!projectQuery.trim();
 
   const toggle = (key: string) => {
     setExpanded((current) => {
@@ -153,6 +171,11 @@ export function OrganisationTree({ onNavigate, selection, compact = false }: Org
   const collapseAll = () => setExpanded(new Set());
 
   useEffect(() => {
+    if (!searching) return;
+    expandAll();
+  }, [searching, projectQuery, projectsData]);
+
+  useEffect(() => {
     if (!selection) return;
     const keys = new Set<string>();
     if (selection.regionId) keys.add(nodeKey('region', selection.regionId));
@@ -163,7 +186,13 @@ export function OrganisationTree({ onNavigate, selection, compact = false }: Org
   }, [selection?.regionId, selection?.countryId, selection?.clientId]);
 
   const renderRegion = (region: Region, depth: number) => {
-    const regionCountries = countriesByRegion.get(region.id) ?? [];
+    const regionCountries = (countriesByRegion.get(region.id) ?? []).filter((country) => {
+      if (!searching) return true;
+      return (clientsByCountry.get(country.id) ?? []).some(
+        (client) => (projectsByClient.get(client.id) ?? []).length > 0,
+      );
+    });
+    if (searching && regionCountries.length === 0) return null;
     const key = nodeKey('region', region.id);
     const isExpanded = expanded.has(key);
 
@@ -188,7 +217,10 @@ export function OrganisationTree({ onNavigate, selection, compact = false }: Org
   };
 
   const renderCountry = (country: Country, regionId: string, depth: number) => {
-    const countryClients = clientsByCountry.get(country.id) ?? [];
+    const countryClients = (clientsByCountry.get(country.id) ?? []).filter(
+      (client) => !searching || (projectsByClient.get(client.id) ?? []).length > 0,
+    );
+    if (searching && countryClients.length === 0) return null;
     const key = nodeKey('country', country.id);
     const isExpanded = expanded.has(key);
 
@@ -214,6 +246,7 @@ export function OrganisationTree({ onNavigate, selection, compact = false }: Org
 
   const renderClient = (client: Client, regionId: string, countryId: string, depth: number) => {
     const clientProjects = projectsByClient.get(client.id) ?? [];
+    if (searching && clientProjects.length === 0) return null;
     const key = nodeKey('client', client.id);
     const isExpanded = expanded.has(key);
 
@@ -246,7 +279,7 @@ export function OrganisationTree({ onNavigate, selection, compact = false }: Org
       onToggle={() => {}}
       icon={<FolderKanban size={compact ? 14 : 16} />}
       label={project.name}
-      meta={compact ? undefined : project.ragStatus}
+      meta={compact ? project.product || undefined : project.product || project.ragStatus}
       href={`/projects/${project.id}`}
       compact={compact}
     />

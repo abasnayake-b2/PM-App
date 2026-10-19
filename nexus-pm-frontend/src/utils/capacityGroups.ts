@@ -38,6 +38,16 @@ export type CapacityProjectHint = {
   functionalUnit: string;
 };
 
+export type FunctionalUnitManager = {
+  id: string;
+  name: string;
+};
+
+export type FunctionalUnitAssignment = {
+  name: string;
+  managers: FunctionalUnitManager[];
+};
+
 function normKey(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -54,17 +64,52 @@ function allocationFunctionalUnit(
   fuByProjectId: Map<string, string>,
   fuByProjectName: Map<string, string>,
 ): string {
-  const fromAllocation = allocation.workCategoryName?.trim();
-  if (fromAllocation) return fromAllocation;
   if (allocation.projectId && fuByProjectId.has(allocation.projectId)) {
     return fuByProjectId.get(allocation.projectId)!;
   }
   const fromName = fuByProjectName.get(normKey(allocation.projectName ?? ''));
-  return fromName || UNASSIGNED_FUNCTIONAL_UNIT;
+  if (fromName) return fromName;
+  return allocation.workCategoryName?.trim() || UNASSIGNED_FUNCTIONAL_UNIT;
 }
 
-function allocationProjectName(allocation: Allocation): string {
+function allocationProjectName(
+  allocation: Allocation,
+  projectNameById: Map<string, string>,
+): string {
+  if (allocation.projectId && projectNameById.has(allocation.projectId)) {
+    return projectNameById.get(allocation.projectId)!;
+  }
   return allocation.projectName?.trim() || allocation.workCategoryName?.trim() || UNASSIGNED_PROJECT;
+}
+
+export function functionalUnitProjects(
+  functionalUnit: string,
+  hints: CapacityProjectHint[],
+): string[] {
+  const fuKey = normKey(functionalUnit);
+  return [
+    ...new Set(
+      hints
+        .filter((hint) => normKey(hint.functionalUnit) === fuKey)
+        .map((hint) => hint.projectName.trim())
+        .filter((name) => name && normKey(name) !== fuKey),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+export function functionalUnitDisplayLabel(
+  functionalUnit: string,
+  hints: CapacityProjectHint[],
+): string {
+  const projects = functionalUnitProjects(functionalUnit, hints);
+  return projects.length === 0 ? functionalUnit : `${functionalUnit} (${projects.join(', ')})`;
+}
+
+export function splitPersonName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: 'Unassigned', lastName: '' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
 }
 
 export function groupCapacityByEngineeringManager(rows: Capacity[]): CapacityManagerGroup[] {
@@ -133,33 +178,101 @@ function addLeaf(
   leaf.items.push(...items);
 }
 
+function assignedManagersForUnit(
+  functionalUnit: string,
+  assignments: FunctionalUnitAssignment[],
+): FunctionalUnitManager[] {
+  const key = normKey(functionalUnit);
+  return assignments.find((assignment) => normKey(assignment.name) === key)?.managers ?? [];
+}
+
+function managerMatchesRow(manager: FunctionalUnitManager, row: Capacity): boolean {
+  if (row.engineeringManagerManagementId && manager.id === row.engineeringManagerManagementId) {
+    return true;
+  }
+  const rowName = normKey(row.engineeringManagerName ?? '');
+  return rowName.length > 0 && normKey(manager.name) === rowName;
+}
+
+/** Manager label for a functional unit comes from the managers assigned to that unit. */
+function managerForFunctionalUnit(
+  functionalUnit: string,
+  row: Capacity,
+  assignments: FunctionalUnitAssignment[],
+): string {
+  const assigned = assignedManagersForUnit(functionalUnit, assignments);
+  const personal = row.engineeringManagerName?.trim() || 'Unassigned';
+  if (assigned.length === 0) return personal;
+  const match = assigned.find((manager) => managerMatchesRow(manager, row));
+  if (match) return match.name;
+  if (assigned.length === 1) return assigned[0].name;
+  return personal;
+}
+
+function functionalUnitsForManager(
+  row: Capacity,
+  assignments: FunctionalUnitAssignment[],
+): FunctionalUnitAssignment[] {
+  return assignments.filter(
+    (assignment) =>
+      assignment.name.trim() &&
+      assignment.managers.some((manager) => managerMatchesRow(manager, row)),
+  );
+}
+
 export function groupCapacityByFuManagerProject(
   rows: Capacity[],
   projectHints: CapacityProjectHint[] = [],
+  assignments: FunctionalUnitAssignment[] = [],
 ): CapacityFuGroup[] {
   const fuMap = new Map<string, FuAcc>();
   const fuByProjectId = new Map<string, string>();
   const fuByProjectName = new Map<string, string>();
+  const projectNameById = new Map<string, string>();
   for (const hint of projectHints) {
     const functionalUnit = hint.functionalUnit.trim() || UNASSIGNED_FUNCTIONAL_UNIT;
     const projectName = hint.projectName.trim();
     if (!projectName) continue;
-    if (hint.projectId) fuByProjectId.set(hint.projectId, functionalUnit);
+    if (hint.projectId) {
+      fuByProjectId.set(hint.projectId, functionalUnit);
+      projectNameById.set(hint.projectId, projectName);
+    }
     fuByProjectName.set(normKey(projectName), functionalUnit);
   }
   for (const row of rows) {
-    const manager = row.engineeringManagerName?.trim() || 'Unassigned';
     const allocations = row.periodAllocations ?? row.allocations ?? [];
     if (allocations.length === 0) {
-      addLeaf(fuMap, UNASSIGNED_FUNCTIONAL_UNIT, manager, UNASSIGNED_PROJECT, row, []);
+      const ownedUnits = functionalUnitsForManager(row, assignments);
+      if (ownedUnits.length === 0) {
+        addLeaf(
+          fuMap,
+          UNASSIGNED_FUNCTIONAL_UNIT,
+          row.engineeringManagerName?.trim() || 'Unassigned',
+          UNASSIGNED_PROJECT,
+          row,
+          [],
+        );
+      } else {
+        for (const unit of ownedUnits) {
+          addLeaf(
+            fuMap,
+            unit.name,
+            managerForFunctionalUnit(unit.name, row, assignments),
+            UNASSIGNED_PROJECT,
+            row,
+            [],
+          );
+        }
+      }
       continue;
     }
     for (const allocation of allocations) {
+      const functionalUnit = allocationFunctionalUnit(allocation, fuByProjectId, fuByProjectName);
       addLeaf(
         fuMap,
-        allocationFunctionalUnit(allocation, fuByProjectId, fuByProjectName),
-        manager,
-        allocationProjectName(allocation),
+        functionalUnit,
+        managerForFunctionalUnit(functionalUnit, row, assignments),
+        allocationProjectName(allocation, projectNameById),
         row,
         [allocation],
       );

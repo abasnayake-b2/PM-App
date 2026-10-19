@@ -36,6 +36,9 @@ export function ResourcesLayout() {
         <NavLink to="/resources/summary" className={tabClass}>
           Summary
         </NavLink>
+        <NavLink to="/resources/charts" className={tabClass}>
+          Charts
+        </NavLink>
         <NavLink to="/resources/history" className={tabClass}>
           History
         </NavLink>

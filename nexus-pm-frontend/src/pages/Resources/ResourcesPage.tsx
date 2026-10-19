@@ -18,6 +18,7 @@ import { P } from '@/utils/permissions';
 import { isManagerOrAboveRole, hasOrgWideVisibility, isScopedEngineeringManagerRole, isDeliveryManagerRole } from '@/utils/orgRoles';
 import { fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
 import { averageAllocatedPct, defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
+import type { FunctionalUnitAssignment } from '@/utils/capacityGroups';
 import { groupedManagerNames } from '@/utils/managementRoles';
 import { isActiveRosterStatus } from '@/utils/rosterStatus';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
@@ -120,6 +121,17 @@ export function ResourcesPage({ variant = 'full' }: { variant?: 'full' | 'timeli
   const managerGroups = useMemo(
     () => groupedManagerNames(management, engineeringManagers),
     [management, engineeringManagers],
+  );
+  const functionalUnits = useMemo<FunctionalUnitAssignment[]>(
+    () =>
+      workCategories.map((category) => ({
+        name: category.name,
+        managers: (category.engineeringManagers ?? []).map((manager) => ({
+          id: manager.id,
+          name: manager.name,
+        })),
+      })),
+    [workCategories],
   );
   const linkedEmployeeId = selectedRow?.employeeId;
   const { data: assignedIssues, isLoading: assignedIssuesLoading } = useIssues(
@@ -428,6 +440,7 @@ export function ResourcesPage({ variant = 'full' }: { variant?: 'full' | 'timeli
             rangeFrom={fromDate}
             rangeTo={toDate}
             workCategoryId={workCategoryId || undefined}
+            functionalUnits={functionalUnits}
             onSelect={(row) => {
               setPanelEditAllocationId(null);
               setSelectedRow(row);
@@ -463,6 +476,7 @@ export function ResourcesPage({ variant = 'full' }: { variant?: 'full' | 'timeli
             rows={filteredCapacity}
             from={fromDate}
             to={toDate}
+            functionalUnits={functionalUnits}
             canEdit={canEditAllocations}
             datesSaving={updateAllocation.isPending}
             onRowSelect={(row) => {

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FolderKanban, Plus } from 'lucide-react';
+import { FolderKanban, Plus, Search } from 'lucide-react';
 import { ListViewToggle, type ListViewMode } from '@/components/ListViewToggle';
 import { OrganisationTree } from '@/components/OrganisationTree';
 import { ProjectCard } from '@/components/ProjectCard';
@@ -43,6 +43,8 @@ export function ProjectsPage() {
   const [engineeringManagerManagementId, setEngineeringManagerManagementId] = useState('');
   const [projectTypeId, setProjectTypeId] = useState('');
   const [workCategoryId, setWorkCategoryId] = useState('');
+  const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search.trim());
   const [showArchived, setShowArchived] = useState(false);
 
   const { data: regions } = useQuery({
@@ -119,6 +121,7 @@ export function ProjectsPage() {
     engineeringManagerManagementId: engineeringManagerManagementId || undefined,
     projectTypeId: projectTypeId || undefined,
     workCategoryId: workCategoryId || undefined,
+    q: deferredSearch || undefined,
     includeArchived: showArchived,
   });
 
@@ -192,7 +195,11 @@ export function ProjectsPage() {
       )}
 
       {!isLoading && !error && projects.length === 0 && (
-        <p className="text-text2">No projects match your filters.</p>
+        <p className="text-text2">
+          {deferredSearch
+            ? `No projects match “${deferredSearch}”.`
+            : 'No projects match your filters.'}
+        </p>
       )}
 
       {!isLoading && !error && projects.length > 0 && view === 'cards' && (
@@ -254,6 +261,23 @@ export function ProjectsPage() {
 
       <div className="mt-6 flex flex-wrap items-end gap-4">
         <ListViewToggle view={view} onChange={setView} />
+
+        <label className="relative flex flex-col gap-1 text-sm">
+          <span className="text-text2">Search</span>
+          <span className="relative">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text2"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Project or product name…"
+              className="min-w-[16rem] rounded-lg border border-border bg-bg2 py-2 pl-9 pr-3 text-sm outline-none focus:border-accent"
+            />
+          </span>
+        </label>
 
         {canFilterOrg && (
           <>
@@ -432,6 +456,7 @@ export function ProjectsPage() {
               <OrganisationTree
                 compact
                 selection={orgFilter}
+                projectQuery={deferredSearch}
                 onNavigate={handleTreeNavigate}
               />
             </div>
