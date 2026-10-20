@@ -18,5 +18,7 @@ public class WorkCategoryRequest {
     @Min(1)
     private Integer sortOrder;
 
+    private UUID functionalUnitCategoryId;
+
     private List<UUID> engineeringManagerManagementIds;
 }

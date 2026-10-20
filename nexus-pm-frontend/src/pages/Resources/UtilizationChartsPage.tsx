@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
@@ -21,9 +21,14 @@ import {
   isManagerOrAboveRole,
   isScopedEngineeringManagerRole,
 } from '@/utils/orgRoles';
-import { defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
+import {
+  allocationFunctionalUnitLabel,
+  defaultDateRange,
+  todayLocalIso,
+} from '@/utils/allocationUi';
 import {
   monthlyAllocationSeries,
+  monthlyFunctionalUnitGrid,
   type MonthlyAllocationPerson,
   type MonthlyAllocationPoint,
 } from '@/utils/allocationCharts';
@@ -51,16 +56,48 @@ function personEntry(person: MonthlyAllocationPerson): SlideOverEntry {
   return meta ? { label: person.name, meta } : person.name;
 }
 
-function peopleGroup(title: string, people: MonthlyAllocationPerson[]): SlideOverGroup {
-  return {
-    title: `${title} (${people.length})`,
-    items: people.map(personEntry),
+const NO_FUNCTIONAL_UNIT = 'No functional unit';
+
+function groupsByFunctionalUnit(
+  people: { entry: SlideOverEntry; units: string[] }[],
+  unitOrder: Map<string, number>,
+): SlideOverGroup[] {
+  const buckets = new Map<string, SlideOverEntry[]>();
+  for (const person of people) {
+    const units = person.units.length > 0 ? person.units : [NO_FUNCTIONAL_UNIT];
+    for (const unit of units) {
+      const list = buckets.get(unit) ?? [];
+      list.push(person.entry);
+      buckets.set(unit, list);
+    }
+  }
+  const rank = (name: string) => {
+    if (name === NO_FUNCTIONAL_UNIT) return Number.MAX_SAFE_INTEGER;
+    return unitOrder.get(name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER - 1;
   };
+  const labelOf = (entry: SlideOverEntry) => (typeof entry === 'string' ? entry : entry.label);
+  return [...buckets.entries()]
+    .sort(
+      (a, b) =>
+        rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }),
+    )
+    .map(([name, items]) => ({
+      title: `${name} (${items.length})`,
+      items: [...items].sort((a, b) =>
+        labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: 'base' }),
+      ),
+    }));
 }
 
 function summaryPersonEntry(person: SummaryPerson): SlideOverEntry {
   const meta = [person.designationName, person.engineeringManagerName].filter(Boolean).join(' · ');
   return meta ? { label: person.employeeName, meta } : person.employeeName;
+}
+
+function summaryUnits(person: SummaryPerson): string[] {
+  return [
+    ...new Set(person.allocations.map((allocation) => allocationFunctionalUnitLabel(allocation))),
+  ];
 }
 
 function Kpi({
@@ -131,34 +168,6 @@ export function UtilizationChartsPage() {
   const [toDate, setToDate] = useState(defaults.to);
   const [drill, setDrill] = useState<DrillPanel | null>(null);
 
-  const openAllocated = (point: MonthlyAllocationPoint) => {
-    setDrill({
-      title: point.label,
-      subtitle: `${point.allocated} allocated · ${point.from} → ${point.to}`,
-      items: point.allocatedPeople.map(personEntry),
-    });
-  };
-
-  const openNotAllocated = (point: MonthlyAllocationPoint) => {
-    setDrill({
-      title: point.label,
-      subtitle: `${point.notAllocated} not allocated · ${point.from} → ${point.to}`,
-      items: point.notAllocatedPeople.map(personEntry),
-    });
-  };
-
-  const openTeam = (point: MonthlyAllocationPoint) => {
-    setDrill({
-      title: point.label,
-      subtitle: `${point.allocated + point.notAllocated} people · ${point.from} → ${point.to}`,
-      groups: [
-        peopleGroup('Allocated', point.allocatedPeople),
-        peopleGroup('Not allocated', point.notAllocatedPeople),
-      ].filter((group) => group.items.length > 0),
-      defaultExpanded: true,
-    });
-  };
-
   useEffect(() => {
     if (locksEmFilter && userName) {
       setEngineeringManagerFilter(userName);
@@ -221,27 +230,114 @@ export function UtilizationChartsPage() {
     () => (rangeReady ? monthlyAllocationSeries(rows, fromDate, toDate) : []),
     [rows, fromDate, toDate, rangeReady],
   );
+  const unitGrid = useMemo(() => {
+    if (!rangeReady) return null;
+    const catalog = (
+      workCategoryId
+        ? sortedWorkCategories.filter((category) => category.id === workCategoryId)
+        : sortedWorkCategories
+    ).map((category) => ({
+      name: category.name,
+      managers: (category.engineeringManagers ?? []).map((manager) => ({
+        id: manager.id,
+        name: manager.name,
+      })),
+    }));
+    return monthlyFunctionalUnitGrid(rows, fromDate, toDate, catalog);
+  }, [rangeReady, rows, fromDate, toDate, workCategoryId, sortedWorkCategories]);
   const summary = useMemo(
     () => (rangeReady ? buildAllocationSummary(rows, fromDate, toDate) : null),
     [rows, fromDate, toDate, rangeReady],
   );
+  const unitOrder = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const category of workCategories) {
+      const name = category.name?.trim();
+      if (!name) continue;
+      const order = category.sortOrder;
+      map.set(
+        name.toLowerCase(),
+        order == null || !Number.isFinite(Number(order))
+          ? Number.MAX_SAFE_INTEGER - 1
+          : Number(order),
+      );
+    }
+    return map;
+  }, [workCategories]);
+
+  const openUnitCell = (
+    unit: string,
+    monthLabel: string,
+    from: string,
+    to: string,
+    people: MonthlyAllocationPerson[],
+    kind: 'allocated' | 'not allocated',
+  ) => {
+    setDrill({
+      title: `${unit} · ${monthLabel}`,
+      subtitle: `${people.length} ${kind} · ${from} → ${to}`,
+      items: people.map(personEntry),
+    });
+  };
+
+  const openAllocated = (point: MonthlyAllocationPoint) => {
+    setDrill({
+      title: point.label,
+      subtitle: `${point.allocated} allocated · ${point.from} → ${point.to}`,
+      groups: groupsByFunctionalUnit(
+        point.allocatedPeople.map((person) => ({
+          entry: personEntry(person),
+          units: person.functionalUnits,
+        })),
+        unitOrder,
+      ),
+      defaultExpanded: false,
+    });
+  };
+
+  const openNotAllocated = (point: MonthlyAllocationPoint) => {
+    setDrill({
+      title: point.label,
+      subtitle: `${point.notAllocated} not allocated · ${point.from} → ${point.to}`,
+      groups: groupsByFunctionalUnit(
+        point.notAllocatedPeople.map((person) => ({
+          entry: personEntry(person),
+          units: person.functionalUnits,
+        })),
+        unitOrder,
+      ),
+      defaultExpanded: false,
+    });
+  };
+
+  const openTeam = (point: MonthlyAllocationPoint) => {
+    setDrill({
+      title: point.label,
+      subtitle: `${point.allocated + point.notAllocated} people · ${point.from} → ${point.to}`,
+      groups: groupsByFunctionalUnit(
+        [...point.allocatedPeople, ...point.notAllocatedPeople].map((person) => ({
+          entry: personEntry(person),
+          units: person.functionalUnits,
+        })),
+        unitOrder,
+      ),
+      defaultExpanded: false,
+    });
+  };
 
   const openRangeTeam = () => {
     if (!summary) return;
     setDrill({
       title: 'Team members',
       subtitle: `${summary.totals.teamSize} people · ${fromDate} → ${toDate}`,
-      groups: [
-        {
-          title: `Allocated (${summary.allocatedPeople.length})`,
-          items: summary.allocatedPeople.map(summaryPersonEntry),
-        },
-        {
-          title: `Not allocated (${summary.unallocatedPeople.length})`,
-          items: summary.unallocatedPeople.map(summaryPersonEntry),
-        },
-      ].filter((group) => group.items.length > 0),
-      defaultExpanded: true,
+      groups: groupsByFunctionalUnit(
+        [...summary.allocatedPeople, ...summary.unallocatedPeople].map((person) => ({
+          entry: summaryPersonEntry(person),
+          units: summaryUnits(person),
+        })),
+        unitOrder,
+      ),
+      defaultExpanded: false,
     });
   };
 
@@ -250,7 +346,14 @@ export function UtilizationChartsPage() {
     setDrill({
       title: 'People allocated',
       subtitle: `${summary.totals.allocatedCount} people · ${fromDate} → ${toDate}`,
-      items: summary.allocatedPeople.map(summaryPersonEntry),
+      groups: groupsByFunctionalUnit(
+        summary.allocatedPeople.map((person) => ({
+          entry: summaryPersonEntry(person),
+          units: summaryUnits(person),
+        })),
+        unitOrder,
+      ),
+      defaultExpanded: false,
     });
   };
 
@@ -259,7 +362,14 @@ export function UtilizationChartsPage() {
     setDrill({
       title: 'Not allocated',
       subtitle: `${summary.totals.unallocatedCount} people · ${fromDate} → ${toDate}`,
-      items: summary.unallocatedPeople.map(summaryPersonEntry),
+      groups: groupsByFunctionalUnit(
+        summary.unallocatedPeople.map((person) => ({
+          entry: summaryPersonEntry(person),
+          units: summaryUnits(person),
+        })),
+        unitOrder,
+      ),
+      defaultExpanded: false,
     });
   };
 
@@ -462,6 +572,124 @@ export function UtilizationChartsPage() {
                   </tbody>
                 </table>
               </div>
+              {unitGrid && unitGrid.months.length > 0 && (
+                <div className="mt-8 border-t border-border pt-6">
+                  <h3 className="text-base font-semibold">By functional unit</h3>
+                  <p className="mt-1 text-sm text-text2">
+                    Allocated counts people with an allocation in that functional unit for the month.
+                    Not allocated counts people with no allocation that month, under the functional
+                    unit their manager is assigned to. The total is the sum of the rows.
+                  </p>
+                  <div className="mt-4 overflow-auto rounded-lg border border-border">
+                    <table className="w-max min-w-full border-separate border-spacing-0 text-left text-sm">
+                      <thead className="sticky top-0 z-20 bg-bg3 text-xs font-semibold uppercase tracking-wide text-text2">
+                        <tr>
+                          <th
+                            rowSpan={2}
+                            className="sticky left-0 z-30 min-w-[14rem] border-b border-border bg-bg3 px-3 py-2 shadow-[1px_0_0_var(--border)]"
+                          >
+                            Functional unit
+                          </th>
+                          {unitGrid.months.map((month) => (
+                            <th
+                              key={month.key}
+                              colSpan={2}
+                              className="border-b border-l border-border px-3 py-2 text-center"
+                            >
+                              {month.label}
+                            </th>
+                          ))}
+                        </tr>
+                        <tr>
+                          {unitGrid.months.map((month) => (
+                            <Fragment key={month.key}>
+                              <th className="border-b border-l border-border px-3 py-2 text-right">
+                                Allocated
+                              </th>
+                              <th className="border-b border-border px-3 py-2 text-right">
+                                Not allocated
+                              </th>
+                            </Fragment>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {unitGrid.rows.map((row) => (
+                          <tr key={row.name}>
+                            <td className="sticky left-0 z-10 border-t border-border bg-bg2 px-3 py-2 font-medium shadow-[1px_0_0_var(--border)]">
+                              {row.name}
+                            </td>
+                            {row.cells.map((cell, index) => {
+                              const month = unitGrid.months[index];
+                              return (
+                                <Fragment key={month.key}>
+                                  <td className="border-l border-t border-border px-3 py-2 text-right">
+                                    <CountButton
+                                      value={cell.allocatedPeople.length}
+                                      onClick={() =>
+                                        openUnitCell(
+                                          row.name,
+                                          month.label,
+                                          month.from,
+                                          month.to,
+                                          cell.allocatedPeople,
+                                          'allocated',
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                  <td className="border-t border-border px-3 py-2 text-right">
+                                    <CountButton
+                                      value={cell.notAllocatedPeople.length}
+                                      onClick={() =>
+                                        openUnitCell(
+                                          row.name,
+                                          month.label,
+                                          month.from,
+                                          month.to,
+                                          cell.notAllocatedPeople,
+                                          'not allocated',
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                </Fragment>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-bg3 text-sm font-semibold">
+                        <tr>
+                          <td className="sticky left-0 z-10 border-t border-border bg-bg3 px-3 py-2 shadow-[1px_0_0_var(--border)]">
+                            Total
+                          </td>
+                          {unitGrid.months.map((month, index) => {
+                            const allocated = unitGrid.rows.reduce(
+                              (sum, row) => sum + row.cells[index].allocatedPeople.length,
+                              0,
+                            );
+                            const notAllocated = unitGrid.rows.reduce(
+                              (sum, row) => sum + row.cells[index].notAllocatedPeople.length,
+                              0,
+                            );
+                            return (
+                              <Fragment key={month.key}>
+                                <td className="border-l border-t border-border px-3 py-2 text-right tabular-nums">
+                                  {allocated}
+                                </td>
+                                <td className="border-t border-border px-3 py-2 text-right tabular-nums">
+                                  {notAllocated}
+                                </td>
+                              </Fragment>
+                            );
+                          })}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>

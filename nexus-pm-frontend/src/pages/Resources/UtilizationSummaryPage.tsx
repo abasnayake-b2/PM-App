@@ -44,6 +44,7 @@ export function UtilizationSummaryPage() {
   const [taskCategoryId, setTaskCategoryId] = useState('');
   const [taskTypeId, setTaskTypeId] = useState('');
   const [projectTypeId, setProjectTypeId] = useState('');
+  const [functionalUnitCategoryId, setFunctionalUnitCategoryId] = useState('');
   const [workCategoryId, setWorkCategoryId] = useState('');
   const [fromDate, setFromDate] = useState(defaults.from);
   const [toDate, setToDate] = useState(defaults.to);
@@ -118,6 +119,31 @@ export function UtilizationSummaryPage() {
     () => [...workCategories].sort(compareByPriority),
     [workCategories],
   );
+  const functionalUnitCategories = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; sortOrder: number }>();
+    for (const category of sortedWorkCategories) {
+      const id = category.functionalUnitCategoryId;
+      const name = category.functionalUnitCategoryName?.trim();
+      if (!id || !name) continue;
+      const sortOrder = category.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const existing = byId.get(id);
+      if (!existing || sortOrder < existing.sortOrder) {
+        byId.set(id, { id, name, sortOrder });
+      }
+    }
+    return [...byId.values()].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+    );
+  }, [sortedWorkCategories]);
+  const categoryUnits = useMemo(
+    () =>
+      functionalUnitCategoryId
+        ? sortedWorkCategories.filter(
+            (category) => category.functionalUnitCategoryId === functionalUnitCategoryId,
+          )
+        : sortedWorkCategories,
+    [sortedWorkCategories, functionalUnitCategoryId],
+  );
 
   const rows = useMemo(() => {
     if (!capacity) return [];
@@ -137,9 +163,21 @@ export function UtilizationSummaryPage() {
       taskCategoryId: taskCategoryId || undefined,
       taskTypeId: taskTypeId || undefined,
       projectTypeId: projectTypeId || undefined,
+      workCategoryIds:
+        functionalUnitCategoryId && !workCategoryId
+          ? categoryUnits.map((category) => category.id)
+          : undefined,
     }),
-    [taskCategoryId, taskTypeId, projectTypeId],
+    [taskCategoryId, taskTypeId, projectTypeId, functionalUnitCategoryId, workCategoryId, categoryUnits],
   );
+
+  useEffect(() => {
+    if (!functionalUnitCategoryId || !workCategoryId) return;
+    const selected = workCategories.find((category) => category.id === workCategoryId);
+    if (selected && selected.functionalUnitCategoryId !== functionalUnitCategoryId) {
+      setWorkCategoryId('');
+    }
+  }, [functionalUnitCategoryId, workCategoryId, workCategories]);
 
   if (!showTeamCapacity) {
     return <Navigate to="/resources" replace />;
@@ -266,6 +304,22 @@ export function UtilizationSummaryPage() {
         </label>
 
         <label className="text-sm">
+          <span className="text-text2">Functional unit category</span>
+          <select
+            value={functionalUnitCategoryId}
+            onChange={(e) => setFunctionalUnitCategoryId(e.target.value)}
+            className="mt-1 block min-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
+          >
+            <option value="">All categories</option>
+            {functionalUnitCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
           <span className="text-text2">Functional unit</span>
           <select
             value={workCategoryId}
@@ -273,7 +327,7 @@ export function UtilizationSummaryPage() {
             className="mt-1 block min-w-[14rem] rounded-lg border border-border bg-bg3 px-3 py-2 text-sm"
           >
             <option value="">All functional units</option>
-            {sortedWorkCategories.map((category) => (
+            {categoryUnits.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.sortOrder != null ? `${category.sortOrder}. ${category.name}` : category.name}
               </option>
@@ -316,8 +370,9 @@ export function UtilizationSummaryPage() {
             rangeFrom={fromDate}
             rangeTo={toDate}
             filters={summaryFilters}
-            workCategories={sortedWorkCategories}
+            workCategories={categoryUnits}
             workCategoryId={workCategoryId || undefined}
+            includeUnassigned={!functionalUnitCategoryId && !workCategoryId}
           />
         </div>
       )}

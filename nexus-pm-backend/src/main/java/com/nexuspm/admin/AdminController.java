@@ -5,6 +5,7 @@ import com.nexuspm.issue.field.IssueFieldDefinitionService;
 import com.nexuspm.issue.field.dto.CreateIssueFieldDefinitionRequest;
 import com.nexuspm.issue.field.dto.IssueFieldDefinitionResponse;
 import com.nexuspm.issue.field.dto.UpdateIssueFieldDefinitionRequest;
+import com.nexuspm.lookup.entity.FunctionalUnitCategory;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
@@ -430,6 +431,33 @@ public class AdminController {
         referenceDataService.deleteProjectType(id);
     }
 
+    @GetMapping("/reference/functional-unit-categories")
+    @PreAuthorize("@perm.can('REFERENCE_VIEW')")
+    public List<FunctionalUnitCategory> listReferenceFunctionalUnitCategories() {
+        return referenceDataService.listFunctionalUnitCategories();
+    }
+
+    @PostMapping("/reference/functional-unit-categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perm.can('REFERENCE_CREATE')")
+    public FunctionalUnitCategory createFunctionalUnitCategory(@Valid @RequestBody TaskTypeRequest request) {
+        return referenceDataService.createFunctionalUnitCategory(request.getName(), request.getDescription());
+    }
+
+    @PutMapping("/reference/functional-unit-categories/{id}")
+    @PreAuthorize("@perm.can('REFERENCE_UPDATE')")
+    public FunctionalUnitCategory updateFunctionalUnitCategory(
+            @PathVariable UUID id, @Valid @RequestBody TaskTypeRequest request) {
+        return referenceDataService.updateFunctionalUnitCategory(id, request.getName(), request.getDescription());
+    }
+
+    @DeleteMapping("/reference/functional-unit-categories/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perm.can('REFERENCE_DELETE')")
+    public void deleteFunctionalUnitCategory(@PathVariable UUID id) {
+        referenceDataService.deleteFunctionalUnitCategory(id);
+    }
+
     @GetMapping("/reference/work-categories")
     @PreAuthorize("@perm.can('REFERENCE_VIEW')")
     public List<WorkCategoryResponse> listReferenceWorkCategories() {
@@ -444,6 +472,7 @@ public class AdminController {
                 request.getName(),
                 request.getDescription(),
                 request.getSortOrder(),
+                request.getFunctionalUnitCategoryId(),
                 request.getEngineeringManagerManagementIds());
     }
 
@@ -456,6 +485,7 @@ public class AdminController {
                 request.getName(),
                 request.getDescription(),
                 request.getSortOrder(),
+                request.getFunctionalUnitCategoryId(),
                 request.getEngineeringManagerManagementIds());
     }
 

@@ -407,7 +407,7 @@ CREATE TABLE project_type (
     updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE work_category (
+CREATE TABLE functional_unit_category (
     id          CHAR(36)     NOT NULL PRIMARY KEY,
     name        VARCHAR(150) NOT NULL UNIQUE,
     description VARCHAR(500) NULL,
@@ -417,6 +417,25 @@ CREATE TABLE work_category (
     created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE work_category (
+    id          CHAR(36)     NOT NULL PRIMARY KEY,
+    name        VARCHAR(150) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order  INT          NOT NULL DEFAULT 0,
+    functional_unit_category_id CHAR(36) NULL,
+    created_by  CHAR(36)     NULL,
+    updated_by  CHAR(36)     NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_work_category_fu_category FOREIGN KEY (functional_unit_category_id)
+        REFERENCES functional_unit_category(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO functional_unit_category (id, name, sort_order) VALUES
+('f1000001-0000-0000-0000-000000000001', 'BMS', 1),
+('f1000001-0000-0000-0000-000000000002', 'FINCON', 2),
+('f1000001-0000-0000-0000-000000000003', 'IFSAH', 3);
 
 INSERT INTO project_type (id, name, sort_order) VALUES
 ('d1000001-0000-0000-0000-000000000001', 'NTP', 1),

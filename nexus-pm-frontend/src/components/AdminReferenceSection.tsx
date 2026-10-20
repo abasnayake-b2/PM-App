@@ -40,6 +40,10 @@ import {
   createAdminProjectType,
   updateAdminProjectType,
   deleteAdminProjectType,
+  fetchAdminFunctionalUnitCategories,
+  createAdminFunctionalUnitCategory,
+  updateAdminFunctionalUnitCategory,
+  deleteAdminFunctionalUnitCategory,
   fetchAdminWorkCategories,
   createAdminWorkCategory,
   updateAdminWorkCategory,
@@ -82,6 +86,7 @@ const REF_TABS: { key: RefTab; label: string; addLabel?: string }[] = [
   { key: 'task-types', label: 'Task types' },
   { key: 'task-categories', label: 'Task categories', addLabel: 'Task category' },
   { key: 'project-types', label: 'Project types', addLabel: 'Project type' },
+  { key: 'functional-unit-categories', label: 'Functional unit categories', addLabel: 'Functional unit category' },
   { key: 'work-categories', label: 'Functional units', addLabel: 'Functional unit' },
   { key: 'statuses', label: 'Statuses' },
   { key: 'priorities', label: 'Priorities' },
@@ -152,9 +157,19 @@ function gridColumns(tab: RefTab): GridColumn[] {
         { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
         { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
       ];
+    case 'functional-unit-categories':
+      return [
+        { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
+        { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
+      ];
     case 'work-categories':
       return [
         { key: 'name', header: 'Name', render: (i) => i.name ?? '—' },
+        {
+          key: 'category',
+          header: 'Category',
+          render: (i) => i.functionalUnitCategoryName ?? '—',
+        },
         { key: 'priority', header: 'Priority', render: (i) => (i.sortOrder != null ? String(i.sortOrder) : '—') },
         { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
         {
@@ -256,6 +271,7 @@ function useRefQuery(tab: RefTab) {
     'task-types': fetchAdminTaskTypes,
     'task-categories': fetchAdminTaskCategories,
     'project-types': fetchAdminProjectTypes,
+    'functional-unit-categories': fetchAdminFunctionalUnitCategories,
     'work-categories': fetchAdminWorkCategories,
     statuses: fetchAdminStatuses,
     priorities: fetchAdminPriorities,
@@ -316,11 +332,13 @@ function ReferenceFormFields({
   initial,
   departments,
   streams,
+  functionalUnitCategories,
 }: {
   tab: RefTab;
   initial?: ReferenceItem;
   departments: ReferenceItem[];
   streams: ReferenceItem[];
+  functionalUnitCategories: ReferenceItem[];
 }) {
   return (
     <>
@@ -331,6 +349,7 @@ function ReferenceFormFields({
         tab === 'task-types' ||
         tab === 'task-categories' ||
         tab === 'project-types' ||
+        tab === 'functional-unit-categories' ||
         tab === 'work-categories' ||
         tab === 'statuses') && (
         <label className="block text-sm">
@@ -342,6 +361,7 @@ function ReferenceFormFields({
         tab === 'task-types' ||
         tab === 'task-categories' ||
         tab === 'project-types' ||
+        tab === 'functional-unit-categories' ||
         tab === 'work-categories') && (
         <label className="block text-sm">
           <span className="text-text2">Description</span>
@@ -355,6 +375,21 @@ function ReferenceFormFields({
       )}
       {tab === 'work-categories' && (
         <>
+          <label className="block text-sm">
+            <span className="text-text2">Functional unit category</span>
+            <select
+              name="functionalUnitCategoryId"
+              defaultValue={initial?.functionalUnitCategoryId ?? ''}
+              className={inputClass}
+            >
+              <option value="">Select category…</option>
+              {functionalUnitCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="block text-sm">
             <span className="text-text2">Priority</span>
             <input
@@ -482,6 +517,11 @@ export function AdminReferenceSection() {
     queryFn: fetchAdminStreams,
     enabled: tab === 'designations' || dialog !== null,
   });
+  const { data: functionalUnitCategories = [] } = useQuery({
+    queryKey: ['admin-reference', 'functional-unit-categories'],
+    queryFn: fetchAdminFunctionalUnitCategories,
+    enabled: tab === 'work-categories' || tab === 'functional-unit-categories',
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
@@ -513,6 +553,7 @@ export function AdminReferenceSection() {
     qc.invalidateQueries({ queryKey: ['task-types'] });
     qc.invalidateQueries({ queryKey: ['task-categories'] });
     qc.invalidateQueries({ queryKey: ['project-types'] });
+    qc.invalidateQueries({ queryKey: ['functional-unit-categories'] });
     qc.invalidateQueries({ queryKey: ['work-categories'] });
   };
 
@@ -566,6 +607,12 @@ export function AdminReferenceSection() {
           ? updateAdminProjectType(itemId, name, description)
           : createAdminProjectType(name, description);
       }
+      case 'functional-unit-categories': {
+        const description = ((fd.get('description') as string) || '').trim() || undefined;
+        return itemId
+          ? updateAdminFunctionalUnitCategory(itemId, name, description)
+          : createAdminFunctionalUnitCategory(name, description);
+      }
       case 'work-categories': {
         const description = ((fd.get('description') as string) || '').trim() || undefined;
         const engineeringManagerManagementIds = fd
@@ -574,9 +621,24 @@ export function AdminReferenceSection() {
         const sortRaw = String(fd.get('sortOrder') ?? '').trim();
         const parsed = Number(sortRaw);
         const sortOrder = sortRaw === '' || Number.isNaN(parsed) ? undefined : parsed;
+        const functionalUnitCategoryId =
+          String(fd.get('functionalUnitCategoryId') ?? '').trim() || null;
         return itemId
-          ? updateAdminWorkCategory(itemId, name, description, engineeringManagerManagementIds, sortOrder)
-          : createAdminWorkCategory(name, description, engineeringManagerManagementIds, sortOrder);
+          ? updateAdminWorkCategory(
+              itemId,
+              name,
+              description,
+              engineeringManagerManagementIds,
+              sortOrder,
+              functionalUnitCategoryId,
+            )
+          : createAdminWorkCategory(
+              name,
+              description,
+              engineeringManagerManagementIds,
+              sortOrder,
+              functionalUnitCategoryId,
+            );
       }
       case 'issue-types':
         return itemId
@@ -643,6 +705,8 @@ export function AdminReferenceSection() {
           return deleteAdminTaskCategory(id);
         case 'project-types':
           return deleteAdminProjectType(id);
+        case 'functional-unit-categories':
+          return deleteAdminFunctionalUnitCategory(id);
         case 'work-categories':
           return deleteAdminWorkCategory(id);
         case 'statuses':
@@ -692,6 +756,7 @@ export function AdminReferenceSection() {
         tab !== 'task-types' &&
         tab !== 'task-categories' &&
         tab !== 'project-types' &&
+        tab !== 'functional-unit-categories' &&
         tab !== 'work-categories' && (
         <ReferenceDataExcelUpload onImported={invalidate} />
       )}
@@ -866,6 +931,7 @@ export function AdminReferenceSection() {
               initial={editing ?? undefined}
               departments={departments}
               streams={streams}
+              functionalUnitCategories={functionalUnitCategories}
             />
             <div className="flex gap-3 pt-2">
               <button

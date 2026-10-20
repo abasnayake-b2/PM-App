@@ -12,4 +12,6 @@ public interface WorkCategoryRepository extends JpaRepository<WorkCategory, UUID
     Optional<WorkCategory> findByNameIgnoreCase(String name);
 
     List<WorkCategory> findAllByOrderBySortOrderAscNameAsc();
+
+    boolean existsByFunctionalUnitCategory_Id(UUID functionalUnitCategoryId);
 }

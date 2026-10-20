@@ -11,6 +11,7 @@ export type RefTab =
   | 'task-types'
   | 'task-categories'
   | 'project-types'
+  | 'functional-unit-categories'
   | 'work-categories'
   | 'statuses'
   | 'priorities';
@@ -73,9 +74,15 @@ function detailFields(tab: RefTab, item: ReferenceItem): { label: string; value?
         { label: 'Name', value: item.name },
         { label: 'Description', value: item.description },
       ];
+    case 'functional-unit-categories':
+      return [
+        { label: 'Name', value: item.name },
+        { label: 'Description', value: item.description },
+      ];
     case 'work-categories':
       return [
         { label: 'Name', value: item.name },
+        { label: 'Functional unit category', value: item.functionalUnitCategoryName },
         { label: 'Priority', value: item.sortOrder != null ? String(item.sortOrder) : null },
         { label: 'Description', value: item.description },
         {
@@ -164,6 +171,7 @@ export function itemSearchText(item: ReferenceItem): string {
     item.code,
     item.workflowCode,
     item.description,
+    item.functionalUnitCategoryName,
     item.department?.name,
     item.departmentName,
     item.stream?.name,

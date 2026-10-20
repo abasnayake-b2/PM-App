@@ -14,6 +14,8 @@ public class WorkCategoryResponse {
     private String name;
     private String description;
     private Integer sortOrder;
+    private UUID functionalUnitCategoryId;
+    private String functionalUnitCategoryName;
     private List<ManagerItem> engineeringManagers;
     private String createdByName;
     private String updatedByName;

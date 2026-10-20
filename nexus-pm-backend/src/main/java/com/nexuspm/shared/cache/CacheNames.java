@@ -8,6 +8,7 @@ public final class CacheNames {
     public static final String TASK_TYPES = "task-types";
     public static final String TASK_CATEGORIES = "task-categories";
     public static final String PROJECT_TYPES = "project-types";
+    public static final String FUNCTIONAL_UNIT_CATEGORIES = "functional-unit-categories";
     public static final String WORK_CATEGORIES = "work-categories";
     public static final String ISSUE_STATUSES = "issue-statuses";
     public static final String DEPARTMENTS = "departments";
@@ -31,6 +32,7 @@ public final class CacheNames {
             TASK_TYPES,
             TASK_CATEGORIES,
             PROJECT_TYPES,
+            FUNCTIONAL_UNIT_CATEGORIES,
             WORK_CATEGORIES,
             ISSUE_STATUSES,
             DEPARTMENTS,

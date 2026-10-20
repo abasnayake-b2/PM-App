@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { SlideOverListPanel } from '@/components/SlideOverListPanel';
 import type { Capacity, Allocation } from '@/types';
@@ -82,6 +82,49 @@ function personAllocationGroups(allocations: Allocation[]): SlideOverGroup[] {
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
 }
 
+type HeadcountRole = 'architects' | 'developers' | 'qas';
+
+const HEADCOUNT_TONE = 'bg-slate-500/15';
+
+const HEADCOUNT_ROLES: { key: HeadcountRole; label: string }[] = [
+  { key: 'architects', label: 'Architects' },
+  { key: 'developers', label: 'Developers' },
+  { key: 'qas', label: 'QAs' },
+];
+
+function emptyHeadcount(): Record<HeadcountRole, SummaryPerson[]> {
+  return { architects: [], developers: [], qas: [] };
+}
+
+/** Allocated people are architects, QAs, or developers. Managers are assigned on the functional unit. */
+function headcountRole(designation?: string): HeadcountRole {
+  const name = (designation ?? '').toLowerCase();
+  if (name.includes('architect')) return 'architects';
+  if (
+    /\bqa\b/.test(name) ||
+    name.includes('quality') ||
+    name.includes('sdet') ||
+    name.includes('test engineer')
+  ) {
+    return 'qas';
+  }
+  return 'developers';
+}
+
+function assignedManagerPerson(manager: { id: string; name: string; roleTitle?: string }): SummaryPerson {
+  return {
+    employeeId: manager.id,
+    employeeName: manager.name,
+    designationName: manager.roleTitle,
+    engineeringManagerName: manager.name,
+    allocatedPct: 0,
+    availablePct: 100,
+    fte: 0,
+    personDays: 0,
+    allocations: [],
+  };
+}
+
 function personEntry(person: SummaryPerson): SlideOverEntry {
   const status = person.fte > 0 ? `${person.allocatedPct}% allocated` : 'Not allocated';
   return {
@@ -90,6 +133,28 @@ function personEntry(person: SummaryPerson): SlideOverEntry {
       person.designationName ? ` · ${person.designationName}` : ''
     }`,
   };
+}
+
+/** Managers are the assigned engineering managers. Everyone else is grouped by designation. */
+function roleGroups(people: SummaryPerson[], managers: SummaryPerson[]): SlideOverGroup[] {
+  const managerIds = new Set(managers.map((person) => person.employeeId));
+  const managerNames = new Set(managers.map((person) => person.employeeName.trim().toLowerCase()));
+  const buckets = emptyHeadcount();
+  const managerPeople: SummaryPerson[] = [];
+  for (const person of people) {
+    const isManager =
+      managerIds.has(person.employeeId) || managerNames.has(person.employeeName.trim().toLowerCase());
+    if (isManager) managerPeople.push(person);
+    else buckets[headcountRole(person.designationName)].push(person);
+  }
+  return [
+    { title: 'Managers', people: managerPeople },
+    { title: 'Architects', people: buckets.architects },
+    { title: 'Developers', people: buckets.developers },
+    { title: 'QAs', people: buckets.qas },
+  ]
+    .filter((group) => group.people.length > 0)
+    .map((group) => ({ title: group.title, items: group.people.map(personEntry) }));
 }
 
 function engineerAllocationGroups(people: SummaryPerson[]): SlideOverGroup[] {
@@ -167,18 +232,21 @@ function ExpandLabel({
 function CountButton({
   value,
   onClick,
+  plain = false,
 }: {
   value: number;
   onClick?: () => void;
+  plain?: boolean;
 }) {
+  const weight = plain ? 'font-normal' : 'font-semibold';
   if (!onClick || value === 0) {
-    return <span className="font-semibold tabular-nums">{value}</span>;
+    return <span className={`${weight} tabular-nums`}>{value}</span>;
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="font-semibold tabular-nums text-accent hover:underline"
+      className={`${weight} tabular-nums text-accent hover:underline`}
       title="View details"
     >
       {value}
@@ -237,19 +305,24 @@ function SummaryTable({
   children,
   empty,
   emptyMessage = 'No allocations in this date range.',
+  actions,
 }: {
   title: string;
   description: string;
-  headers: { label: string; align?: 'left' | 'right' }[];
+  headers: { label: string; align?: 'left' | 'right'; className?: string }[];
   children: ReactNode;
   empty: boolean;
   emptyMessage?: string;
+  actions?: ReactNode;
 }) {
   return (
     <section className="space-y-3">
-      <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-sm text-text2">{description}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-text2">{description}</p>
+        </div>
+        {actions}
       </div>
       <div className="rounded-xl border border-border">
         <div className="max-h-[min(60vh,640px)] overflow-auto">
@@ -259,9 +332,7 @@ function SummaryTable({
                 {headers.map((header) => (
                   <th
                     key={header.label}
-                    className={
-                      header.align === 'right' ? 'px-3 py-2 text-right' : 'px-3 py-2'
-                    }
+                    className={`${header.align === 'right' ? 'px-3 py-2 text-right' : 'px-3 py-2'} ${header.className ?? ''}`}
                   >
                     {header.label}
                   </th>
@@ -332,6 +403,7 @@ export function ResourceAllocationSummary({
   filters,
   workCategories = [],
   workCategoryId,
+  includeUnassigned = true,
 }: {
   rows: Capacity[];
   rangeFrom: string;
@@ -339,9 +411,11 @@ export function ResourceAllocationSummary({
   filters?: AllocationSummaryFilters;
   workCategories?: WorkCategory[];
   workCategoryId?: string;
+  includeUnassigned?: boolean;
 }) {
   const [drill, setDrill] = useState<DrillPanel | null>(null);
   const [openManagers, setOpenManagers] = useState<Set<string>>(() => new Set());
+  const [openCategories, setOpenCategories] = useState<Set<string>>(() => new Set());
   const summary = useMemo(
     () => buildAllocationSummary(rows, rangeFrom, rangeTo, filters),
     [rows, rangeFrom, rangeTo, filters],
@@ -361,13 +435,71 @@ export function ResourceAllocationSummary({
         scopedWorkCategories,
         rangeFrom,
         rangeTo,
-        { includeUnassigned: !workCategoryId },
+        { includeUnassigned: includeUnassigned && !workCategoryId },
       ),
-    [summary.allocatedPeople, summary.managers, scopedWorkCategories, rangeFrom, rangeTo, workCategoryId],
+    [
+      summary.allocatedPeople,
+      summary.managers,
+      scopedWorkCategories,
+      rangeFrom,
+      rangeTo,
+      workCategoryId,
+      includeUnassigned,
+    ],
   );
+  const categoryComposition = useMemo(() => {
+    const categoryNameByUnit = new Map(
+      scopedWorkCategories.map((category) => [
+        category.id,
+        category.functionalUnitCategoryName?.trim() || 'No category',
+      ]),
+    );
+    const categoryById = new Map(scopedWorkCategories.map((category) => [category.id, category]));
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        managers: { id: string; name: string; roleTitle?: string }[];
+        people: Record<HeadcountRole, SummaryPerson[]>;
+      }[]
+    >();
+    const order: string[] = [];
+    for (const tree of categoryTrees) {
+      const categoryName = categoryNameByUnit.get(tree.id) || 'No category';
+      if (!groups.has(categoryName)) {
+        groups.set(categoryName, []);
+        order.push(categoryName);
+      }
+      const people = emptyHeadcount();
+      const seen = new Set<string>();
+      for (const node of tree.managers) {
+        for (const person of node.team) {
+          if (seen.has(person.employeeId)) continue;
+          seen.add(person.employeeId);
+          people[headcountRole(person.designationName)].push(person);
+        }
+      }
+      for (const role of HEADCOUNT_ROLES) {
+        people[role.key].sort((a, b) =>
+          a.employeeName.localeCompare(b.employeeName, undefined, { sensitivity: 'base' }),
+        );
+      }
+      const managers = [...(categoryById.get(tree.id)?.engineeringManagers ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      );
+      groups.get(categoryName)!.push({ id: tree.id, name: tree.name, managers, people });
+    }
+    const names = [
+      ...order.filter((name) => name !== 'No category'),
+      ...order.filter((name) => name === 'No category'),
+    ];
+    return names.map((name) => ({ name, units: groups.get(name) ?? [] }));
+  }, [categoryTrees, scopedWorkCategories]);
   const categoryIds = categoryTrees.map((tree) => tree.id).join('|');
   useEffect(() => {
     setOpenManagers(new Set());
+    setOpenCategories(new Set());
   }, [categoryIds]);
   const toggleManager = (key: string) => {
     setOpenManagers((prev) => toggleSet(prev, key));
@@ -419,6 +551,14 @@ export function ResourceAllocationSummary({
     });
   };
 
+  const openHeadcount = (unitName: string, role: string, people: SummaryPerson[]) => {
+    setDrill({
+      title: `${unitName} · ${role}`,
+      subtitle: `${people.length} people · ${rangeFrom} → ${rangeTo}`,
+      items: people.map(personEntry),
+    });
+  };
+
   const openTreeManagerPeople = (node: WorkCategoryManagerNode) => {
     setDrill({
       title: node.managerName,
@@ -428,14 +568,17 @@ export function ResourceAllocationSummary({
     });
   };
 
-  const openTreeManagerProjects = (node: WorkCategoryManagerNode) => {
+  const openManagerRoster = (node: WorkCategoryManagerNode, people: SummaryPerson[]) => {
+    const allocated = people.filter((person) => person.fte > 0);
+    const unallocated = people.filter((person) => person.fte <= 0);
     setDrill({
       title: node.managerName,
-      subtitle: `Projects in ${rangeFrom} → ${rangeTo}`,
-      items: node.projects.map((project) => ({
-        label: project.name,
-        meta: `${formatFte(project.fte)} FTE`,
-      })),
+      subtitle: `${people.length} team members · ${rangeFrom} → ${rangeTo}`,
+      groups: [
+        { title: `Allocated (${allocated.length})`, items: allocated.map(personEntry) },
+        { title: `Not allocated (${unallocated.length})`, items: unallocated.map(personEntry) },
+      ].filter((group) => group.items.length > 0),
+      defaultExpanded: true,
     });
   };
 
@@ -475,6 +618,212 @@ export function ResourceAllocationSummary({
 
   const cell = 'whitespace-nowrap px-3 py-2';
   const treeCell = 'px-3 py-2';
+  const rosterFor = (node: WorkCategoryManagerNode): SummaryPerson[] => {
+    const name = node.managerName.trim().toLowerCase();
+    const named = summary.managers.find((manager) => manager.managerName.trim().toLowerCase() === name);
+    if (named && named.people.length > 0) return named.people;
+    const byId = summary.managers.find((manager) =>
+      manager.people.some((person) => person.engineeringManagerManagementId === node.managerId),
+    );
+    if (byId && byId.people.length > 0) return byId.people;
+    return node.team;
+  };
+  const visibleManagerRows = (node: WorkCategoryManagerNode) => {
+    if (!openManagers.has(node.key)) return 1;
+    return 1 + Math.max(rosterFor(node).length, 1);
+  };
+  const compositionManagers = categoryComposition.flatMap((group) =>
+    group.units.flatMap((unit) => {
+      const tree = categoryTrees.find((item) => item.id === unit.id);
+      if (!tree) return [];
+      return managersForFunctionalUnit(
+        tree,
+        scopedWorkCategories.find((category) => category.id === unit.id),
+      );
+    }),
+  );
+  const byPersonName = (a: SummaryPerson, b: SummaryPerson) =>
+    a.employeeName.localeCompare(b.employeeName, undefined, { sensitivity: 'base' });
+  type OverviewUnit = (typeof categoryComposition)[number]['units'][number];
+  const buildOverview = (units: OverviewUnit[]) => {
+    const teamById = new Map<string, SummaryPerson>();
+    const allocatedIds = new Set<string>();
+    const seenManagers = new Set<string>();
+    for (const unit of units) {
+      const tree = categoryTrees.find((item) => item.id === unit.id);
+      const nodes = tree
+        ? managersForFunctionalUnit(
+            tree,
+            scopedWorkCategories.find((category) => category.id === unit.id),
+          )
+        : [];
+      for (const node of nodes) {
+        for (const person of node.team) {
+          if (person.fte > 0) allocatedIds.add(person.employeeId);
+          if (!teamById.has(person.employeeId)) teamById.set(person.employeeId, person);
+        }
+        const managerKey = node.managerId || node.managerName.trim().toLowerCase();
+        if (seenManagers.has(managerKey)) continue;
+        seenManagers.add(managerKey);
+        for (const person of rosterFor(node)) {
+          if (!teamById.has(person.employeeId)) teamById.set(person.employeeId, person);
+        }
+      }
+    }
+    const assignedManagers = new Map<string, { id: string; name: string; roleTitle?: string }>();
+    for (const unit of units) {
+      for (const manager of unit.managers) {
+        if (!assignedManagers.has(manager.id)) assignedManagers.set(manager.id, manager);
+      }
+    }
+    const matchesAssignedManager = (person: SummaryPerson) =>
+      assignedManagers.has(person.employeeId) ||
+      [...assignedManagers.values()].some(
+        (manager) => manager.name.trim().toLowerCase() === person.employeeName.trim().toLowerCase(),
+      );
+    for (const manager of assignedManagers.values()) {
+      const alreadyOnTeam = [...teamById.values()].some(
+        (person) =>
+          person.employeeId === manager.id ||
+          person.employeeName.trim().toLowerCase() === manager.name.trim().toLowerCase(),
+      );
+      if (!alreadyOnTeam) teamById.set(manager.id, assignedManagerPerson(manager));
+    }
+    const team = [...teamById.values()].sort(byPersonName);
+    const managers = team.filter(matchesAssignedManager);
+    const engineers = team.filter((person) => !matchesAssignedManager(person));
+    const allocated = team.filter((person) => allocatedIds.has(person.employeeId));
+    const notAllocated = engineers.filter((person) => !allocatedIds.has(person.employeeId));
+    const managerCount = units.reduce((sum, unit) => sum + unit.managers.length, 0);
+    const roleCounts = {
+      architects: 0,
+      developers: 0,
+      qas: 0,
+    } satisfies Record<HeadcountRole, number>;
+    for (const unit of units) {
+      for (const role of HEADCOUNT_ROLES) roleCounts[role.key] += unit.people[role.key].length;
+    }
+    const total = HEADCOUNT_ROLES.reduce((sum, role) => sum + roleCounts[role.key], 0);
+    return { units, team, managers, engineers, allocated, notAllocated, managerCount, roleCounts, total };
+  };
+  const categoryOverview = categoryComposition.map((group) => ({
+    name: group.name,
+    ...buildOverview(group.units),
+    unitRows: group.units.map((unit) => ({
+      id: unit.id,
+      name: unit.name,
+      ...buildOverview([unit]),
+    })),
+  }));
+  const overviewCountCells = (
+    row: ReturnType<typeof buildOverview> & { name: string },
+    functionalUnitCount?: number,
+    shaded = true,
+  ) => (
+    <>
+      <td className={`${cell} text-right`}>
+        {functionalUnitCount == null ? null : (
+          <CountButton
+            plain
+            value={functionalUnitCount}
+            onClick={() =>
+              setDrill({
+                title: `${row.name} · Functional units`,
+                subtitle: `${functionalUnitCount} functional units`,
+                items: row.units.map((unit) => unit.name),
+              })
+            }
+          />
+        )}
+      </td>
+      <td className={`${cell} text-right`}>
+        <CountButton
+          plain
+          value={row.team.length}
+          onClick={() =>
+            setDrill({
+              title: `${row.name} · Team`,
+              subtitle: `${row.team.length} people · ${rangeFrom} → ${rangeTo}`,
+              groups: roleGroups(row.team, row.managers),
+            })
+          }
+        />
+      </td>
+      <td className={`${cell} text-right`}>
+        <CountButton
+          plain
+          value={row.managers.length}
+          onClick={() =>
+            setDrill({
+              title: `${row.name} · Managers`,
+              subtitle: `${row.managers.length} engineering managers · ${rangeFrom} → ${rangeTo}`,
+              items: row.managers.map(personEntry),
+            })
+          }
+        />
+      </td>
+      <td className={`${cell} text-right`}>
+        <CountButton
+          plain
+          value={row.engineers.length}
+          onClick={() =>
+            setDrill({
+              title: `${row.name} · Engineers`,
+              subtitle: `${row.engineers.length} people · ${rangeFrom} → ${rangeTo}`,
+              groups: roleGroups(row.engineers, row.managers),
+            })
+          }
+        />
+      </td>
+      <td className={`${cell} text-right`}>
+        <CountButton
+          plain
+          value={row.allocated.length}
+          onClick={() =>
+            setDrill({
+              title: `${row.name} · Allocated`,
+              subtitle: `${row.allocated.length} people · ${rangeFrom} → ${rangeTo}`,
+              groups: roleGroups(row.allocated, row.managers),
+            })
+          }
+        />
+      </td>
+      <td className={`${cell} text-right`}>
+        <CountButton
+          plain
+          value={row.notAllocated.length}
+          onClick={() =>
+            setDrill({
+              title: `${row.name} · Not allocated`,
+              subtitle: `${row.notAllocated.length} people · ${rangeFrom} → ${rangeTo}`,
+              groups: roleGroups(row.notAllocated, row.managers),
+            })
+          }
+        />
+      </td>
+      {HEADCOUNT_ROLES.map((role) => (
+        <td key={role.key} className={`${cell} text-right ${shaded ? HEADCOUNT_TONE : ''}`}>
+          <CountButton
+            plain
+            value={row.roleCounts[role.key]}
+            onClick={() =>
+              setDrill({
+                title: `${row.name} · ${role.label}`,
+                subtitle: `${row.roleCounts[role.key]} people · ${rangeFrom} → ${rangeTo}`,
+                groups: row.units
+                  .filter((unit) => unit.people[role.key].length > 0)
+                  .map((unit) => ({
+                    title: `${unit.name} (${unit.people[role.key].length})`,
+                    items: unit.people[role.key].map(personEntry),
+                  })),
+              })
+            }
+          />
+        </td>
+      ))}
+      <td className={`${cell} text-right tabular-nums ${shaded ? HEADCOUNT_TONE : ''}`}>{row.total}</td>
+    </>
+  );
 
   return (
     <div className="space-y-6">
@@ -497,133 +846,293 @@ export function ResourceAllocationSummary({
       </div>
 
       <SummaryTable
-        title="By functional unit → manager → team"
-        description="People allocated to each functional unit, grouped under the manager assigned to that functional unit."
+        title="Functional unit categories"
+        description="Team is the managers assigned to the category plus the engineers on their rosters. Not allocated is engineers minus the people allocated on those units."
         headers={[
+          { label: 'Functional unit category' },
+          { label: '# Functional units', align: 'right' },
+          { label: 'Team', align: 'right' },
+          { label: 'Managers', align: 'right' },
+          { label: 'Engineers', align: 'right' },
+          { label: 'Allocated', align: 'right' },
+          { label: 'Not allocated', align: 'right' },
+          { label: 'Number of Architects', align: 'right', className: HEADCOUNT_TONE },
+          { label: 'Developers', align: 'right', className: HEADCOUNT_TONE },
+          { label: 'QAs', align: 'right', className: HEADCOUNT_TONE },
+          { label: 'Total', align: 'right', className: HEADCOUNT_TONE },
+        ]}
+        empty={categoryOverview.length === 0}
+        emptyMessage="No functional unit categories."
+      >
+        {categoryOverview.map((group) => {
+          const open = openCategories.has(group.name);
+          return (
+            <Fragment key={group.name}>
+              <tr className="border-t border-border bg-bg2 hover:bg-bg2">
+                <td className={`${cell} font-semibold`}>
+                  <ExpandLabel
+                    open={open}
+                    label={group.name}
+                    onClick={() => setOpenCategories((prev) => toggleSet(prev, group.name))}
+                  />
+                </td>
+                {overviewCountCells(group, group.units.length)}
+              </tr>
+              {open &&
+                group.unitRows.map((unit) => (
+                  <tr key={unit.id} className="border-t border-border bg-bg text-xs hover:bg-bg2/30">
+                    <td className={`${treeCell} ${indentClass(1)} text-sm font-medium`}>{unit.name}</td>
+                    {overviewCountCells(unit, undefined, false)}
+                  </tr>
+                ))}
+            </Fragment>
+          );
+        })}
+        {categoryOverview.length > 0 && (
+          <tr className="border-t border-border bg-bg2">
+            <td className={`${cell} font-semibold`}>Total</td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + group.units.length, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + group.team.length, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + group.managers.length, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + group.engineers.length, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + group.allocated.length, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + group.notAllocated.length, 0)}
+            </td>
+            {HEADCOUNT_ROLES.map((role) => (
+              <td key={role.key} className={`${cell} text-right tabular-nums ${HEADCOUNT_TONE}`}>
+                {categoryOverview.reduce((sum, group) => sum + group.roleCounts[role.key], 0)}
+              </td>
+            ))}
+            <td className={`${cell} text-right tabular-nums ${HEADCOUNT_TONE}`}>
+              {categoryOverview.reduce((sum, group) => sum + group.total, 0)}
+            </td>
+          </tr>
+        )}
+      </SummaryTable>
+
+      <SummaryTable
+        title="By functional unit category"
+        description="Team is the manager’s full roster. Allocated is the people with an allocation on that functional unit. Not allocated is the rest of that team."
+        headers={[
+          { label: 'Functional unit category' },
           { label: 'Priority', align: 'right' },
           { label: 'Functional unit' },
           { label: 'Manager' },
           { label: 'Team', align: 'right' },
           { label: 'Allocated', align: 'right' },
-          { label: 'Projects', align: 'right' },
-          { label: 'FTE', align: 'right' },
-          { label: 'Available FTE', align: 'right' },
+          { label: 'Not allocated', align: 'right' },
+          { label: 'Architects', align: 'right', className: HEADCOUNT_TONE },
+          { label: 'Developers', align: 'right', className: HEADCOUNT_TONE },
+          { label: 'QAs', align: 'right', className: HEADCOUNT_TONE },
+          { label: 'Total', align: 'right', className: HEADCOUNT_TONE },
         ]}
-        empty={categoryTrees.length === 0}
+        empty={categoryComposition.length === 0}
         emptyMessage="No functional units."
       >
-        {categoryTrees.flatMap((tree) => {
-          const managers = managersForFunctionalUnit(
-            tree,
-            scopedWorkCategories.find((category) => category.id === tree.id),
-          );
-          if (managers.length === 0) {
-            return [
-              <tr key={tree.id} className="border-t border-border hover:bg-bg2/50">
-                <td className={`${cell} text-right tabular-nums text-text2`}>
-                  {tree.sortOrder != null ? tree.sortOrder : '—'}
+        {categoryComposition.flatMap((group) => {
+          const units = group.units.map((unit) => {
+            const tree = categoryTrees.find((item) => item.id === unit.id);
+            const managers = tree
+              ? managersForFunctionalUnit(
+                  tree,
+                  scopedWorkCategories.find((category) => category.id === unit.id),
+                )
+              : [];
+            const span =
+              managers.length === 0
+                ? 1
+                : managers.reduce((sum, node) => sum + visibleManagerRows(node), 0);
+            return { unit, tree, managers, span };
+          });
+          const groupSpan = units.reduce((sum, item) => sum + item.span, 0);
+          return units.flatMap(({ unit, tree, managers, span }, unitIndex) => {
+            const total = HEADCOUNT_ROLES.reduce((sum, role) => sum + unit.people[role.key].length, 0);
+            const categoryCell = unitIndex === 0 && (
+              <td rowSpan={groupSpan} className={`${treeCell} align-top font-semibold`}>
+                {group.name}
+              </td>
+            );
+            const unitCells = (
+              <>
+                <td rowSpan={span} className={`${cell} align-top text-right tabular-nums text-text2`}>
+                  {tree?.sortOrder != null ? tree.sortOrder : '—'}
                 </td>
-                <td className={`${treeCell} font-semibold`}>{tree.name}</td>
-                <td className={`${treeCell} text-text2`}>No engineering managers assigned.</td>
-                <td className={`${cell} text-right tabular-nums`}>0</td>
-                <td className={`${cell} text-right tabular-nums`}>0</td>
-                <td className={`${cell} text-right tabular-nums`}>0</td>
-                <td className={`${cell} text-right tabular-nums`}>{formatFte(0)}</td>
-                <td className={`${cell} text-right tabular-nums`}>{formatFte(0)}</td>
-              </tr>,
-            ];
-          }
-          return managers.flatMap((node, managerIndex) => {
-            const managerOpen = openManagers.has(node.key);
-            const rows = [
-              <tr key={node.key} className="border-t border-border hover:bg-bg2/50">
-                <td className={`${cell} text-right tabular-nums text-text2`}>
-                  {managerIndex === 0 ? (tree.sortOrder != null ? tree.sortOrder : '—') : ''}
+                <td rowSpan={span} className={`${treeCell} align-top font-semibold`}>
+                  {unit.name}
                 </td>
-                <td className={`${treeCell} font-semibold`}>
-                  {managerIndex === 0 ? tree.name : ''}
-                </td>
-                <td className={`${treeCell} font-medium`}>
-                  <ExpandLabel
-                    open={managerOpen}
-                    label={node.managerName}
-                    onClick={() => toggleManager(node.key)}
-                  />
-                </td>
-                <td className={`${cell} text-right`}>
-                  <CountButton value={node.teamSize} onClick={() => openTreeManagerPeople(node)} />
-                </td>
-                <td className={`${cell} text-right`}>
-                  <CountButton value={node.allocatedCount} onClick={() => openTreeManagerPeople(node)} />
-                </td>
-                <td className={`${cell} text-right`}>
-                  <CountButton value={node.projectCount} onClick={() => openTreeManagerProjects(node)} />
-                </td>
-                <td className={`${cell} text-right tabular-nums`}>{formatFte(node.allocatedFte)}</td>
-                <td className={`${cell} text-right tabular-nums`}>{formatFte(node.availableFte)}</td>
-              </tr>,
-            ];
-            if (!managerOpen) return rows;
-            if (node.team.length === 0) {
-              rows.push(
-                <tr key={`${node.key}:empty`} className="border-t border-border">
-                  <td className={cell} />
-                  <td className={treeCell} />
-                  <td className={`${treeCell} ${indentClass(1)} text-text2`}>
-                    No people allocated to this functional unit.
+              </>
+            );
+            const roleCells = (
+              <>
+                {HEADCOUNT_ROLES.map((role) => (
+                  <td key={role.key} rowSpan={span} className={`${cell} align-top text-right ${HEADCOUNT_TONE}`}>
+                    <CountButton
+                      value={unit.people[role.key].length}
+                      onClick={() => openHeadcount(unit.name, role.label, unit.people[role.key])}
+                    />
                   </td>
-                  <td className={cell} />
-                  <td className={cell} />
-                  <td className={cell} />
-                  <td className={cell} />
-                  <td className={cell} />
+                ))}
+                <td rowSpan={span} className={`${cell} align-top text-right font-semibold tabular-nums ${HEADCOUNT_TONE}`}>
+                  {total}
+                </td>
+              </>
+            );
+            if (managers.length === 0) {
+              return [
+                <tr key={unit.id} className="border-t border-border hover:bg-bg2/50">
+                  {categoryCell}
+                  {unitCells}
+                  <td className={`${treeCell} text-text2`}>No engineering managers assigned.</td>
+                  <td className={`${cell} text-right tabular-nums`}>0</td>
+                  <td className={`${cell} text-right tabular-nums`}>0</td>
+                  <td className={`${cell} text-right tabular-nums`}>0</td>
+                  {roleCells}
                 </tr>,
-              );
-              return rows;
+              ];
             }
-            for (const person of node.team) {
-              rows.push(
-                <tr key={`${node.key}:${person.employeeId}`} className="border-t border-border hover:bg-bg2/30">
-                  <td className={cell} />
-                  <td className={treeCell} />
-                  <td className={`${treeCell} ${indentClass(1)}`}>
-                    {person.fte > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => openPersonAllocations(person)}
-                        className="text-left text-accent hover:underline"
-                      >
-                        {person.employeeName}
-                      </button>
-                    ) : (
-                      person.employeeName
-                    )}
-                    {person.designationName ? (
-                      <span className="ml-2 text-xs text-text2">{person.designationName}</span>
-                    ) : null}
+            return managers.flatMap((node, managerIndex) => {
+              const managerOpen = openManagers.has(node.key);
+              const roster = rosterFor(node);
+              const allocatedIds = new Set(node.team.map((person) => person.employeeId));
+              const notAllocated = roster.filter((person) => !allocatedIds.has(person.employeeId));
+              const rows = [
+                <tr key={node.key} className="border-t border-border hover:bg-bg2/50">
+                  {managerIndex === 0 && categoryCell}
+                  {managerIndex === 0 && unitCells}
+                  <td className={`${treeCell} font-medium`}>
+                    <ExpandLabel
+                      open={managerOpen}
+                      label={node.managerName}
+                      onClick={() => toggleManager(node.key)}
+                    />
                   </td>
-                  <td className={`${cell} text-right tabular-nums text-text2`}>1</td>
-                  <td className={`${cell} text-right tabular-nums`}>{person.fte > 0 ? 1 : 0}</td>
+                  <td className={`${cell} text-right`}>
+                    <CountButton value={roster.length} onClick={() => openManagerRoster(node, roster)} />
+                  </td>
+                  <td className={`${cell} text-right`}>
+                    <CountButton value={node.allocatedCount} onClick={() => openTreeManagerPeople(node)} />
+                  </td>
                   <td className={`${cell} text-right`}>
                     <CountButton
-                      value={person.allocations.length}
-                      onClick={
-                        person.allocations.length > 0
-                          ? () => openPersonAllocations(person)
-                          : undefined
+                      value={notAllocated.length}
+                      onClick={() =>
+                        setDrill({
+                          title: `${node.managerName} · Not allocated`,
+                          subtitle: `${notAllocated.length} people · ${unit.name} · ${rangeFrom} → ${rangeTo}`,
+                          items: notAllocated.map(personEntry),
+                        })
                       }
                     />
                   </td>
-                  <td className={`${cell} text-right tabular-nums`}>{formatFte(person.fte)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>
-                    {formatFte(Math.max(0, 1 - person.fte))}
-                  </td>
+                  {managerIndex === 0 && roleCells}
                 </tr>,
-              );
-            }
-            return rows;
+              ];
+              if (!managerOpen) return rows;
+              if (roster.length === 0) {
+                rows.push(
+                  <tr key={`${node.key}:empty`} className="border-t border-border">
+                    <td className={`${treeCell} ${indentClass(1)} text-text2`}>
+                      No people on this team.
+                    </td>
+                    <td className={cell} />
+                    <td className={cell} />
+                    <td className={cell} />
+                  </tr>,
+                );
+                return rows;
+              }
+              for (const person of roster) {
+                const allocatedHere = allocatedIds.has(person.employeeId);
+                const scoped = node.team.find((member) => member.employeeId === person.employeeId) ?? person;
+                rows.push(
+                  <tr key={`${node.key}:${person.employeeId}`} className="border-t border-border hover:bg-bg2/30">
+                    <td className={`${treeCell} ${indentClass(1)}`}>
+                      {allocatedHere ? (
+                        <button
+                          type="button"
+                          onClick={() => openPersonAllocations(scoped)}
+                          className="text-left text-accent hover:underline"
+                        >
+                          {person.employeeName}
+                        </button>
+                      ) : (
+                        person.employeeName
+                      )}
+                      {person.designationName ? (
+                        <span className="ml-2 text-xs text-text2">{person.designationName}</span>
+                      ) : null}
+                    </td>
+                    <td className={`${cell} text-right tabular-nums text-text2`}>1</td>
+                    <td className={`${cell} text-right tabular-nums`}>{allocatedHere ? 1 : 0}</td>
+                    <td className={`${cell} text-right tabular-nums`}>{allocatedHere ? 0 : 1}</td>
+                  </tr>,
+                );
+              }
+              return rows;
+            });
           });
         })}
+        {categoryComposition.length > 0 && (
+          <tr className="border-t border-border bg-bg2 font-semibold">
+            <td className={cell} colSpan={4}>
+              Total
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {(() => {
+                const seen = new Set<string>();
+                return compositionManagers.reduce((sum, node) => {
+                  const key = node.managerId || node.managerName.trim().toLowerCase();
+                  if (seen.has(key)) return sum;
+                  seen.add(key);
+                  return sum + rosterFor(node).length;
+                }, 0);
+              })()}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {compositionManagers.reduce((sum, node) => sum + node.allocatedCount, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {compositionManagers.reduce((sum, node) => {
+                const roster = rosterFor(node);
+                const allocatedIds = new Set(node.team.map((person) => person.employeeId));
+                return sum + roster.filter((person) => !allocatedIds.has(person.employeeId)).length;
+              }, 0)}
+            </td>
+            {HEADCOUNT_ROLES.map((role) => (
+              <td key={role.key} className={`${cell} text-right tabular-nums ${HEADCOUNT_TONE}`}>
+                {categoryComposition.reduce(
+                  (sum, group) =>
+                    sum + group.units.reduce((unitSum, unit) => unitSum + unit.people[role.key].length, 0),
+                  0,
+                )}
+              </td>
+            ))}
+            <td className={`${cell} text-right tabular-nums ${HEADCOUNT_TONE}`}>
+              {categoryComposition.reduce(
+                (sum, group) =>
+                  sum +
+                  group.units.reduce(
+                    (unitSum, unit) =>
+                      unitSum +
+                      HEADCOUNT_ROLES.reduce((roleSum, role) => roleSum + unit.people[role.key].length, 0),
+                    0,
+                  ),
+                0,
+              )}
+            </td>
+          </tr>
+        )}
       </SummaryTable>
 
       <div className="grid gap-6 xl:grid-cols-2">

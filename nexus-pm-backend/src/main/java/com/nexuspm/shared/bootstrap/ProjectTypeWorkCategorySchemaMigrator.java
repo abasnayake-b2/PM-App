@@ -59,9 +59,18 @@ public class ProjectTypeWorkCategorySchemaMigrator implements BeanPostProcessor 
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             ensureLookupTable(statement, "project_type");
+            ensureLookupTable(statement, "functional_unit_category");
             ensureLookupTable(statement, "work_category");
             seedProjectTypes(statement);
+            seedFunctionalUnitCategories(statement);
             seedWorkCategories(statement);
+            if (tableExists(statement, "work_category") && tableExists(statement, "functional_unit_category")) {
+                ensureColumn(statement, "work_category", "functional_unit_category_id",
+                        "ALTER TABLE work_category ADD COLUMN functional_unit_category_id CHAR(36) NULL AFTER sort_order");
+                ensureFk(statement, "work_category", "fk_work_category_fu_category",
+                        "ALTER TABLE work_category ADD CONSTRAINT fk_work_category_fu_category "
+                                + "FOREIGN KEY (functional_unit_category_id) REFERENCES functional_unit_category(id)");
+            }
             if (tableExists(statement, "project")) {
                 ensureColumn(statement, "project", "project_type_id",
                         "ALTER TABLE project ADD COLUMN project_type_id CHAR(36) NULL AFTER product");
@@ -113,6 +122,16 @@ public class ProjectTypeWorkCategorySchemaMigrator implements BeanPostProcessor 
                 ('d1000001-0000-0000-0000-000000000001', 'NTP', 1),
                 ('d1000001-0000-0000-0000-000000000002', 'GBL', 2),
                 ('d1000001-0000-0000-0000-000000000003', 'Client Project', 3)
+                """);
+    }
+
+    private void seedFunctionalUnitCategories(Statement statement) throws Exception {
+        statement.execute(
+                """
+                INSERT IGNORE INTO functional_unit_category (id, name, sort_order) VALUES
+                ('f1000001-0000-0000-0000-000000000001', 'BMS', 1),
+                ('f1000001-0000-0000-0000-000000000002', 'FINCON', 2),
+                ('f1000001-0000-0000-0000-000000000003', 'IFSAH', 3)
                 """);
     }
 

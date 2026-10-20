@@ -42,6 +42,8 @@ export interface WorkCategory {
   name: string;
   description?: string;
   sortOrder?: number;
+  functionalUnitCategoryId?: string | null;
+  functionalUnitCategoryName?: string | null;
   engineeringManagers?: WorkCategoryManager[];
 }
 

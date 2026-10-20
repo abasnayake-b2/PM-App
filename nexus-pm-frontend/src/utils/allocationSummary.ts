@@ -56,6 +56,7 @@ export type AllocationSummaryFilters = {
   taskCategoryId?: string;
   taskTypeId?: string;
   projectTypeId?: string;
+  workCategoryIds?: string[];
 };
 
 function matchesSummaryFilters(
@@ -69,6 +70,9 @@ function matchesSummaryFilters(
     return false;
   }
   if (filters?.projectTypeId && allocation.projectTypeId !== filters.projectTypeId) {
+    return false;
+  }
+  if (filters?.workCategoryIds && !filters.workCategoryIds.includes(allocation.workCategoryId ?? '')) {
     return false;
   }
   return true;

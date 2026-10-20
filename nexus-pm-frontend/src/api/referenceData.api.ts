@@ -21,6 +21,8 @@ export interface ReferenceItem {
   stream?: { id: string; name: string; department?: { id: string; name: string } };
   management?: boolean;
   engineeringManagers?: { id: string; name: string; roleTitle?: string }[];
+  functionalUnitCategoryId?: string | null;
+  functionalUnitCategoryName?: string | null;
   sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -303,6 +305,32 @@ export async function deleteAdminProjectType(id: string): Promise<void> {
   await api.delete(`${base}/project-types/${id}`);
 }
 
+export async function fetchAdminFunctionalUnitCategories(): Promise<ReferenceItem[]> {
+  const { data } = await api.get<ReferenceItem[]>(`${base}/functional-unit-categories`);
+  return data;
+}
+
+export async function createAdminFunctionalUnitCategory(
+  name: string,
+  description?: string,
+): Promise<ReferenceItem> {
+  const { data } = await api.post<ReferenceItem>(`${base}/functional-unit-categories`, { name, description });
+  return data;
+}
+
+export async function updateAdminFunctionalUnitCategory(
+  id: string,
+  name: string,
+  description?: string,
+): Promise<ReferenceItem> {
+  const { data } = await api.put<ReferenceItem>(`${base}/functional-unit-categories/${id}`, { name, description });
+  return data;
+}
+
+export async function deleteAdminFunctionalUnitCategory(id: string): Promise<void> {
+  await api.delete(`${base}/functional-unit-categories/${id}`);
+}
+
 export async function fetchAdminWorkCategories(): Promise<ReferenceItem[]> {
   const { data } = await api.get<ReferenceItem[]>(`${base}/work-categories`);
   return data;
@@ -313,12 +341,14 @@ export async function createAdminWorkCategory(
   description?: string,
   engineeringManagerManagementIds?: string[],
   sortOrder?: number,
+  functionalUnitCategoryId?: string | null,
 ): Promise<ReferenceItem> {
   const { data } = await api.post<ReferenceItem>(`${base}/work-categories`, {
     name,
     description,
     engineeringManagerManagementIds,
     sortOrder,
+    functionalUnitCategoryId: functionalUnitCategoryId || null,
   });
   return data;
 }
@@ -329,12 +359,14 @@ export async function updateAdminWorkCategory(
   description?: string,
   engineeringManagerManagementIds?: string[],
   sortOrder?: number,
+  functionalUnitCategoryId?: string | null,
 ): Promise<ReferenceItem> {
   const { data } = await api.put<ReferenceItem>(`${base}/work-categories/${id}`, {
     name,
     description,
     engineeringManagerManagementIds,
     sortOrder,
+    functionalUnitCategoryId: functionalUnitCategoryId || null,
   });
   return data;
 }

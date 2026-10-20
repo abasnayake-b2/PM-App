@@ -1,6 +1,7 @@
 package com.nexuspm.admin;
 
 import com.nexuspm.lookup.IssueTypeCatalog;
+import com.nexuspm.lookup.entity.FunctionalUnitCategory;
 import com.nexuspm.lookup.entity.IssueStatus;
 import com.nexuspm.lookup.entity.IssueType;
 import com.nexuspm.lookup.entity.Priority;
@@ -10,6 +11,7 @@ import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.lookup.dto.WorkCategoryResponse;
 import com.nexuspm.lookup.entity.WorkCategory;
 import com.nexuspm.lookup.entity.WorkCategoryManager;
+import com.nexuspm.lookup.repository.FunctionalUnitCategoryRepository;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
@@ -68,6 +70,7 @@ public class ReferenceDataService {
     private final TaskTypeRepository taskTypeRepository;
     private final TaskCategoryRepository taskCategoryRepository;
     private final ProjectTypeRepository projectTypeRepository;
+    private final FunctionalUnitCategoryRepository functionalUnitCategoryRepository;
     private final WorkCategoryRepository workCategoryRepository;
     private final WorkCategoryManagerRepository workCategoryManagerRepository;
     private final TeamManagementRepository teamManagementRepository;
@@ -485,6 +488,66 @@ public class ReferenceDataService {
                 .orElse(0) + 1;
     }
 
+    @Cacheable(cacheNames = CacheNames.FUNCTIONAL_UNIT_CATEGORIES, key = "'admin-all'")
+    @Transactional(readOnly = true)
+    public List<FunctionalUnitCategory> listFunctionalUnitCategories() {
+        return auditNameEnricher.enrichAll(
+                functionalUnitCategoryRepository.findAllByOrderBySortOrderAscNameAsc());
+    }
+
+    @CacheEvict(cacheNames = CacheNames.FUNCTIONAL_UNIT_CATEGORIES, allEntries = true)
+    @Transactional
+    public FunctionalUnitCategory createFunctionalUnitCategory(String name, String description) {
+        String trimmed = name.trim();
+        if (functionalUnitCategoryRepository.findByNameIgnoreCase(trimmed).isPresent()) {
+            throw new BusinessException("DUPLICATE", "Functional unit category already exists", 400);
+        }
+        FunctionalUnitCategory category = new FunctionalUnitCategory();
+        category.setId(UUID.randomUUID());
+        category.setName(trimmed);
+        category.setDescription(trimToNull(description));
+        category.setSortOrder(nextFunctionalUnitCategorySortOrder());
+        return auditNameEnricher.enrich(functionalUnitCategoryRepository.save(category));
+    }
+
+    @CacheEvict(cacheNames = {CacheNames.FUNCTIONAL_UNIT_CATEGORIES, CacheNames.WORK_CATEGORIES}, allEntries = true)
+    @Transactional
+    public FunctionalUnitCategory updateFunctionalUnitCategory(UUID id, String name, String description) {
+        FunctionalUnitCategory category = functionalUnitCategoryRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit category not found", 404));
+        String trimmed = name.trim();
+        functionalUnitCategoryRepository.findByNameIgnoreCase(trimmed)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BusinessException("DUPLICATE", "Functional unit category already exists", 400);
+                });
+        category.setName(trimmed);
+        category.setDescription(trimToNull(description));
+        return auditNameEnricher.enrich(functionalUnitCategoryRepository.save(category));
+    }
+
+    @CacheEvict(cacheNames = {CacheNames.FUNCTIONAL_UNIT_CATEGORIES, CacheNames.WORK_CATEGORIES}, allEntries = true)
+    @Transactional
+    public void deleteFunctionalUnitCategory(UUID id) {
+        if (!functionalUnitCategoryRepository.existsById(id)) {
+            throw new BusinessException("NOT_FOUND", "Functional unit category not found", 404);
+        }
+        if (workCategoryRepository.existsByFunctionalUnitCategory_Id(id)) {
+            throw new BusinessException(
+                    "IN_USE", "Functional unit category is assigned to one or more functional units", 400);
+        }
+        functionalUnitCategoryRepository.deleteById(id);
+    }
+
+    private int nextFunctionalUnitCategorySortOrder() {
+        return functionalUnitCategoryRepository.findAll().stream()
+                .map(FunctionalUnitCategory::getSortOrder)
+                .filter(order -> order != null)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(0) + 1;
+    }
+
     @Cacheable(cacheNames = CacheNames.WORK_CATEGORIES, key = "'admin-all'")
     @Transactional(readOnly = true)
     public List<WorkCategoryResponse> listWorkCategories() {
@@ -503,7 +566,11 @@ public class ReferenceDataService {
     @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
     @Transactional
     public WorkCategoryResponse createWorkCategory(
-            String name, String description, Integer sortOrder, List<UUID> engineeringManagerManagementIds) {
+            String name,
+            String description,
+            Integer sortOrder,
+            UUID functionalUnitCategoryId,
+            List<UUID> engineeringManagerManagementIds) {
         String trimmed = name.trim();
         if (workCategoryRepository.findByNameIgnoreCase(trimmed).isPresent()) {
             throw new BusinessException("DUPLICATE", "Functional unit already exists", 400);
@@ -513,6 +580,7 @@ public class ReferenceDataService {
         category.setName(trimmed);
         category.setDescription(trimToNull(description));
         category.setSortOrder(sortOrder != null ? sortOrder : nextWorkCategorySortOrder());
+        category.setFunctionalUnitCategory(resolveFunctionalUnitCategory(functionalUnitCategoryId));
         workCategoryRepository.save(category);
         replaceWorkCategoryManagers(category, engineeringManagerManagementIds);
         return toWorkCategoryResponse(
@@ -525,7 +593,12 @@ public class ReferenceDataService {
     @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
     @Transactional
     public WorkCategoryResponse updateWorkCategory(
-            UUID id, String name, String description, Integer sortOrder, List<UUID> engineeringManagerManagementIds) {
+            UUID id,
+            String name,
+            String description,
+            Integer sortOrder,
+            UUID functionalUnitCategoryId,
+            List<UUID> engineeringManagerManagementIds) {
         WorkCategory category = workCategoryRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit not found", 404));
         String trimmed = name.trim();
@@ -539,6 +612,7 @@ public class ReferenceDataService {
         if (sortOrder != null) {
             category.setSortOrder(sortOrder);
         }
+        category.setFunctionalUnitCategory(resolveFunctionalUnitCategory(functionalUnitCategoryId));
         workCategoryRepository.save(category);
         replaceWorkCategoryManagers(category, engineeringManagerManagementIds);
         return toWorkCategoryResponse(
@@ -592,15 +666,26 @@ public class ReferenceDataService {
                 .sorted(Comparator.comparing(
                         WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+        FunctionalUnitCategory group = category.getFunctionalUnitCategory();
         return WorkCategoryResponse.builder()
                 .id(category.getId())
                 .name(category.getName())
                 .description(category.getDescription())
                 .sortOrder(category.getSortOrder())
+                .functionalUnitCategoryId(group != null ? group.getId() : null)
+                .functionalUnitCategoryName(group != null ? group.getName() : null)
                 .engineeringManagers(managers)
                 .createdByName(category.getCreatedByName())
                 .updatedByName(category.getUpdatedByName())
                 .build();
+    }
+
+    private FunctionalUnitCategory resolveFunctionalUnitCategory(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        return functionalUnitCategoryRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit category not found", 404));
     }
 
     private int nextWorkCategorySortOrder() {

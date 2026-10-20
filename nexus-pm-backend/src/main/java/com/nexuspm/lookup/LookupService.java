@@ -99,11 +99,14 @@ public class LookupService {
                             .sorted(Comparator.comparing(
                                     WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
                             .toList();
+                    var group = category.getFunctionalUnitCategory();
                     return WorkCategoryResponse.builder()
                             .id(category.getId())
                             .name(category.getName())
                             .description(category.getDescription())
                             .sortOrder(category.getSortOrder())
+                            .functionalUnitCategoryId(group != null ? group.getId() : null)
+                            .functionalUnitCategoryName(group != null ? group.getName() : null)
                             .engineeringManagers(managers)
                             .build();
                 })
