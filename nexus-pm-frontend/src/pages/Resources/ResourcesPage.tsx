@@ -19,7 +19,7 @@ import { isManagerOrAboveRole, hasOrgWideVisibility, isScopedEngineeringManagerR
 import { fetchProjectTypes, fetchWorkCategories } from '@/api/lookup.api';
 import { averageAllocatedPct, defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
 import type { FunctionalUnitAssignment } from '@/utils/capacityGroups';
-import { groupedManagerNames } from '@/utils/managementRoles';
+import { directorsFromManagerReportingLine, groupedManagerNames } from '@/utils/managementRoles';
 import { isActiveRosterStatus } from '@/utils/rosterStatus';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
 import type { Capacity } from '@/types';
@@ -124,14 +124,25 @@ export function ResourcesPage({ variant = 'full' }: { variant?: 'full' | 'timeli
   );
   const functionalUnits = useMemo<FunctionalUnitAssignment[]>(
     () =>
-      workCategories.map((category) => ({
-        name: category.name,
-        managers: (category.engineeringManagers ?? []).map((manager) => ({
+      workCategories.map((category) => {
+        const managers = (category.engineeringManagers ?? []).map((manager) => ({
           id: manager.id,
           name: manager.name,
-        })),
-      })),
-    [workCategories],
+        }));
+        const assignedDirectors = (category.directors ?? []).map((director) => ({
+          id: director.id,
+          name: director.name,
+        }));
+        const directors =
+          assignedDirectors.length > 0
+            ? assignedDirectors
+            : directorsFromManagerReportingLine(managers, management).map((director) => ({
+                id: director.id,
+                name: director.name,
+              }));
+        return { name: category.name, managers, directors };
+      }),
+    [workCategories, management],
   );
   const linkedEmployeeId = selectedRow?.employeeId;
   const { data: assignedIssues, isLoading: assignedIssuesLoading } = useIssues(

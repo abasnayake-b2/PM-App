@@ -9,7 +9,7 @@ import {
   PROJECT_RD_GRID_WIDTH,
   PROJECT_RD_ROW_PX,
 } from '@/components/EmProjectRdSummaryGrid';
-import { fetchEmProjectRdSummary } from '@/api/issues.api';
+import { fetchEmProjectRdSummary, type EmProjectRdRow } from '@/api/issues.api';
 import { fetchProjects } from '@/api/projects.api';
 import {
   UNASSIGNED_FUNCTIONAL_UNIT,
@@ -43,6 +43,7 @@ import {
   type TimelineWeek,
 } from '@/utils/allocationUi';
 
+const DIRECTOR_LABEL_WIDTH = 148;
 const FU_LABEL_WIDTH = 196;
 const EM_LABEL_WIDTH = 128;
 const MEMBER_LABEL_WIDTH = 260;
@@ -387,6 +388,66 @@ function AllocationBars({
   );
 }
 
+function blankRdProject(
+  projectId: string | undefined,
+  projectName: string,
+  workCategoryName: string,
+): EmProjectRdRow {
+  return {
+    projectId: projectId ?? '',
+    projectName,
+    workCategoryName,
+    buckets: RD_STATUS_BUCKETS.map((bucket) => ({
+      key: bucket.key,
+      label: bucket.name,
+      rdCount: 0,
+      effort: 0,
+      rds: [],
+    })),
+    totalRd: 0,
+    totalEffort: 0,
+  };
+}
+
+/** Every project on the functional unit, with RD totals when the summary has them. */
+function rdProjectsForFunctionalUnit(
+  functionalUnit: string,
+  hints: CapacityProjectHint[],
+  summary: EmProjectRdRow[],
+): EmProjectRdRow[] {
+  const fuKey = functionalUnit.trim().toLowerCase();
+  const summaryById = new Map<string, EmProjectRdRow>();
+  const summaryByName = new Map<string, EmProjectRdRow>();
+  for (const project of summary) {
+    if (project.projectId) summaryById.set(project.projectId, project);
+    const name = project.projectName?.trim().toLowerCase();
+    const projectFu = project.workCategoryName?.trim().toLowerCase();
+    if (name && projectFu === fuKey) summaryByName.set(name, project);
+  }
+  const byKey = new Map<string, EmProjectRdRow>();
+  const add = (row: EmProjectRdRow) => {
+    const key = row.projectId || row.projectName.trim().toLowerCase();
+    if (!key || byKey.has(key)) return;
+    byKey.set(key, row);
+  };
+  for (const hint of hints) {
+    if (hint.functionalUnit.trim().toLowerCase() !== fuKey) continue;
+    const name = hint.projectName.trim();
+    if (!name) continue;
+    const fromSummary =
+      (hint.projectId ? summaryById.get(hint.projectId) : undefined) ??
+      summaryByName.get(name.toLowerCase());
+    add(fromSummary ?? blankRdProject(hint.projectId, name, functionalUnit));
+  }
+  for (const project of summary) {
+    if (project.workCategoryName?.trim().toLowerCase() !== fuKey) continue;
+    add(project);
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.projectName.localeCompare(b.projectName, undefined, { sensitivity: 'base' }),
+  );
+}
+
 export function AllocationTimeline({
   rows,
   from,
@@ -401,6 +462,8 @@ export function AllocationTimeline({
   const [granularity, setGranularity] = useState<TimelineGranularity>('daily');
   const [showDates, setShowDates] = useState(true);
   const [showRdGrid, setShowRdGrid] = useState(false);
+  const [showDirector, setShowDirector] = useState(false);
+  const [showManager, setShowManager] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
   const { data: rdSummary } = useQuery({
@@ -409,7 +472,7 @@ export function AllocationTimeline({
   });
   const { data: projectsPage } = useQuery({
     queryKey: ['projects', 'utilization-hints'],
-    queryFn: () => fetchProjects({ size: 500 }),
+    queryFn: () => fetchProjects({ size: 2000 }),
   });
   const projectHints = useMemo<CapacityProjectHint[]>(() => {
     const hints = new Map<string, CapacityProjectHint>();
@@ -440,26 +503,7 @@ export function AllocationTimeline({
     return [...hints.values()];
   }, [projectsPage, rdSummary]);
 
-  const rdProjectsByFuEm = useMemo(() => {
-    const fuByProjectId = new Map(
-      (projectsPage?.content ?? [])
-        .filter((project) => project.workCategoryName?.trim())
-        .map((project) => [project.id, project.workCategoryName!.trim()] as const),
-    );
-    const map = new Map<string, NonNullable<typeof rdSummary>['projects']>();
-    for (const project of rdSummary?.projects ?? []) {
-      const fu =
-        project.workCategoryName?.trim() ||
-        fuByProjectId.get(project.projectId) ||
-        UNASSIGNED_FUNCTIONAL_UNIT;
-      const em = (project.emName?.trim() || 'Unassigned').toLowerCase();
-      const key = `${fu.toLowerCase()}|${em}`;
-      const list = map.get(key) ?? [];
-      list.push(project);
-      map.set(key, list);
-    }
-    return map;
-  }, [rdSummary, projectsPage]);
+  const rdSummaryProjects = rdSummary?.projects ?? [];
 
   const leftBodyRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
@@ -505,10 +549,13 @@ export function AllocationTimeline({
 
   const fuGroups = useMemo(() => {
     return groupCapacityByFuManagerProject(rows, projectHints, functionalUnits).map((fu) => {
+      const fuRdProjects = rdProjectsForFunctionalUnit(
+        fu.functionalUnit,
+        projectHints,
+        rdSummaryProjects,
+      );
       const managers = fu.managers.map((mgr) => {
-        const rdProjects =
-          rdProjectsByFuEm.get(`${fu.functionalUnit.toLowerCase()}|${mgr.manager.toLowerCase()}`) ??
-          [];
+        const rdProjects: EmProjectRdRow[] = [];
         const membersById = new Map<
           string,
           { row: Capacity; items: Allocation[] }
@@ -536,34 +583,73 @@ export function AllocationTimeline({
             a.row.employeeName.localeCompare(b.row.employeeName, undefined, { sensitivity: 'base' }),
           );
         const membersHeight = members.reduce((sum, member) => sum + member.height, 0);
-        const rdHeight = showRdGrid ? rdProjects.length * PROJECT_RD_ROW_PX : 0;
-        const minHeight = members.length === 0 ? Math.max(rdHeight, 28) : 0;
+        const minHeight = members.length === 0 ? 28 : 0;
         return {
           manager: mgr.manager,
           members,
           rdProjects,
-          height: Math.max(membersHeight, rdHeight, minHeight),
+          height: Math.max(membersHeight, minHeight),
         };
       }).filter((manager) => manager.members.length > 0);
       if (managers.length === 0) return null;
+      if (showRdGrid && fuRdProjects.length > 0) {
+        managers[0].rdProjects = fuRdProjects;
+        managers[0].height = Math.max(
+          managers[0].height,
+          fuRdProjects.length * PROJECT_RD_ROW_PX,
+        );
+      }
       return {
         functionalUnit: fu.functionalUnit,
         managers,
         height: managers.reduce((sum, manager) => sum + manager.height, 0),
       };
     }).filter((fu): fu is NonNullable<typeof fu> => fu != null);
-  }, [rows, getSpan, projectHints, functionalUnits, rdProjectsByFuEm, showRdGrid]);
+  }, [rows, getSpan, projectHints, functionalUnits, rdSummaryProjects, showRdGrid]);
+
+  const directorGroups = useMemo(() => {
+    const groups: { key: string; label: string; units: typeof fuGroups; height: number }[] = [];
+    for (const fu of fuGroups) {
+      const assignment = functionalUnits.find(
+        (unit) => unit.name.trim().toLowerCase() === fu.functionalUnit.trim().toLowerCase(),
+      );
+      const names = (assignment?.directors ?? []).map((director) => director.name.trim()).filter(Boolean);
+      const label = names.length > 0 ? names.join(', ') : 'Unassigned';
+      const key = label.toLowerCase();
+      let group = groups.find((item) => item.key === key);
+      if (!group) {
+        group = { key, label, units: [], height: 0 };
+        groups.push(group);
+      }
+      group.units.push(fu);
+      group.height += fu.height;
+    }
+    groups.sort((a, b) => {
+      if (a.label === 'Unassigned') return 1;
+      if (b.label === 'Unassigned') return -1;
+      return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+    });
+    return groups;
+  }, [fuGroups, functionalUnits]);
 
   const rowLayouts = useMemo(
     () =>
-      fuGroups.flatMap((fu) =>
-        fu.managers.flatMap((manager) =>
-          manager.members.length > 0
-            ? manager.members
-            : [{ row: null, items: [] as Allocation[], height: manager.height }],
+      directorGroups.flatMap((group) =>
+        group.units.flatMap((fu) =>
+        fu.managers.flatMap((manager) => {
+          if (manager.members.length === 0) {
+            return [{ row: null, items: [] as Allocation[], height: manager.height }];
+          }
+          const used = manager.members.reduce((sum, member) => sum + member.height, 0);
+          if (manager.height <= used) return manager.members;
+          return [
+            ...manager.members,
+            { row: null, items: [] as Allocation[], height: manager.height - used },
+          ];
+        }),
         ),
       ),
-    [fuGroups],
+    [directorGroups],
   );
 
   const granularityOptions: { key: TimelineGranularity; label: string; icon: typeof Calendar }[] = [
@@ -579,9 +665,10 @@ export function AllocationTimeline({
       : HEADER_HEIGHT_MONTHLY;
   const detailsWidth = showDetails ? DESIGNATION_COL_WIDTH : DETAILS_RAIL_WIDTH;
   const leftWidth =
-    (showRdGrid ? PROJECT_RD_GRID_WIDTH : RD_GRID_RAIL_WIDTH) +
+    (showDirector ? DIRECTOR_LABEL_WIDTH : RD_GRID_RAIL_WIDTH) +
     FU_LABEL_WIDTH +
-    EM_LABEL_WIDTH +
+    (showRdGrid ? PROJECT_RD_GRID_WIDTH : RD_GRID_RAIL_WIDTH) +
+    (showManager ? EM_LABEL_WIDTH : RD_GRID_RAIL_WIDTH) +
     MEMBER_LABEL_WIDTH +
     detailsWidth;
 
@@ -643,6 +730,24 @@ export function AllocationTimeline({
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text2">
           <input
             type="checkbox"
+            checked={showDirector}
+            onChange={(e) => setShowDirector(e.target.checked)}
+            className="rounded border-border"
+          />
+          Director
+        </label>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text2">
+          <input
+            type="checkbox"
+            checked={showManager}
+            onChange={(e) => setShowManager(e.target.checked)}
+            className="rounded border-border"
+          />
+          Manager
+        </label>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text2">
+          <input
+            type="checkbox"
             checked={showDetails}
             onChange={(e) => setShowDetails(e.target.checked)}
             className="rounded border-border"
@@ -669,30 +774,41 @@ export function AllocationTimeline({
           className="flex shrink-0 border-r border-border bg-bg2"
           style={{ width: leftWidth }}
         >
-          {!showRdGrid && (
-            <button
-              type="button"
-              onClick={() => setShowRdGrid(true)}
-              className="flex shrink-0 flex-col items-center gap-2 border-r border-border bg-bg2 pt-3 text-text2 hover:bg-bg3 hover:text-accent"
-              style={{ width: RD_GRID_RAIL_WIDTH }}
-              title="Reveal project RD grid"
-              aria-label="Reveal project RD grid"
-            >
-              <ChevronRight size={14} />
-              <span className="text-[10px] font-medium tracking-wide [writing-mode:vertical-rl] rotate-180">
-                Project RDs
-              </span>
-            </button>
-          )}
           <div className="flex min-w-0 flex-1 flex-col">
           <div
             className="flex shrink-0 border-b border-border text-sm font-medium text-text2"
             style={{ height: headerHeight }}
           >
-            {showRdGrid && (
-              <div className="shrink-0 border-r border-border" style={{ width: PROJECT_RD_GRID_WIDTH }}>
-                <EmProjectRdSummaryHeader onCollapse={() => setShowRdGrid(false)} />
+            {showDirector ? (
+              <div
+                className="flex items-start justify-between gap-1 border-r border-border px-2 pt-2"
+                style={{ width: DIRECTOR_LABEL_WIDTH }}
+              >
+                <span>Director</span>
+                <button
+                  type="button"
+                  onClick={() => setShowDirector(false)}
+                  className="rounded p-0.5 text-text2 hover:bg-bg3 hover:text-accent"
+                  title="Collapse director"
+                  aria-label="Collapse director"
+                >
+                  <ChevronLeft size={14} />
+                </button>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDirector(true)}
+                className="flex h-full shrink-0 flex-col items-center gap-1 overflow-hidden border-r border-border bg-bg2 pt-2 text-text2 hover:bg-bg3 hover:text-accent"
+                style={{ width: RD_GRID_RAIL_WIDTH }}
+                title="Show director"
+                aria-label="Show director"
+              >
+                <ChevronRight size={14} />
+                <span className="text-[10px] font-medium tracking-wide [writing-mode:vertical-rl] rotate-180">
+                  Director
+                </span>
+              </button>
             )}
             <div
               className="flex items-start border-r border-border px-3 pt-2"
@@ -700,12 +816,56 @@ export function AllocationTimeline({
             >
               Functional unit
             </div>
-            <div
-              className="flex items-start border-r border-border px-3 pt-2"
-              style={{ width: EM_LABEL_WIDTH }}
-            >
-              Manager
-            </div>
+            {showRdGrid ? (
+              <div className="shrink-0 border-r border-border" style={{ width: PROJECT_RD_GRID_WIDTH }}>
+                <EmProjectRdSummaryHeader onCollapse={() => setShowRdGrid(false)} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowRdGrid(true)}
+                className="flex h-full shrink-0 flex-col items-center gap-1 overflow-hidden border-r border-border bg-bg2 pt-2 text-text2 hover:bg-bg3 hover:text-accent"
+                style={{ width: RD_GRID_RAIL_WIDTH }}
+                title="Reveal project RD grid"
+                aria-label="Reveal project RD grid"
+              >
+                <ChevronRight size={14} />
+                <span className="text-[10px] font-medium tracking-wide [writing-mode:vertical-rl] rotate-180">
+                  Projects
+                </span>
+              </button>
+            )}
+            {showManager ? (
+              <div
+                className="flex items-start justify-between gap-1 border-r border-border px-2 pt-2"
+                style={{ width: EM_LABEL_WIDTH }}
+              >
+                <span>Manager</span>
+                <button
+                  type="button"
+                  onClick={() => setShowManager(false)}
+                  className="rounded p-0.5 text-text2 hover:bg-bg3 hover:text-accent"
+                  title="Collapse manager"
+                  aria-label="Collapse manager"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowManager(true)}
+                className="flex h-full shrink-0 flex-col items-center gap-1 overflow-hidden border-r border-border bg-bg2 pt-2 text-text2 hover:bg-bg3 hover:text-accent"
+                style={{ width: RD_GRID_RAIL_WIDTH }}
+                title="Show manager"
+                aria-label="Show manager"
+              >
+                <ChevronRight size={14} />
+                <span className="text-[10px] font-medium tracking-wide [writing-mode:vertical-rl] rotate-180">
+                  Manager
+                </span>
+              </button>
+            )}
             <div
               className="flex items-center border-r border-border px-3"
               style={{ width: MEMBER_LABEL_WIDTH }}
@@ -746,11 +906,53 @@ export function AllocationTimeline({
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
             onScroll={() => syncScroll('left')}
           >
-            {fuGroups.map((fu) => {
+            {directorGroups.map((group) => (
+              <div key={`director:${group.key}`} className="flex border-b border-border">
+                {showDirector ? (
+                  <div
+                    className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
+                    style={{ width: DIRECTOR_LABEL_WIDTH, minHeight: group.height }}
+                  >
+                    <p className="text-sm font-semibold leading-snug break-words">{group.label}</p>
+                  </div>
+                ) : (
+                  <div
+                    className="shrink-0 border-r border-border"
+                    style={{ width: RD_GRID_RAIL_WIDTH, minHeight: group.height }}
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+            {group.units.map((fu) => {
               const fuProjects = functionalUnitProjects(fu.functionalUnit, projectHints);
+              const assignment = functionalUnits.find(
+                (unit) => unit.name.trim().toLowerCase() === fu.functionalUnit.trim().toLowerCase(),
+              );
+              const emNames = (
+                assignment?.managers?.length
+                  ? assignment.managers.map((manager) => manager.name)
+                  : fu.managers.map((manager) => manager.manager)
+              )
+                .map((name) => name.trim())
+                .filter(Boolean);
+              const engineerCount = fu.managers.reduce((sum, manager) => sum + manager.members.length, 0);
               return (
-              <div key={`fu:${fu.functionalUnit}`} className="flex border-b border-border">
-                {showRdGrid && (
+              <div key={`fu:${fu.functionalUnit}`} className="flex border-b border-border last:border-b-0">
+                <div
+                  className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
+                  style={{ width: FU_LABEL_WIDTH, minHeight: fu.height }}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-snug break-words">{fu.functionalUnit}</p>
+                    <p className="mt-0.5 text-[10px] font-medium leading-snug text-text2 break-words">
+                      (EM: {emNames.length} | {emNames.join(', ') || '—'}
+                      <br />
+                      Engineers: {engineerCount}
+                      <br />
+                      Projects: {fuProjects.length} | {fuProjects.join(', ') || '—'})
+                    </p>
+                  </div>
+                </div>
+                {showRdGrid ? (
                   <div
                     className="shrink-0 border-r border-border bg-bg"
                     style={{ width: PROJECT_RD_GRID_WIDTH, minHeight: fu.height }}
@@ -761,43 +963,44 @@ export function AllocationTimeline({
                         className="overflow-y-auto"
                         style={{ minHeight: manager.height }}
                       >
-                        <EmProjectRdSummaryRows projects={manager.rdProjects} />
+                        {manager.rdProjects.length > 0 && (
+                          <EmProjectRdSummaryRows projects={manager.rdProjects} />
+                        )}
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <div
+                    className="shrink-0 border-r border-border"
+                    style={{ width: RD_GRID_RAIL_WIDTH, minHeight: fu.height }}
+                  />
                 )}
-                <div
-                  className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
-                  style={{ width: FU_LABEL_WIDTH, minHeight: fu.height }}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold leading-snug break-words">{fu.functionalUnit}</p>
-                    {fuProjects.length > 0 && (
-                      <p className="mt-0.5 text-[10px] font-medium leading-snug text-text2">
-                        ({fuProjects.join(', ')})
-                      </p>
-                    )}
-                  </div>
-                </div>
                 <div className="min-w-0 flex-1">
                   {fu.managers.map((manager) => {
                     const { firstName, lastName } = splitPersonName(manager.manager);
                     return (
                     <div key={`em:${fu.functionalUnit}:${manager.manager}`} className="flex">
-                      <div
-                        className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
-                        style={{ width: EM_LABEL_WIDTH, minHeight: manager.height }}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold leading-snug break-words">{firstName}</p>
-                          {lastName ? (
-                            <p className="text-sm font-semibold leading-snug break-words">{lastName}</p>
-                          ) : null}
-                          <p className="mt-0.5 text-[10px] font-medium text-text2">
-                            ({manager.members.length})
-                          </p>
+                      {showManager ? (
+                        <div
+                          className="flex shrink-0 items-start justify-start border-r border-border bg-bg px-3 py-1.5 text-left"
+                          style={{ width: EM_LABEL_WIDTH, minHeight: manager.height }}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold leading-snug break-words">{firstName}</p>
+                            {lastName ? (
+                              <p className="text-sm font-semibold leading-snug break-words">{lastName}</p>
+                            ) : null}
+                            <p className="mt-0.5 text-[10px] font-medium text-text2">
+                              ({manager.members.length})
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div
+                          className="shrink-0 border-r border-border"
+                          style={{ width: RD_GRID_RAIL_WIDTH, minHeight: manager.height }}
+                        />
+                      )}
                       <div className="shrink-0 border-r border-border" style={{ width: MEMBER_LABEL_WIDTH }}>
                         {manager.members.map(({ row, height }) => {
                           const inactive = (row.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE';
@@ -855,6 +1058,9 @@ export function AllocationTimeline({
               </div>
               );
             })}
+                </div>
+              </div>
+            ))}
           </div>
           </div>
         </div>

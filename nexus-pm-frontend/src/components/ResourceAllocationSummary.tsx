@@ -1,13 +1,23 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { SlideOverListPanel } from '@/components/SlideOverListPanel';
+import { SlideOverPanel } from '@/components/SlideOverPanel';
+import {
+  EmProjectRdSummaryHeader,
+  EmProjectRdSummaryRows,
+  PROJECT_RD_GRID_WIDTH,
+} from '@/components/EmProjectRdSummaryGrid';
 import type { Capacity, Allocation } from '@/types';
 import type { WorkCategory } from '@/api/lookup.api';
+import { fetchProjects } from '@/api/projects.api';
+import { fetchEmProjectRdSummary, type EmProjectRdRow } from '@/api/issues.api';
 import type { SlideOverEntry, SlideOverGroup } from '@/utils/breakdownProjects';
 import {
   allocationFunctionalUnitLabel,
   allocationTaskLabel,
   formatAllocationDateRange,
+  RD_STATUS_BUCKETS,
 } from '@/utils/allocationUi';
 import {
   buildAllocationSummary,
@@ -28,7 +38,39 @@ type DrillPanel = {
   items?: SlideOverEntry[];
   groups?: SlideOverGroup[];
   defaultExpanded?: boolean;
+  rdProjects?: EmProjectRdRow[];
 };
+
+function blankRdProject(projectId: string, projectName: string): EmProjectRdRow {
+  return {
+    projectId,
+    projectName,
+    buckets: RD_STATUS_BUCKETS.map((bucket) => ({
+      key: bucket.key,
+      label: bucket.name,
+      rdCount: 0,
+      effort: 0,
+      rds: [],
+    })),
+    totalRd: 0,
+    totalEffort: 0,
+  };
+}
+
+function rdRowsForProjects(
+  projects: { id: string; name: string }[],
+  summary: EmProjectRdRow[],
+): EmProjectRdRow[] {
+  const byId = new Map(summary.filter((row) => row.projectId).map((row) => [row.projectId, row]));
+  const byName = new Map(summary.map((row) => [row.projectName.trim().toLowerCase(), row]));
+  return projects.map((project) => {
+    return (
+      byId.get(project.id) ??
+      byName.get(project.name.trim().toLowerCase()) ??
+      blankRdProject(project.id, project.name)
+    );
+  });
+}
 
 function allocationEntry(allocation: Allocation): SlideOverEntry {
   const extras = [
@@ -744,11 +786,48 @@ export function ResourceAllocationSummary({
       ...buildOverview([unit]),
     })),
   }));
+  const { data: projectsPage } = useQuery({
+    queryKey: ['projects', 'functional-unit-counts'],
+    queryFn: () => fetchProjects({ size: 2000 }),
+  });
+  const { data: rdSummary } = useQuery({
+    queryKey: ['em-project-rd-summary'],
+    queryFn: fetchEmProjectRdSummary,
+  });
+  const projectsByUnit = useMemo(() => {
+    const byUnit = new Map<string, { id: string; name: string }[]>();
+    for (const project of projectsPage?.content ?? []) {
+      const unitId = project.workCategoryId;
+      const name = project.name?.trim();
+      if (!unitId || !name) continue;
+      const list = byUnit.get(unitId) ?? [];
+      list.push({ id: project.id, name });
+      byUnit.set(unitId, list);
+    }
+    for (const projects of byUnit.values()) {
+      projects.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    }
+    return byUnit;
+  }, [projectsPage]);
+  const projectsFor = (units: { id: string }[]) => {
+    const projects: { id: string; name: string }[] = [];
+    for (const unit of units) projects.push(...(projectsByUnit.get(unit.id) ?? []));
+    return projects;
+  };
+  const openProjectGrid = (title: string, projects: { id: string; name: string }[]) => {
+    setDrill({
+      title: `${title} · Projects`,
+      subtitle: `${projects.length} projects`,
+      rdProjects: rdRowsForProjects(projects, rdSummary?.projects ?? []),
+    });
+  };
   const overviewCountCells = (
     row: ReturnType<typeof buildOverview> & { name: string },
     functionalUnitCount?: number,
     shaded = true,
-  ) => (
+  ) => {
+    const unitProjects = projectsFor(row.units);
+    return (
     <>
       <td className={`${cell} text-right`}>
         {functionalUnitCount == null ? null : (
@@ -764,6 +843,13 @@ export function ResourceAllocationSummary({
             }
           />
         )}
+      </td>
+      <td className={`${cell} text-right`}>
+        <CountButton
+          plain
+          value={unitProjects.length}
+          onClick={() => openProjectGrid(row.name, unitProjects)}
+        />
       </td>
       <td className={`${cell} text-right`}>
         <CountButton
@@ -852,7 +938,8 @@ export function ResourceAllocationSummary({
       ))}
       <td className={`${cell} text-right tabular-nums ${shaded ? HEADCOUNT_TONE : ''}`}>{row.total}</td>
     </>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -880,6 +967,7 @@ export function ResourceAllocationSummary({
         headers={[
           { label: 'Functional unit category' },
           { label: '# Functional units', align: 'right' },
+          { label: 'Projects', align: 'right' },
           { label: 'Team', align: 'right' },
           { label: 'Managers', align: 'right' },
           { label: 'Engineers', align: 'right' },
@@ -953,6 +1041,9 @@ export function ResourceAllocationSummary({
               {categoryOverview.reduce((sum, group) => sum + group.units.length, 0)}
             </td>
             <td className={`${cell} text-right tabular-nums`}>
+              {categoryOverview.reduce((sum, group) => sum + projectsFor(group.units).length, 0)}
+            </td>
+            <td className={`${cell} text-right tabular-nums`}>
               {categoryOverview.reduce((sum, group) => sum + group.team.length, 0)}
             </td>
             <td className={`${cell} text-right tabular-nums`}>
@@ -987,6 +1078,7 @@ export function ResourceAllocationSummary({
           { label: 'Director / VP' },
           { label: 'Priority', align: 'right' },
           { label: 'Functional unit' },
+          { label: 'Projects', align: 'right' },
           { label: 'Manager' },
           { label: 'Team', align: 'right' },
           { label: 'Allocated', align: 'right' },
@@ -1033,6 +1125,7 @@ export function ResourceAllocationSummary({
                 {director.label}
               </td>
             );
+            const unitProjects = projectsByUnit.get(unit.id) ?? [];
             const unitCells = (
               <>
                 <td rowSpan={span} className={`${cell} align-top text-right tabular-nums text-text2`}>
@@ -1040,6 +1133,12 @@ export function ResourceAllocationSummary({
                 </td>
                 <td rowSpan={span} className={`${treeCell} align-top font-semibold`}>
                   {unit.name}
+                </td>
+                <td rowSpan={span} className={`${cell} align-top text-right`}>
+                  <CountButton
+                    value={unitProjects.length}
+                    onClick={() => openProjectGrid(unit.name, unitProjects)}
+                  />
                 </td>
               </>
             );
@@ -1158,9 +1257,18 @@ export function ResourceAllocationSummary({
         })}
         {categoryComposition.length > 0 && (
           <tr className="border-t border-border bg-bg2 font-semibold">
-            <td className={cell} colSpan={5}>
+            <td className={cell} colSpan={4}>
               Total
             </td>
+            <td className={`${cell} text-right tabular-nums`}>
+              {categoryComposition.reduce(
+                (sum, group) =>
+                  sum +
+                  group.units.reduce((unitSum, unit) => unitSum + (projectsByUnit.get(unit.id)?.length ?? 0), 0),
+                0,
+              )}
+            </td>
+            <td className={cell} />
             <td className={`${cell} text-right tabular-nums`}>
               {(() => {
                 const seen = new Set<string>();
@@ -1367,15 +1475,32 @@ export function ResourceAllocationSummary({
         </SummaryTable>
       </div>
 
-      {drill && (
-        <SlideOverListPanel
+      {drill?.rdProjects ? (
+        <SlideOverPanel
           title={drill.title}
           subtitle={drill.subtitle}
-          items={drill.items}
-          groups={drill.groups}
-          defaultExpanded={drill.defaultExpanded}
           onClose={() => setDrill(null)}
-        />
+          size="half"
+          protectUnsaved={false}
+        >
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <div style={{ minWidth: PROJECT_RD_GRID_WIDTH }}>
+              <EmProjectRdSummaryHeader />
+              <EmProjectRdSummaryRows projects={drill.rdProjects} />
+            </div>
+          </div>
+        </SlideOverPanel>
+      ) : (
+        drill && (
+          <SlideOverListPanel
+            title={drill.title}
+            subtitle={drill.subtitle}
+            items={drill.items}
+            groups={drill.groups}
+            defaultExpanded={drill.defaultExpanded}
+            onClose={() => setDrill(null)}
+          />
+        )
       )}
     </div>
   );

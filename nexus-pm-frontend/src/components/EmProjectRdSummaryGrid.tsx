@@ -48,6 +48,8 @@ function ColGroup() {
   );
 }
 
+const TITLE_RULE = { borderBottom: '3px solid color-mix(in srgb, var(--text) 75%, transparent)' };
+
 function PairHeads({ border }: { border?: boolean }) {
   return (
     <>
@@ -66,8 +68,8 @@ export function EmProjectRdSummaryHeader({ onCollapse }: { onCollapse?: () => vo
       <thead>
         <tr className="text-center">
           <th
-            rowSpan={2}
             className="border-r border-border px-1 text-left text-[10px] font-medium text-text2"
+            style={TITLE_RULE}
           >
             <div className="flex items-center justify-between gap-0.5">
               <span>Projects</span>
@@ -89,7 +91,7 @@ export function EmProjectRdSummaryHeader({ onCollapse }: { onCollapse?: () => vo
               key={bucket.key}
               colSpan={2}
               className="border-r border-border px-0.5 text-[10px] font-semibold"
-              style={{ color: bucket.color }}
+              style={{ color: bucket.color, ...TITLE_RULE }}
             >
               <span className="block leading-tight">{bucket.name}</span>
               <span className="block text-[8px] font-normal leading-tight opacity-80">
@@ -97,11 +99,12 @@ export function EmProjectRdSummaryHeader({ onCollapse }: { onCollapse?: () => vo
               </span>
             </th>
           ))}
-          <th colSpan={2} className="px-0.5 text-[10px] font-medium text-text2">
+          <th colSpan={2} className="px-0.5 text-[10px] font-medium text-text2" style={TITLE_RULE}>
             Total
           </th>
         </tr>
         <tr className="text-center">
+          <th className="border-r border-border" />
           {RD_STATUS_BUCKETS.map((bucket) => (
             <PairHeads key={`${bucket.key}-sub`} border />
           ))}
@@ -151,25 +154,26 @@ export function EmProjectRdSummaryRows({ projects }: { projects: EmProjectRdRow[
       <table className="w-full table-fixed border-collapse text-[10px] tabular-nums">
         <ColGroup />
         <tbody>
-          {projects.map((project) => {
+          {projects.map((project, index) => {
             const allRds = (project.buckets ?? []).flatMap((bucket) => bucket.rds ?? []);
+            const label = `${index + 1}. ${project.projectName}`;
             return (
-              <tr key={project.projectId} className="border-b border-border/70 last:border-b-0">
+              <tr key={project.projectId || label} className="border-b border-border/70 last:border-b-0">
                 <td className="truncate border-r border-border px-1 py-0.5 text-left font-medium">
                   {project.projectId ? (
                     <button
                       type="button"
-                      title={project.projectName}
+                      title={label}
                       onClick={(event) => {
                         event.stopPropagation();
                         setMatrixProject({ id: project.projectId, name: project.projectName });
                       }}
                       className="block w-full truncate text-left font-medium text-accent hover:underline"
                     >
-                      {project.projectName}
+                      {label}
                     </button>
                   ) : (
-                    project.projectName
+                    label
                   )}
                 </td>
                 {(project.buckets ?? []).map((bucket) => (

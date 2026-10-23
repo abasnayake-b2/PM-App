@@ -46,6 +46,7 @@ export type FunctionalUnitManager = {
 export type FunctionalUnitAssignment = {
   name: string;
   managers: FunctionalUnitManager[];
+  directors?: FunctionalUnitManager[];
 };
 
 function normKey(value: string): string {
