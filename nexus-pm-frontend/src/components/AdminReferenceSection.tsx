@@ -71,7 +71,9 @@ import { fetchTeamManagement } from '@/api/teamRoster.api';
 import {
   isCoeManagerTitle,
   isDeliveryManagerTitle,
+  isDirectorTitle,
   isEngineeringManagerRole,
+  isVpEngineeringTitle,
 } from '@/utils/managementRoles';
 import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/utils/permissions';
@@ -180,6 +182,12 @@ function gridColumns(tab: RefTab): GridColumn[] {
               ? i.engineeringManagers.map((manager) => manager.name).join(', ')
               : '—',
         },
+        {
+          key: 'directors',
+          header: 'Directors / VP',
+          render: (i) =>
+            i.directors?.length ? i.directors.map((person) => person.name).join(', ') : '—',
+        },
       ];
     case 'statuses':
       return [
@@ -282,38 +290,34 @@ function useRefQuery(tab: RefTab) {
   });
 }
 
-function WorkCategoryManagerFields({ initial }: { initial?: ReferenceItem }) {
-  const { data: management = [] } = useQuery({
-    queryKey: ['team-management'],
-    queryFn: () => fetchTeamManagement(),
-  });
-  const selected = new Set((initial?.engineeringManagers ?? []).map((manager) => manager.id));
-  const options = management
-    .filter(
-      (person) =>
-        (person.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE' &&
-        (isEngineeringManagerRole(person.roleTitle) ||
-          isDeliveryManagerTitle(person.roleTitle) ||
-          isCoeManagerTitle(person.roleTitle)),
-    )
-    .slice()
-    .sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' }));
-
+function ManagementCheckboxList({
+  legend,
+  hint,
+  inputName,
+  emptyMessage,
+  options,
+  selectedIds,
+}: {
+  legend: string;
+  hint: string;
+  inputName: string;
+  emptyMessage: string;
+  options: { id: string; fullName: string; roleTitle: string }[];
+  selectedIds: Set<string>;
+}) {
   return (
     <fieldset className="mt-1">
-      <legend className="text-sm text-text2">Engineering managers</legend>
-      <p className="mt-1 text-xs text-text3">
-        Assigned managers own this functional unit’s projects and team when filters are applied.
-      </p>
+      <legend className="text-sm text-text2">{legend}</legend>
+      <p className="mt-1 text-xs text-text3">{hint}</p>
       <div className="mt-2 max-h-56 space-y-1 overflow-auto rounded-lg border border-border bg-bg3 p-3">
-        {options.length === 0 && <p className="text-sm text-text2">No engineering managers found.</p>}
+        {options.length === 0 && <p className="text-sm text-text2">{emptyMessage}</p>}
         {options.map((person) => (
           <label key={person.id} className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
-              name="engineeringManagerManagementIds"
+              name={inputName}
               value={person.id}
-              defaultChecked={selected.has(person.id)}
+              defaultChecked={selectedIds.has(person.id)}
               className="mt-0.5"
             />
             <span>
@@ -324,6 +328,61 @@ function WorkCategoryManagerFields({ initial }: { initial?: ReferenceItem }) {
         ))}
       </div>
     </fieldset>
+  );
+}
+
+function WorkCategoryManagerFields({ initial }: { initial?: ReferenceItem }) {
+  const { data: management = [] } = useQuery({
+    queryKey: ['team-management'],
+    queryFn: () => fetchTeamManagement(),
+  });
+  const active = (person: { status?: string; id: string }, selected: Set<string>) =>
+    selected.has(person.id) || (person.status ?? 'ACTIVE').toUpperCase() !== 'INACTIVE';
+  const byName = (a: { fullName: string }, b: { fullName: string }) =>
+    a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' });
+  const managerSelected = new Set((initial?.engineeringManagers ?? []).map((manager) => manager.id));
+  const directorSelected = new Set((initial?.directors ?? []).map((person) => person.id));
+  const managers = management
+    .filter(
+      (person) =>
+        active(person, managerSelected) &&
+        (isEngineeringManagerRole(person.roleTitle) ||
+          isDeliveryManagerTitle(person.roleTitle) ||
+          isCoeManagerTitle(person.roleTitle) ||
+          managerSelected.has(person.id)),
+    )
+    .slice()
+    .sort(byName);
+  const directors = management
+    .filter(
+      (person) =>
+        active(person, directorSelected) &&
+        (isDirectorTitle(person.roleTitle) ||
+          isVpEngineeringTitle(person.roleTitle) ||
+          directorSelected.has(person.id)),
+    )
+    .slice()
+    .sort(byName);
+
+  return (
+    <>
+      <ManagementCheckboxList
+        legend="Engineering managers"
+        hint="Assigned managers own this functional unit’s projects and team when filters are applied."
+        inputName="engineeringManagerManagementIds"
+        emptyMessage="No engineering managers found."
+        options={managers}
+        selectedIds={managerSelected}
+      />
+      <ManagementCheckboxList
+        legend="Directors / VP Engineering"
+        hint="Assigned directors and VP Engineering are linked to this functional unit the same way as engineering managers."
+        inputName="directorManagementIds"
+        emptyMessage="No directors or VP Engineering found."
+        options={directors}
+        selectedIds={directorSelected}
+      />
+    </>
   );
 }
 
@@ -618,6 +677,7 @@ export function AdminReferenceSection() {
         const engineeringManagerManagementIds = fd
           .getAll('engineeringManagerManagementIds')
           .map((value) => String(value));
+        const directorManagementIds = fd.getAll('directorManagementIds').map((value) => String(value));
         const sortRaw = String(fd.get('sortOrder') ?? '').trim();
         const parsed = Number(sortRaw);
         const sortOrder = sortRaw === '' || Number.isNaN(parsed) ? undefined : parsed;
@@ -631,6 +691,7 @@ export function AdminReferenceSection() {
               engineeringManagerManagementIds,
               sortOrder,
               functionalUnitCategoryId,
+              directorManagementIds,
             )
           : createAdminWorkCategory(
               name,
@@ -638,6 +699,7 @@ export function AdminReferenceSection() {
               engineeringManagerManagementIds,
               sortOrder,
               functionalUnitCategoryId,
+              directorManagementIds,
             );
       }
       case 'issue-types':

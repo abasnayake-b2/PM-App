@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ResourceAllocationSummary } from '@/components/ResourceAllocationSummary';
 import { ManagerNameOptGroups } from '@/components/ManagerNameOptGroups';
+import { MultiStatusFilter } from '@/components/MultiStatusFilter';
 import { useCapacity } from '@/hooks/useResources';
 import { useDepartments } from '@/hooks/useEmployees';
 import { fetchRosterDesignations, fetchRosterStreams } from '@/api/rosterLookups.api';
@@ -18,7 +19,11 @@ import {
   isScopedEngineeringManagerRole,
 } from '@/utils/orgRoles';
 import { defaultDateRange, todayLocalIso } from '@/utils/allocationUi';
-import { groupedManagerNames } from '@/utils/managementRoles';
+import {
+  directorsFromManagerReportingLine,
+  groupedManagerNames,
+  isDirectorOrVpTitle,
+} from '@/utils/managementRoles';
 import { isActiveRosterStatus } from '@/utils/rosterStatus';
 import { compareByPriority } from '@/utils/allocationSummary';
 
@@ -45,6 +50,7 @@ export function UtilizationSummaryPage() {
   const [taskTypeId, setTaskTypeId] = useState('');
   const [projectTypeId, setProjectTypeId] = useState('');
   const [functionalUnitCategoryId, setFunctionalUnitCategoryId] = useState('');
+  const [directorIds, setDirectorIds] = useState<string[]>([]);
   const [workCategoryId, setWorkCategoryId] = useState('');
   const [fromDate, setFromDate] = useState(defaults.from);
   const [toDate, setToDate] = useState(defaults.to);
@@ -119,9 +125,50 @@ export function UtilizationSummaryPage() {
     () => [...workCategories].sort(compareByPriority),
     [workCategories],
   );
+  const unitsWithDirectors = useMemo(
+    () =>
+      sortedWorkCategories.map((category) => {
+        if (category.directors && category.directors.length > 0) return category;
+        const inferred = directorsFromManagerReportingLine(
+          category.engineeringManagers ?? [],
+          management,
+        );
+        if (inferred.length === 0) return category;
+        return { ...category, directors: inferred };
+      }),
+    [sortedWorkCategories, management],
+  );
+  const directorOptions = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string }>();
+    const add = (id: string, name: string, roleTitle?: string) => {
+      const role = roleTitle?.trim();
+      byId.set(id, { id, name: role ? `${name} · ${role}` : name });
+    };
+    for (const person of management) {
+      if ((person.status ?? 'ACTIVE').toUpperCase() === 'INACTIVE') continue;
+      if (isDirectorOrVpTitle(person.roleTitle)) {
+        add(person.id, person.fullName, person.roleTitle);
+      }
+    }
+    for (const category of unitsWithDirectors) {
+      for (const director of category.directors ?? []) {
+        if (!byId.has(director.id)) add(director.id, director.name, director.roleTitle);
+      }
+    }
+    return [...byId.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+    );
+  }, [management, unitsWithDirectors]);
+  const directorScopedUnits = useMemo(() => {
+    if (directorIds.length === 0) return unitsWithDirectors;
+    const selected = new Set(directorIds);
+    return unitsWithDirectors.filter((category) =>
+      (category.directors ?? []).some((director) => selected.has(director.id)),
+    );
+  }, [unitsWithDirectors, directorIds]);
   const functionalUnitCategories = useMemo(() => {
     const byId = new Map<string, { id: string; name: string; sortOrder: number }>();
-    for (const category of sortedWorkCategories) {
+    for (const category of directorScopedUnits) {
       const id = category.functionalUnitCategoryId;
       const name = category.functionalUnitCategoryName?.trim();
       if (!id || !name) continue;
@@ -134,15 +181,15 @@ export function UtilizationSummaryPage() {
     return [...byId.values()].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
     );
-  }, [sortedWorkCategories]);
+  }, [directorScopedUnits]);
   const categoryUnits = useMemo(
     () =>
       functionalUnitCategoryId
-        ? sortedWorkCategories.filter(
+        ? directorScopedUnits.filter(
             (category) => category.functionalUnitCategoryId === functionalUnitCategoryId,
           )
-        : sortedWorkCategories,
-    [sortedWorkCategories, functionalUnitCategoryId],
+        : directorScopedUnits,
+    [directorScopedUnits, functionalUnitCategoryId],
   );
 
   const rows = useMemo(() => {
@@ -164,20 +211,32 @@ export function UtilizationSummaryPage() {
       taskTypeId: taskTypeId || undefined,
       projectTypeId: projectTypeId || undefined,
       workCategoryIds:
-        functionalUnitCategoryId && !workCategoryId
+        (functionalUnitCategoryId || directorIds.length > 0) && !workCategoryId
           ? categoryUnits.map((category) => category.id)
           : undefined,
     }),
-    [taskCategoryId, taskTypeId, projectTypeId, functionalUnitCategoryId, workCategoryId, categoryUnits],
+    [
+      taskCategoryId,
+      taskTypeId,
+      projectTypeId,
+      functionalUnitCategoryId,
+      directorIds,
+      workCategoryId,
+      categoryUnits,
+    ],
   );
 
   useEffect(() => {
-    if (!functionalUnitCategoryId || !workCategoryId) return;
-    const selected = workCategories.find((category) => category.id === workCategoryId);
-    if (selected && selected.functionalUnitCategoryId !== functionalUnitCategoryId) {
+    if (
+      functionalUnitCategoryId &&
+      !directorScopedUnits.some((category) => category.functionalUnitCategoryId === functionalUnitCategoryId)
+    ) {
+      setFunctionalUnitCategoryId('');
+    }
+    if (workCategoryId && !categoryUnits.some((category) => category.id === workCategoryId)) {
       setWorkCategoryId('');
     }
-  }, [functionalUnitCategoryId, workCategoryId, workCategories]);
+  }, [directorScopedUnits, categoryUnits, functionalUnitCategoryId, workCategoryId]);
 
   if (!showTeamCapacity) {
     return <Navigate to="/resources" replace />;
@@ -254,6 +313,18 @@ export function UtilizationSummaryPage() {
             <ManagerNameOptGroups groups={managerGroups} />
           </select>
         </label>
+
+        <MultiStatusFilter
+          fieldLabel="Directors / VP"
+          allLabel="All directors / VPs"
+          menuLabel="Directors / VP"
+          noun="director"
+          plural="directors / VPs"
+          className="z-30"
+          statuses={directorOptions}
+          selectedIds={directorIds}
+          onChange={setDirectorIds}
+        />
 
         <label className="text-sm">
           <span className="text-text2">Task category</span>
@@ -372,7 +443,7 @@ export function UtilizationSummaryPage() {
             filters={summaryFilters}
             workCategories={categoryUnits}
             workCategoryId={workCategoryId || undefined}
-            includeUnassigned={!functionalUnitCategoryId && !workCategoryId}
+            includeUnassigned={!functionalUnitCategoryId && !workCategoryId && directorIds.length === 0}
           />
         </div>
       )}

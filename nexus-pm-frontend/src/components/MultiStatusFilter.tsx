@@ -12,6 +12,11 @@ interface MultiStatusFilterProps {
   onChange: (selectedIds: string[]) => void;
   disabled?: boolean;
   className?: string;
+  fieldLabel?: string;
+  allLabel?: string;
+  menuLabel?: string;
+  noun?: string;
+  plural?: string;
 }
 
 export function MultiStatusFilter({
@@ -20,6 +25,11 @@ export function MultiStatusFilter({
   onChange,
   disabled = false,
   className = '',
+  fieldLabel = 'Status',
+  allLabel = 'All statuses',
+  menuLabel = 'Statuses',
+  noun = 'status',
+  plural,
 }: MultiStatusFilterProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,14 +54,14 @@ export function MultiStatusFilter({
 
   const label =
     selectedIds.length === 0
-      ? 'All statuses'
+      ? allLabel
       : selectedIds.length === 1
-        ? statuses.find((status) => status.id === selectedIds[0])?.name ?? '1 status'
-        : `${selectedIds.length} statuses`;
+        ? statuses.find((status) => status.id === selectedIds[0])?.name ?? `1 ${noun}`
+        : `${selectedIds.length} ${plural ?? `${noun}s`}`;
 
   return (
     <div ref={containerRef} className={`relative text-sm ${className}`}>
-      <span className="text-text2">Status</span>
+      <span className="text-text2">{fieldLabel}</span>
       <button
         type="button"
         disabled={disabled}
@@ -64,7 +74,7 @@ export function MultiStatusFilter({
       {open && (
         <div className="absolute z-20 mt-1 max-h-72 w-full min-w-[240px] overflow-auto rounded-lg border border-border bg-bg2 p-2 shadow-lg">
           <div className="mb-2 flex items-center justify-between gap-2 border-b border-border px-2 pb-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-text2">Statuses</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-text2">{menuLabel}</span>
             {selectedIds.length > 0 && (
               <button
                 type="button"

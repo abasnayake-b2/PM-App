@@ -236,25 +236,29 @@ export function rdStatusBarFontColor(sequence?: number | null): string {
   return '#111827';
 }
 
-const RD_STATUS_SEQUENCE_BY_NAME: Record<string, number> = {
-  'requirements initiated': 1,
-  'initial requirement gathering': 2,
-  'pending bp effort': 3,
-  'pending bp effort approval': 4,
-  'ballpark accepted': 5,
-  'rd drafting': 6,
-  'pending rd approval': 7,
-  'rd signed off': 8,
-  'pending final effort': 9,
-  'pending quotation preparation': 10,
-  'pending quotation approval': 11,
-  'quotation approved / dev not started': 12,
-  'dev in progress': 13,
-  'dev completed': 14,
-  'sit testing': 15,
-  'uat testing': 16,
-  'uat signed off / pending production': 17,
-};
+export const RD_STATUS_STEPS = [
+  { sequence: 1, name: 'Requirements initiated' },
+  { sequence: 2, name: 'Initial requirement gathering' },
+  { sequence: 3, name: 'Pending BP effort' },
+  { sequence: 4, name: 'Pending BP effort approval' },
+  { sequence: 5, name: 'Ballpark accepted' },
+  { sequence: 6, name: 'RD drafting' },
+  { sequence: 7, name: 'Pending RD approval' },
+  { sequence: 8, name: 'RD signed off' },
+  { sequence: 9, name: 'Pending final effort' },
+  { sequence: 10, name: 'Pending quotation preparation' },
+  { sequence: 11, name: 'Pending quotation approval' },
+  { sequence: 12, name: 'Quotation approved / dev not started' },
+  { sequence: 13, name: 'Dev in progress' },
+  { sequence: 14, name: 'Dev completed' },
+  { sequence: 15, name: 'SIT testing' },
+  { sequence: 16, name: 'UAT testing' },
+  { sequence: 17, name: 'UAT signed off / pending production' },
+] as const;
+
+const RD_STATUS_SEQUENCE_BY_NAME: Record<string, number> = Object.fromEntries(
+  RD_STATUS_STEPS.map((step) => [step.name.toLowerCase(), step.sequence]),
+);
 
 export function rdStatusSequenceFromName(name?: string | null): number | null {
   if (!name) return null;

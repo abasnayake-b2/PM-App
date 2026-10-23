@@ -17,6 +17,7 @@ public class WorkCategoryResponse {
     private UUID functionalUnitCategoryId;
     private String functionalUnitCategoryName;
     private List<ManagerItem> engineeringManagers;
+    private List<ManagerItem> directors;
     private String createdByName;
     private String updatedByName;
 

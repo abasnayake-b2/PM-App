@@ -81,6 +81,8 @@ export interface EmProjectRdBucket {
 export interface EmProjectRdRow {
   projectId: string;
   projectName: string;
+  regionName?: string;
+  countryName?: string;
   emName?: string;
   workCategoryId?: string;
   workCategoryName?: string;

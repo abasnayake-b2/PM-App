@@ -91,6 +91,10 @@ function detailFields(tab: RefTab, item: ReferenceItem): { label: string; value?
             ? item.engineeringManagers.map((manager) => manager.name).join(', ')
             : null,
         },
+        {
+          label: 'Directors / VP Engineering',
+          value: item.directors?.length ? item.directors.map((person) => person.name).join(', ') : null,
+        },
       ];
     case 'statuses':
       return [
@@ -183,6 +187,7 @@ export function itemSearchText(item: ReferenceItem): string {
     item.terminal ? 'terminal' : null,
     item.management ? 'management' : 'employee',
     ...(item.engineeringManagers ?? []).map((manager) => manager.name),
+    ...(item.directors ?? []).map((person) => person.name),
   ]
     .filter(Boolean)
     .join(' ')

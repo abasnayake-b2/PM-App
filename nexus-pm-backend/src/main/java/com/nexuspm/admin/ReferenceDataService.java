@@ -10,8 +10,10 @@ import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.lookup.dto.WorkCategoryResponse;
 import com.nexuspm.lookup.entity.WorkCategory;
+import com.nexuspm.lookup.entity.WorkCategoryDirector;
 import com.nexuspm.lookup.entity.WorkCategoryManager;
 import com.nexuspm.lookup.repository.FunctionalUnitCategoryRepository;
+import com.nexuspm.lookup.repository.WorkCategoryDirectorRepository;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
@@ -73,6 +75,7 @@ public class ReferenceDataService {
     private final FunctionalUnitCategoryRepository functionalUnitCategoryRepository;
     private final WorkCategoryRepository workCategoryRepository;
     private final WorkCategoryManagerRepository workCategoryManagerRepository;
+    private final WorkCategoryDirectorRepository workCategoryDirectorRepository;
     private final TeamManagementRepository teamManagementRepository;
     private final ProjectRepository projectRepository;
     private final IssueStatusRepository issueStatusRepository;
@@ -558,8 +561,12 @@ public class ReferenceDataService {
             byCategory.computeIfAbsent(assignment.getWorkCategory().getId(), ignored -> new ArrayList<>())
                     .add(assignment);
         }
+        Map<UUID, List<WorkCategoryDirector>> directorsByCategory = directorsByCategory();
         return categories.stream()
-                .map(category -> toWorkCategoryResponse(category, byCategory.getOrDefault(category.getId(), List.of())))
+                .map(category -> toWorkCategoryResponse(
+                        category,
+                        byCategory.getOrDefault(category.getId(), List.of()),
+                        directorsByCategory.getOrDefault(category.getId(), List.of())))
                 .toList();
     }
 
@@ -570,7 +577,8 @@ public class ReferenceDataService {
             String description,
             Integer sortOrder,
             UUID functionalUnitCategoryId,
-            List<UUID> engineeringManagerManagementIds) {
+            List<UUID> engineeringManagerManagementIds,
+            List<UUID> directorManagementIds) {
         String trimmed = name.trim();
         if (workCategoryRepository.findByNameIgnoreCase(trimmed).isPresent()) {
             throw new BusinessException("DUPLICATE", "Functional unit already exists", 400);
@@ -583,11 +591,11 @@ public class ReferenceDataService {
         category.setFunctionalUnitCategory(resolveFunctionalUnitCategory(functionalUnitCategoryId));
         workCategoryRepository.save(category);
         replaceWorkCategoryManagers(category, engineeringManagerManagementIds);
+        replaceWorkCategoryDirectors(category, directorManagementIds);
         return toWorkCategoryResponse(
                 auditNameEnricher.enrich(category),
-                workCategoryManagerRepository.findAllWithManager().stream()
-                        .filter(assignment -> assignment.getWorkCategory().getId().equals(category.getId()))
-                        .toList());
+                managersFor(category.getId()),
+                directorsFor(category.getId()));
     }
 
     @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
@@ -598,7 +606,8 @@ public class ReferenceDataService {
             String description,
             Integer sortOrder,
             UUID functionalUnitCategoryId,
-            List<UUID> engineeringManagerManagementIds) {
+            List<UUID> engineeringManagerManagementIds,
+            List<UUID> directorManagementIds) {
         WorkCategory category = workCategoryRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "Functional unit not found", 404));
         String trimmed = name.trim();
@@ -615,11 +624,11 @@ public class ReferenceDataService {
         category.setFunctionalUnitCategory(resolveFunctionalUnitCategory(functionalUnitCategoryId));
         workCategoryRepository.save(category);
         replaceWorkCategoryManagers(category, engineeringManagerManagementIds);
+        replaceWorkCategoryDirectors(category, directorManagementIds);
         return toWorkCategoryResponse(
                 auditNameEnricher.enrich(category),
-                workCategoryManagerRepository.findAllWithManager().stream()
-                        .filter(assignment -> assignment.getWorkCategory().getId().equals(category.getId()))
-                        .toList());
+                managersFor(category.getId()),
+                directorsFor(category.getId()));
     }
 
     @CacheEvict(cacheNames = CacheNames.WORK_CATEGORIES, allEntries = true)
@@ -632,6 +641,7 @@ public class ReferenceDataService {
             throw new BusinessException("IN_USE", "Functional unit is assigned to one or more projects", 400);
         }
         workCategoryManagerRepository.deleteByWorkCategoryId(id);
+        workCategoryDirectorRepository.deleteByWorkCategoryId(id);
         workCategoryRepository.deleteById(id);
     }
 
@@ -652,17 +662,55 @@ public class ReferenceDataService {
         }
     }
 
+    private void replaceWorkCategoryDirectors(WorkCategory category, List<UUID> directorIds) {
+        workCategoryDirectorRepository.deleteByWorkCategoryId(category.getId());
+        if (directorIds == null || directorIds.isEmpty()) {
+            return;
+        }
+        List<UUID> distinct = directorIds.stream().filter(id -> id != null).distinct().toList();
+        for (UUID directorId : distinct) {
+            TeamManagement director = teamManagementRepository.findById(directorId)
+                    .orElseThrow(() -> new BusinessException("NOT_FOUND", "Director or VP Engineering not found", 404));
+            WorkCategoryDirector assignment = new WorkCategoryDirector();
+            assignment.setId(UUID.randomUUID());
+            assignment.setWorkCategory(category);
+            assignment.setDirector(director);
+            workCategoryDirectorRepository.save(assignment);
+        }
+    }
+
+    private List<WorkCategoryManager> managersFor(UUID workCategoryId) {
+        return workCategoryManagerRepository.findAllWithManager().stream()
+                .filter(assignment -> assignment.getWorkCategory().getId().equals(workCategoryId))
+                .toList();
+    }
+
+    private List<WorkCategoryDirector> directorsFor(UUID workCategoryId) {
+        return workCategoryDirectorRepository.findAllWithDirector().stream()
+                .filter(assignment -> assignment.getWorkCategory().getId().equals(workCategoryId))
+                .toList();
+    }
+
+    private Map<UUID, List<WorkCategoryDirector>> directorsByCategory() {
+        Map<UUID, List<WorkCategoryDirector>> byCategory = new LinkedHashMap<>();
+        for (WorkCategoryDirector assignment : workCategoryDirectorRepository.findAllWithDirector()) {
+            byCategory.computeIfAbsent(assignment.getWorkCategory().getId(), ignored -> new ArrayList<>())
+                    .add(assignment);
+        }
+        return byCategory;
+    }
+
     private WorkCategoryResponse toWorkCategoryResponse(
-            WorkCategory category, List<WorkCategoryManager> assignments) {
+            WorkCategory category,
+            List<WorkCategoryManager> assignments,
+            List<WorkCategoryDirector> directorAssignments) {
         List<WorkCategoryResponse.ManagerItem> managers = assignments.stream()
-                .map(assignment -> {
-                    TeamManagement manager = assignment.getEngineeringManager();
-                    return WorkCategoryResponse.ManagerItem.builder()
-                            .id(manager.getId())
-                            .name(manager.getFullName())
-                            .roleTitle(manager.getRoleTitle())
-                            .build();
-                })
+                .map(assignment -> managerItem(assignment.getEngineeringManager()))
+                .sorted(Comparator.comparing(
+                        WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        List<WorkCategoryResponse.ManagerItem> directors = directorAssignments.stream()
+                .map(assignment -> managerItem(assignment.getDirector()))
                 .sorted(Comparator.comparing(
                         WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
@@ -675,8 +723,17 @@ public class ReferenceDataService {
                 .functionalUnitCategoryId(group != null ? group.getId() : null)
                 .functionalUnitCategoryName(group != null ? group.getName() : null)
                 .engineeringManagers(managers)
+                .directors(directors)
                 .createdByName(category.getCreatedByName())
                 .updatedByName(category.getUpdatedByName())
+                .build();
+    }
+
+    private WorkCategoryResponse.ManagerItem managerItem(TeamManagement person) {
+        return WorkCategoryResponse.ManagerItem.builder()
+                .id(person.getId())
+                .name(person.getFullName())
+                .roleTitle(person.getRoleTitle())
                 .build();
     }
 

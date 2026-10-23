@@ -82,6 +82,7 @@ export function AppShell() {
   const [projectManagementOpen, setProjectManagementOpen] = useState(() =>
     pathInGroup(location.pathname, PROJECT_MANAGEMENT_PATHS),
   );
+  const [backlogOpen, setBacklogOpen] = useState(() => location.pathname.startsWith('/issues'));
   const [organizationOpen, setOrganizationOpen] = useState(() =>
     pathInGroup(location.pathname, ORGANIZATION_PATHS),
   );
@@ -98,6 +99,9 @@ export function AppShell() {
   useEffect(() => {
     if (pathInGroup(location.pathname, PROJECT_MANAGEMENT_PATHS)) {
       setProjectManagementOpen(true);
+    }
+    if (location.pathname.startsWith('/issues')) {
+      setBacklogOpen(true);
     }
     if (pathInGroup(location.pathname, ORGANIZATION_PATHS)) {
       setOrganizationOpen(true);
@@ -174,10 +178,27 @@ export function AppShell() {
             </NavLink>
             )}
             {can(P.ISSUES_VIEW) && (
-            <NavLink to="/issues" className={linkClass}>
-              <Bug size={18} />
-              Main Backlog
-            </NavLink>
+            <div>
+              <button
+                type="button"
+                onClick={() => setBacklogOpen((current) => !current)}
+                className="nav-link w-full"
+              >
+                <Bug size={18} />
+                <span className="flex-1 text-left">Main Backlog</span>
+                {backlogOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              {backlogOpen && (
+                <div className="ml-7 mt-1 space-y-1">
+                  <NavLink to="/issues" end className={linkClass}>
+                    Tracker
+                  </NavLink>
+                  <NavLink to="/issues/region" className={linkClass}>
+                    By region
+                  </NavLink>
+                </div>
+              )}
+            </div>
             )}
             {can(P.ALLOCATIONS_VIEW) && (
             <NavLink to="/resources" className={linkClass}>

@@ -465,11 +465,11 @@ public class IssueService {
         }
 
         record Acc(UUID id, String name, String em, UUID workCategoryId, String workCategoryName,
-                   long[] rd, double[] effort) {}
+                   String regionName, String countryName, long[] rd, double[] effort) {}
         Map<UUID, Acc> byProject = new LinkedHashMap<>();
         for (Object[] row : issueRepository.aggregateTopLevelRdByProjectAndStatus(scopedProjectIds)) {
             UUID projectId = (UUID) row[0];
-            int bucket = rdBucketIndex(((Number) row[5]).intValue());
+            int bucket = rdBucketIndex(((Number) row[7]).intValue());
             if (bucket < 0) {
                 continue;
             }
@@ -480,9 +480,11 @@ public class IssueService {
                     emName.isBlank() ? "Unassigned" : emName,
                     (UUID) row[3],
                     row[4] != null ? row[4].toString() : null,
+                    row[5] != null ? row[5].toString() : null,
+                    row[6] != null ? row[6].toString() : null,
                     new long[5],
                     new double[5]));
-            acc.rd[bucket] += ((Number) row[6]).longValue();
+            acc.rd[bucket] += ((Number) row[8]).longValue();
             double[] md = mdTotalByProject.get(projectId.toString());
             if (md != null) {
                 acc.effort[bucket] = md[bucket];
@@ -515,6 +517,8 @@ public class IssueService {
             projects.add(EmProjectRdSummaryResponse.ProjectRow.builder()
                     .projectId(acc.id)
                     .projectName(acc.name)
+                    .regionName(acc.regionName)
+                    .countryName(acc.countryName)
                     .emName(acc.em)
                     .workCategoryId(acc.workCategoryId)
                     .workCategoryName(acc.workCategoryName)

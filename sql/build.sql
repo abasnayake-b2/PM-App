@@ -515,6 +515,15 @@ CREATE TABLE work_category_manager (
     CONSTRAINT fk_wcm_manager  FOREIGN KEY (engineering_manager_management_id) REFERENCES team_management(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE work_category_director (
+    id                      CHAR(36) NOT NULL PRIMARY KEY,
+    work_category_id        CHAR(36) NOT NULL,
+    director_management_id  CHAR(36) NOT NULL,
+    UNIQUE KEY uk_work_category_director (work_category_id, director_management_id),
+    CONSTRAINT fk_wcd_category FOREIGN KEY (work_category_id) REFERENCES work_category(id) ON DELETE CASCADE,
+    CONSTRAINT fk_wcd_director FOREIGN KEY (director_management_id) REFERENCES team_management(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE budget (
     id          CHAR(36)      NOT NULL PRIMARY KEY,
     project_id  CHAR(36)      NOT NULL UNIQUE,

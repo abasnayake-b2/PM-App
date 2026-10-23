@@ -354,6 +354,28 @@ function indentClass(level: 0 | 1 | 2): string {
   return '';
 }
 
+function directorBucket(directors: { id: string; name: string }[] | undefined) {
+  const sorted = [...(directors ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
+  if (sorted.length === 0) return { key: 'unassigned', label: 'Unassigned' };
+  return {
+    key: sorted.map((director) => director.id).join('|'),
+    label: sorted.map((director) => director.name).join(', '),
+  };
+}
+
+function groupByDirector<T extends { directors?: { id: string; name: string }[] }>(units: T[]) {
+  const buckets: { key: string; label: string; units: T[] }[] = [];
+  for (const unit of units) {
+    const bucket = directorBucket(unit.directors);
+    const existing = buckets.find((item) => item.key === bucket.key);
+    if (existing) existing.units.push(unit);
+    else buckets.push({ key: bucket.key, label: bucket.label, units: [unit] });
+  }
+  return buckets;
+}
+
 function emptyManagerNode(categoryId: string, managerId: string, managerName: string): WorkCategoryManagerNode {
   return {
     key: `${categoryId}:${managerId}`,
@@ -416,6 +438,7 @@ export function ResourceAllocationSummary({
   const [drill, setDrill] = useState<DrillPanel | null>(null);
   const [openManagers, setOpenManagers] = useState<Set<string>>(() => new Set());
   const [openCategories, setOpenCategories] = useState<Set<string>>(() => new Set());
+  const [openDirectors, setOpenDirectors] = useState<Set<string>>(() => new Set());
   const summary = useMemo(
     () => buildAllocationSummary(rows, rangeFrom, rangeTo, filters),
     [rows, rangeFrom, rangeTo, filters],
@@ -461,6 +484,7 @@ export function ResourceAllocationSummary({
         id: string;
         name: string;
         managers: { id: string; name: string; roleTitle?: string }[];
+        directors: { id: string; name: string }[];
         people: Record<HeadcountRole, SummaryPerson[]>;
       }[]
     >();
@@ -488,7 +512,10 @@ export function ResourceAllocationSummary({
       const managers = [...(categoryById.get(tree.id)?.engineeringManagers ?? [])].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
       );
-      groups.get(categoryName)!.push({ id: tree.id, name: tree.name, managers, people });
+      const directors = [...(categoryById.get(tree.id)?.directors ?? [])]
+        .map((director) => ({ id: director.id, name: director.name }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      groups.get(categoryName)!.push({ id: tree.id, name: tree.name, managers, directors, people });
     }
     const names = [
       ...order.filter((name) => name !== 'No category'),
@@ -500,6 +527,7 @@ export function ResourceAllocationSummary({
   useEffect(() => {
     setOpenManagers(new Set());
     setOpenCategories(new Set());
+    setOpenDirectors(new Set());
   }, [categoryIds]);
   const toggleManager = (key: string) => {
     setOpenManagers((prev) => toggleSet(prev, key));
@@ -712,6 +740,7 @@ export function ResourceAllocationSummary({
     unitRows: group.units.map((unit) => ({
       id: unit.id,
       name: unit.name,
+      directors: unit.directors,
       ...buildOverview([unit]),
     })),
   }));
@@ -866,6 +895,8 @@ export function ResourceAllocationSummary({
       >
         {categoryOverview.map((group) => {
           const open = openCategories.has(group.name);
+          const directorGroups = groupByDirector(group.units);
+          const unitRowById = new Map(group.unitRows.map((row) => [row.id, row]));
           return (
             <Fragment key={group.name}>
               <tr className="border-t border-border bg-bg2 hover:bg-bg2">
@@ -879,12 +910,39 @@ export function ResourceAllocationSummary({
                 {overviewCountCells(group, group.units.length)}
               </tr>
               {open &&
-                group.unitRows.map((unit) => (
-                  <tr key={unit.id} className="border-t border-border bg-bg text-xs hover:bg-bg2/30">
-                    <td className={`${treeCell} ${indentClass(1)} text-sm font-medium`}>{unit.name}</td>
-                    {overviewCountCells(unit, undefined, false)}
-                  </tr>
-                ))}
+                directorGroups.map((director) => {
+                  const directorKey = `${group.name}:${director.key}`;
+                  const directorOpen = openDirectors.has(directorKey);
+                  const directorRow = {
+                    name: director.label,
+                    ...buildOverview(director.units),
+                  };
+                  return (
+                    <Fragment key={directorKey}>
+                      <tr className="border-t border-border bg-bg hover:bg-bg2/40">
+                        <td className={`${treeCell} ${indentClass(1)} text-sm font-medium`}>
+                          <ExpandLabel
+                            open={directorOpen}
+                            label={director.label}
+                            onClick={() => setOpenDirectors((prev) => toggleSet(prev, directorKey))}
+                          />
+                        </td>
+                        {overviewCountCells(directorRow, director.units.length, false)}
+                      </tr>
+                      {directorOpen &&
+                        director.units.map((unit) => {
+                          const row = unitRowById.get(unit.id);
+                          if (!row) return null;
+                          return (
+                            <tr key={unit.id} className="border-t border-border bg-bg text-xs hover:bg-bg2/30">
+                              <td className={`${treeCell} ${indentClass(2)} text-sm`}>{unit.name}</td>
+                              {overviewCountCells(row, undefined, false)}
+                            </tr>
+                          );
+                        })}
+                    </Fragment>
+                  );
+                })}
             </Fragment>
           );
         })}
@@ -926,6 +984,7 @@ export function ResourceAllocationSummary({
         description="Team is the manager’s full roster. Allocated is the people with an allocation on that functional unit. Not allocated is the rest of that team."
         headers={[
           { label: 'Functional unit category' },
+          { label: 'Director / VP' },
           { label: 'Priority', align: 'right' },
           { label: 'Functional unit' },
           { label: 'Manager' },
@@ -956,11 +1015,22 @@ export function ResourceAllocationSummary({
             return { unit, tree, managers, span };
           });
           const groupSpan = units.reduce((sum, item) => sum + item.span, 0);
-          return units.flatMap(({ unit, tree, managers, span }, unitIndex) => {
+          const directorGroups = groupByDirector(units.map((item) => item.unit)).map((bucket) => ({
+            ...bucket,
+            units: bucket.units.map((unit) => units.find((item) => item.unit.id === unit.id)!),
+          }));
+          return directorGroups.flatMap((director, directorIndex) => {
+            const directorSpan = director.units.reduce((sum, item) => sum + item.span, 0);
+            return director.units.flatMap(({ unit, tree, managers, span }, unitIndex) => {
             const total = HEADCOUNT_ROLES.reduce((sum, role) => sum + unit.people[role.key].length, 0);
-            const categoryCell = unitIndex === 0 && (
+            const categoryCell = directorIndex === 0 && unitIndex === 0 && (
               <td rowSpan={groupSpan} className={`${treeCell} align-top font-semibold`}>
                 {group.name}
+              </td>
+            );
+            const directorCell = unitIndex === 0 && (
+              <td rowSpan={directorSpan} className={`${treeCell} align-top`}>
+                {director.label}
               </td>
             );
             const unitCells = (
@@ -992,6 +1062,7 @@ export function ResourceAllocationSummary({
               return [
                 <tr key={unit.id} className="border-t border-border hover:bg-bg2/50">
                   {categoryCell}
+                  {directorCell}
                   {unitCells}
                   <td className={`${treeCell} text-text2`}>No engineering managers assigned.</td>
                   <td className={`${cell} text-right tabular-nums`}>0</td>
@@ -1009,6 +1080,7 @@ export function ResourceAllocationSummary({
               const rows = [
                 <tr key={node.key} className="border-t border-border hover:bg-bg2/50">
                   {managerIndex === 0 && categoryCell}
+                  {managerIndex === 0 && directorCell}
                   {managerIndex === 0 && unitCells}
                   <td className={`${treeCell} font-medium`}>
                     <ExpandLabel
@@ -1081,11 +1153,12 @@ export function ResourceAllocationSummary({
               }
               return rows;
             });
+            });
           });
         })}
         {categoryComposition.length > 0 && (
           <tr className="border-t border-border bg-bg2 font-semibold">
-            <td className={cell} colSpan={4}>
+            <td className={cell} colSpan={5}>
               Total
             </td>
             <td className={`${cell} text-right tabular-nums`}>

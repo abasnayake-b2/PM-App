@@ -45,6 +45,17 @@ public class ProjectTypeWorkCategorySchemaMigrator implements BeanPostProcessor 
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """;
 
+    private static final String DIRECTOR_DDL = """
+            CREATE TABLE work_category_director (
+                id                      CHAR(36) NOT NULL PRIMARY KEY,
+                work_category_id        CHAR(36) NOT NULL,
+                director_management_id  CHAR(36) NOT NULL,
+                UNIQUE KEY uk_work_category_director (work_category_id, director_management_id),
+                CONSTRAINT fk_wcd_category FOREIGN KEY (work_category_id) REFERENCES work_category(id) ON DELETE CASCADE,
+                CONSTRAINT fk_wcd_director FOREIGN KEY (director_management_id) REFERENCES team_management(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """;
+
     private volatile boolean migrated;
 
     @Override
@@ -88,6 +99,7 @@ public class ProjectTypeWorkCategorySchemaMigrator implements BeanPostProcessor 
             }
             if (tableExists(statement, "work_category") && tableExists(statement, "team_management")) {
                 ensureTable(statement, "work_category_manager", MANAGER_DDL);
+                ensureTable(statement, "work_category_director", DIRECTOR_DDL);
                 backfillManagersFromProjects(statement);
             }
             ensureProjectWorkCategory(statement);

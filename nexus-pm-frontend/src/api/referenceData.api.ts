@@ -21,6 +21,7 @@ export interface ReferenceItem {
   stream?: { id: string; name: string; department?: { id: string; name: string } };
   management?: boolean;
   engineeringManagers?: { id: string; name: string; roleTitle?: string }[];
+  directors?: { id: string; name: string; roleTitle?: string }[];
   functionalUnitCategoryId?: string | null;
   functionalUnitCategoryName?: string | null;
   sortOrder?: number;
@@ -342,11 +343,13 @@ export async function createAdminWorkCategory(
   engineeringManagerManagementIds?: string[],
   sortOrder?: number,
   functionalUnitCategoryId?: string | null,
+  directorManagementIds?: string[],
 ): Promise<ReferenceItem> {
   const { data } = await api.post<ReferenceItem>(`${base}/work-categories`, {
     name,
     description,
     engineeringManagerManagementIds,
+    directorManagementIds,
     sortOrder,
     functionalUnitCategoryId: functionalUnitCategoryId || null,
   });
@@ -360,11 +363,13 @@ export async function updateAdminWorkCategory(
   engineeringManagerManagementIds?: string[],
   sortOrder?: number,
   functionalUnitCategoryId?: string | null,
+  directorManagementIds?: string[],
 ): Promise<ReferenceItem> {
   const { data } = await api.put<ReferenceItem>(`${base}/work-categories/${id}`, {
     name,
     description,
     engineeringManagerManagementIds,
+    directorManagementIds,
     sortOrder,
     functionalUnitCategoryId: functionalUnitCategoryId || null,
   });

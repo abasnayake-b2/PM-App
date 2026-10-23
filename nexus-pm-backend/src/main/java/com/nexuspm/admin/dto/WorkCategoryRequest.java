@@ -21,4 +21,6 @@ public class WorkCategoryRequest {
     private UUID functionalUnitCategoryId;
 
     private List<UUID> engineeringManagerManagementIds;
+
+    private List<UUID> directorManagementIds;
 }

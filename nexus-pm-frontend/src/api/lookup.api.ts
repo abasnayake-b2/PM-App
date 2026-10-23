@@ -45,6 +45,7 @@ export interface WorkCategory {
   functionalUnitCategoryId?: string | null;
   functionalUnitCategoryName?: string | null;
   engineeringManagers?: WorkCategoryManager[];
+  directors?: WorkCategoryManager[];
 }
 
 export interface IssueStatus {

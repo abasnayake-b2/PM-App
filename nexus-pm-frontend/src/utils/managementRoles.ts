@@ -83,8 +83,69 @@ export function groupedManagerNames(
   return { engineering, delivery, coe, other };
 }
 
+export function isDirectorTitle(roleTitle?: string | null) {
+  return /\bdirectors?\b/i.test(roleTitle ?? '');
+}
+
+/** VP whose title is engineering, such as VP Engineering. */
+export function isVpEngineeringTitle(roleTitle?: string | null) {
+  if (!roleTitle?.trim() || !isVpRole(roleTitle)) return false;
+  return /engineer/i.test(roleTitle);
+}
+
 export function isVpRole(roleTitle: string) {
   return /\bvp\b/i.test(roleTitle) || /vice\s+president/i.test(roleTitle);
+}
+
+export function isDirectorOrVpTitle(roleTitle?: string | null) {
+  if (!roleTitle?.trim()) return false;
+  return isDirectorTitle(roleTitle) || isVpRole(roleTitle);
+}
+
+/**
+ * Nearest director or VP above each manager. Used when a functional unit has
+ * no director or VP of its own.
+ */
+export function directorsFromManagerReportingLine(
+  managers: { id: string; name: string }[],
+  management: TeamManagement[],
+): { id: string; name: string; roleTitle?: string }[] {
+  if (managers.length === 0 || management.length === 0) return [];
+  const { byId, byName } = buildManagementIndex(management);
+  const leaders = new Map<string, { id: string; name: string; roleTitle?: string }>();
+  for (const manager of managers) {
+    const start = byId.get(manager.id) ?? byName.get(normalizeName(manager.name));
+    if (!start) continue;
+    const leader = nearestDirectorOrVp(start, byId, byName);
+    if (!leader) continue;
+    leaders.set(leader.id, {
+      id: leader.id,
+      name: leader.fullName,
+      roleTitle: leader.roleTitle,
+    });
+  }
+  return [...leaders.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
+}
+
+function nearestDirectorOrVp(
+  start: TeamManagement,
+  byId: Map<string, TeamManagement>,
+  byName: Map<string, TeamManagement>,
+): TeamManagement | undefined {
+  const seen = new Set<string>([start.id]);
+  let current: TeamManagement | undefined = start;
+  while (current) {
+    const supervisorId = resolveSupervisorId(current, byId, byName);
+    if (!supervisorId || seen.has(supervisorId)) return undefined;
+    seen.add(supervisorId);
+    const supervisor = byId.get(supervisorId);
+    if (!supervisor) return undefined;
+    if (isDirectorOrVpTitle(supervisor.roleTitle)) return supervisor;
+    current = supervisor;
+  }
+  return undefined;
 }
 
 export function isCxoRole(roleTitle: string) {

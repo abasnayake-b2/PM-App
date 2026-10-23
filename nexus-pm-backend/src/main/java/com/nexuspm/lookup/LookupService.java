@@ -8,8 +8,10 @@ import com.nexuspm.lookup.entity.TaskCategory;
 import com.nexuspm.lookup.entity.TaskType;
 import com.nexuspm.lookup.dto.WorkCategoryResponse;
 import com.nexuspm.lookup.entity.WorkCategory;
+import com.nexuspm.lookup.entity.WorkCategoryDirector;
 import com.nexuspm.lookup.entity.WorkCategoryManager;
 import com.nexuspm.lookup.repository.IssueStatusRepository;
+import com.nexuspm.lookup.repository.WorkCategoryDirectorRepository;
 import com.nexuspm.lookup.repository.IssueTypeRepository;
 import com.nexuspm.lookup.repository.PriorityRepository;
 import com.nexuspm.lookup.repository.ProjectTypeRepository;
@@ -43,6 +45,7 @@ public class LookupService {
     private final ProjectTypeRepository projectTypeRepository;
     private final WorkCategoryRepository workCategoryRepository;
     private final WorkCategoryManagerRepository workCategoryManagerRepository;
+    private final WorkCategoryDirectorRepository workCategoryDirectorRepository;
 
     @Cacheable(cacheNames = CacheNames.PRIORITIES, key = "'all'")
     @Transactional(readOnly = true)
@@ -83,22 +86,23 @@ public class LookupService {
             byCategory.computeIfAbsent(assignment.getWorkCategory().getId(), ignored -> new ArrayList<>())
                     .add(assignment);
         }
+        Map<UUID, List<WorkCategoryDirector>> directorsByCategory = new LinkedHashMap<>();
+        for (WorkCategoryDirector assignment : workCategoryDirectorRepository.findAllWithDirector()) {
+            directorsByCategory.computeIfAbsent(assignment.getWorkCategory().getId(), ignored -> new ArrayList<>())
+                    .add(assignment);
+        }
         return categories.stream()
                 .map(category -> {
-                    List<WorkCategoryResponse.ManagerItem> managers = byCategory
+                    List<WorkCategoryResponse.ManagerItem> managers = managerItems(byCategory
                             .getOrDefault(category.getId(), List.of())
                             .stream()
-                            .map(assignment -> {
-                                TeamManagement manager = assignment.getEngineeringManager();
-                                return WorkCategoryResponse.ManagerItem.builder()
-                                        .id(manager.getId())
-                                        .name(manager.getFullName())
-                                        .roleTitle(manager.getRoleTitle())
-                                        .build();
-                            })
-                            .sorted(Comparator.comparing(
-                                    WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
-                            .toList();
+                            .map(WorkCategoryManager::getEngineeringManager)
+                            .toList());
+                    List<WorkCategoryResponse.ManagerItem> directors = managerItems(directorsByCategory
+                            .getOrDefault(category.getId(), List.of())
+                            .stream()
+                            .map(WorkCategoryDirector::getDirector)
+                            .toList());
                     var group = category.getFunctionalUnitCategory();
                     return WorkCategoryResponse.builder()
                             .id(category.getId())
@@ -108,8 +112,21 @@ public class LookupService {
                             .functionalUnitCategoryId(group != null ? group.getId() : null)
                             .functionalUnitCategoryName(group != null ? group.getName() : null)
                             .engineeringManagers(managers)
+                            .directors(directors)
                             .build();
                 })
+                .toList();
+    }
+
+    private List<WorkCategoryResponse.ManagerItem> managerItems(List<TeamManagement> people) {
+        return people.stream()
+                .map(person -> WorkCategoryResponse.ManagerItem.builder()
+                        .id(person.getId())
+                        .name(person.getFullName())
+                        .roleTitle(person.getRoleTitle())
+                        .build())
+                .sorted(Comparator.comparing(
+                        WorkCategoryResponse.ManagerItem::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 

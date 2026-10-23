@@ -473,7 +473,8 @@ public class AdminController {
                 request.getDescription(),
                 request.getSortOrder(),
                 request.getFunctionalUnitCategoryId(),
-                request.getEngineeringManagerManagementIds());
+                request.getEngineeringManagerManagementIds(),
+                request.getDirectorManagementIds());
     }
 
     @PutMapping("/reference/work-categories/{id}")
@@ -486,7 +487,8 @@ public class AdminController {
                 request.getDescription(),
                 request.getSortOrder(),
                 request.getFunctionalUnitCategoryId(),
-                request.getEngineeringManagerManagementIds());
+                request.getEngineeringManagerManagementIds(),
+                request.getDirectorManagementIds());
     }
 
     @DeleteMapping("/reference/work-categories/{id}")

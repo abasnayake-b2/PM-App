@@ -497,11 +497,15 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
             SELECT p.id, p.name,
                    CONCAT(COALESCE(em.firstName, ''), ' ', COALESCE(em.lastName, '')),
                    wc.id, wc.name,
+                   r.name, co.name,
                    s.sequence, COUNT(i)
             FROM RdIssue i
             JOIN i.project p
             LEFT JOIN p.engineeringManagerManagement em
             LEFT JOIN p.workCategory wc
+            LEFT JOIN p.client cl
+            LEFT JOIN cl.country co
+            LEFT JOIN co.region r
             JOIN i.status s
             WHERE i.deleted = false
               AND i.parentIssue IS NULL
@@ -509,7 +513,7 @@ public interface RdIssueRepository extends JpaRepository<RdIssue, UUID> {
               AND p.archived = false
               AND s.sequence BETWEEN 1 AND 17
               AND (:scopedProjectIds IS NULL OR p.id IN :scopedProjectIds)
-            GROUP BY p.id, p.name, em.firstName, em.lastName, wc.id, wc.name, s.sequence
+            GROUP BY p.id, p.name, em.firstName, em.lastName, wc.id, wc.name, r.name, co.name, s.sequence
             """)
     List<Object[]> aggregateTopLevelRdByProjectAndStatus(
             @Param("scopedProjectIds") java.util.Collection<UUID> scopedProjectIds);

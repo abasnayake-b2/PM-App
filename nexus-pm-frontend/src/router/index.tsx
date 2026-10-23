@@ -10,6 +10,7 @@ import { ProjectCreatePage } from '@/pages/Projects/ProjectCreatePage';
 import { ProjectDetailPage } from '@/pages/ProjectDetail/ProjectDetailPage';
 import { OrganisationPage } from '@/pages/Organisation/OrganisationPage';
 import { IssuesPage } from '@/pages/Issues/IssuesPage';
+import { BacklogRegionPage } from '@/pages/Issues/BacklogRegionPage';
 import { IssueCreatePage } from '@/pages/Issues/IssueCreatePage';
 import { IssueDetailPage } from '@/pages/IssueDetail/IssueDetailPage';
 import { ResourcesLayout } from '@/pages/Resources/ResourcesLayout';
@@ -54,6 +55,7 @@ export function AppRouter() {
             <Route path="/projects/new" element={<ProjectCreatePage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/issues" element={<IssuesPage />} />
+            <Route path="/issues/region" element={<BacklogRegionPage />} />
             <Route path="/issues/new" element={<IssueCreatePage />} />
             <Route path="/issues/:id" element={<IssueDetailPage />} />
             <Route path="/resources" element={<ResourcesLayout />}>

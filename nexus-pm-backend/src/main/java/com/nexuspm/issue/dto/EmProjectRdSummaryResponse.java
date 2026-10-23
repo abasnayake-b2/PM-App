@@ -17,6 +17,8 @@ public class EmProjectRdSummaryResponse {
     public static class ProjectRow {
         private UUID projectId;
         private String projectName;
+        private String regionName;
+        private String countryName;
         private String emName;
         private UUID workCategoryId;
         private String workCategoryName;
