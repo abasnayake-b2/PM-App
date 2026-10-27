@@ -16,6 +16,7 @@ import {
   deleteTeamRosterMemberPhoto,
   importTeamManagement,
   importTeamMembers,
+  updateTeamMembers,
   fetchLatestTeamManagementImport,
   fetchLatestTeamMembersImport,
   relinkManagementSupervisors,
@@ -94,6 +95,16 @@ export function useImportTeamMembers() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-roster-members'] });
       qc.invalidateQueries({ queryKey: ['team-import-members-latest'] });
+    },
+  });
+}
+
+export function useUpdateTeamMembers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: updateTeamMembers,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-roster-members'] });
     },
   });
 }

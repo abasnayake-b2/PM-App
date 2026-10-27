@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { RD_STATUS_BUCKETS, rdStatusBarFontColor } from '@/utils/allocationUi';
@@ -48,8 +48,6 @@ function ColGroup() {
   );
 }
 
-const TITLE_RULE = { borderBottom: '3px solid color-mix(in srgb, var(--text) 75%, transparent)' };
-
 function PairHeads({ border }: { border?: boolean }) {
   return (
     <>
@@ -68,8 +66,8 @@ export function EmProjectRdSummaryHeader({ onCollapse }: { onCollapse?: () => vo
       <thead>
         <tr className="text-center">
           <th
+            rowSpan={2}
             className="border-r border-border px-1 text-left text-[10px] font-medium text-text2"
-            style={TITLE_RULE}
           >
             <div className="flex items-center justify-between gap-0.5">
               <span>Projects</span>
@@ -91,7 +89,7 @@ export function EmProjectRdSummaryHeader({ onCollapse }: { onCollapse?: () => vo
               key={bucket.key}
               colSpan={2}
               className="border-r border-border px-0.5 text-[10px] font-semibold"
-              style={{ color: bucket.color, ...TITLE_RULE }}
+              style={{ color: bucket.color }}
             >
               <span className="block leading-tight">{bucket.name}</span>
               <span className="block text-[8px] font-normal leading-tight opacity-80">
@@ -99,12 +97,11 @@ export function EmProjectRdSummaryHeader({ onCollapse }: { onCollapse?: () => vo
               </span>
             </th>
           ))}
-          <th colSpan={2} className="px-0.5 text-[10px] font-medium text-text2" style={TITLE_RULE}>
+          <th colSpan={2} className="px-0.5 text-[10px] font-medium text-text2">
             Total
           </th>
         </tr>
         <tr className="text-center">
-          <th className="border-r border-border" />
           {RD_STATUS_BUCKETS.map((bucket) => (
             <PairHeads key={`${bucket.key}-sub`} border />
           ))}
@@ -141,9 +138,38 @@ function RdCountButton({
   );
 }
 
-export function EmProjectRdSummaryRows({ projects }: { projects: EmProjectRdRow[] }) {
+export function EmProjectRdSummaryRows({
+  projects,
+  showTotals = false,
+}: {
+  projects: EmProjectRdRow[];
+  showTotals?: boolean;
+}) {
   const [popup, setPopup] = useState<RdPopup | null>(null);
   const [matrixProject, setMatrixProject] = useState<{ id: string; name: string } | null>(null);
+  const totals = useMemo(() => {
+    const byKey = new Map<string, { rd: number; effort: number; rds: EmProjectRdItem[] }>();
+    for (const bucket of RD_STATUS_BUCKETS) {
+      byKey.set(bucket.key, { rd: 0, effort: 0, rds: [] });
+    }
+    let totalRd = 0;
+    let totalEffort = 0;
+    const allRds: EmProjectRdItem[] = [];
+    for (const project of projects) {
+      totalRd += project.totalRd || 0;
+      totalEffort += project.totalEffort || 0;
+      for (const bucket of project.buckets ?? []) {
+        const slot = byKey.get(bucket.key);
+        if (!slot) continue;
+        slot.rd += bucket.rdCount || 0;
+        slot.effort += bucket.effort || 0;
+        const rows = bucket.rds ?? [];
+        slot.rds.push(...rows);
+        allRds.push(...rows);
+      }
+    }
+    return { byKey, totalRd, totalEffort, allRds };
+  }, [projects]);
 
   if (projects.length === 0) {
     return <p className="px-2 py-1 text-[10px] text-text3">No RDs</p>;
@@ -158,8 +184,8 @@ export function EmProjectRdSummaryRows({ projects }: { projects: EmProjectRdRow[
             const allRds = (project.buckets ?? []).flatMap((bucket) => bucket.rds ?? []);
             const label = `${index + 1}. ${project.projectName}`;
             return (
-              <tr key={project.projectId || label} className="border-b border-border/70 last:border-b-0">
-                <td className="truncate border-r border-border px-1 py-0.5 text-left font-medium">
+              <tr key={project.projectId || label}>
+                <td className="truncate border-b border-r border-border px-1 py-0.5 text-left font-medium">
                   {project.projectId ? (
                     <button
                       type="button"
@@ -178,7 +204,7 @@ export function EmProjectRdSummaryRows({ projects }: { projects: EmProjectRdRow[
                 </td>
                 {(project.buckets ?? []).map((bucket) => (
                   <Fragment key={bucket.key}>
-                    <td className="border-r border-border/70 px-0.5 text-center">
+                    <td className="border-b border-r border-border px-0.5 text-center">
                       <RdCountButton
                         count={bucket.rdCount}
                         rows={bucket.rds ?? []}
@@ -191,12 +217,12 @@ export function EmProjectRdSummaryRows({ projects }: { projects: EmProjectRdRow[
                         }
                       />
                     </td>
-                    <td className="border-r border-border px-0.5 text-center font-bold">
+                    <td className="border-b border-r border-border px-0.5 text-center font-bold">
                       {cell(bucket.effort)}
                     </td>
                   </Fragment>
                 ))}
-                <td className="border-r border-border/70 px-0.5 text-center">
+                <td className="border-b border-r border-border px-0.5 text-center">
                   <RdCountButton
                     count={project.totalRd}
                     rows={allRds}
@@ -209,10 +235,60 @@ export function EmProjectRdSummaryRows({ projects }: { projects: EmProjectRdRow[
                     }
                   />
                 </td>
-                <td className="px-0.5 text-center font-bold">{cell(project.totalEffort)}</td>
+                <td className="border-b border-border px-0.5 text-center font-bold">{cell(project.totalEffort)}</td>
               </tr>
             );
           })}
+          {showTotals && (
+            <tr className="bg-bg2 font-semibold" style={{ borderTop: '3px solid var(--text)' }}>
+              <td className="border-b border-r border-border px-1 py-0.5 text-left">Total</td>
+              {RD_STATUS_BUCKETS.map((bucket) => {
+                const slot = totals.byKey.get(bucket.key) ?? { rd: 0, effort: 0, rds: [] };
+                return (
+                  <Fragment key={`${bucket.key}-total`}>
+                    <td className="border-b border-r border-border px-0.5 text-center">
+                      {slot.rd ? (
+                        <RdCountButton
+                          count={slot.rd}
+                          rows={slot.rds}
+                          onOpen={() =>
+                            setPopup({
+                              title: 'Total',
+                              subtitle: rdBucketSubtitle(bucket.key, bucket.name),
+                              rows: slot.rds,
+                            })
+                          }
+                        />
+                      ) : (
+                        '0'
+                      )}
+                    </td>
+                    <td className="border-b border-r border-border px-0.5 text-center font-bold">
+                      {cell(slot.effort) || '0'}
+                    </td>
+                  </Fragment>
+                );
+              })}
+              <td className="border-b border-r border-border px-0.5 text-center">
+                {totals.totalRd ? (
+                  <RdCountButton
+                    count={totals.totalRd}
+                    rows={totals.allRds}
+                    onOpen={() =>
+                      setPopup({
+                        title: 'Total',
+                        subtitle: 'All statuses',
+                        rows: totals.allRds,
+                      })
+                    }
+                  />
+                ) : (
+                  '0'
+                )}
+              </td>
+              <td className="border-b border-border px-0.5 text-center font-bold">{cell(totals.totalEffort) || '0'}</td>
+            </tr>
+          )}
         </tbody>
       </table>
       {matrixProject && (

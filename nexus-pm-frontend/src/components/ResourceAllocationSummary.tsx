@@ -1482,11 +1482,14 @@ export function ResourceAllocationSummary({
           onClose={() => setDrill(null)}
           size="half"
           protectUnsaved={false}
+          thickTitleRule
         >
           <div className="overflow-x-auto rounded-lg border border-border">
             <div style={{ minWidth: PROJECT_RD_GRID_WIDTH }}>
-              <EmProjectRdSummaryHeader />
-              <EmProjectRdSummaryRows projects={drill.rdProjects} />
+              <div style={{ borderBottom: '3px solid var(--text)' }}>
+                <EmProjectRdSummaryHeader />
+              </div>
+              <EmProjectRdSummaryRows projects={drill.rdProjects} showTotals />
             </div>
           </div>
         </SlideOverPanel>

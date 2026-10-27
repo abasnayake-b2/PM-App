@@ -49,6 +49,9 @@ export interface ReferenceDataImportResult {
   skillsCreated?: number;
   skillsUpdated?: number;
   skillsSkipped?: number;
+  workTypesCreated?: number;
+  workTypesUpdated?: number;
+  workTypesSkipped?: number;
   errors: string[];
   importedByName?: string;
   importedAt?: string;
@@ -67,6 +70,15 @@ export async function importAdminSkillsData(file: File): Promise<ReferenceDataIm
   const form = new FormData();
   form.append('file', file);
   const { data } = await api.post<ReferenceDataImportResult>(`${base}/skills/import`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function importAdminWorkTypesData(file: File): Promise<ReferenceDataImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<ReferenceDataImportResult>(`${base}/work-types/import`, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;

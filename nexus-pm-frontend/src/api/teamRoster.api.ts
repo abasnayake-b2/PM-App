@@ -68,6 +68,12 @@ export interface ManagementUserProvisioned {
   initialPassword: string;
 }
 
+export interface TeamImportSkippedRow {
+  rowNumber: number;
+  name: string;
+  reason: string;
+}
+
 export interface TeamImportResult {
   batchId: string;
   fileName: string;
@@ -75,6 +81,7 @@ export interface TeamImportResult {
   membersImported: number;
   usersCreated?: number;
   provisionedUsers?: ManagementUserProvisioned[];
+  notUpdated?: TeamImportSkippedRow[];
   importedByName?: string;
   importedAt?: string;
 }
@@ -275,6 +282,15 @@ export async function importTeamMembers(file: File): Promise<TeamImportResult> {
   const form = new FormData();
   form.append('file', file);
   const { data } = await api.post<TeamImportResult>('/team-roster/import/members', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function updateTeamMembers(file: File): Promise<TeamImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<TeamImportResult>('/team-roster/import/members/update', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;

@@ -596,7 +596,7 @@ export function AllocationTimeline({
         managers[0].rdProjects = fuRdProjects;
         managers[0].height = Math.max(
           managers[0].height,
-          fuRdProjects.length * PROJECT_RD_ROW_PX,
+          (fuRdProjects.length + 1) * PROJECT_RD_ROW_PX,
         );
       }
       return {
@@ -964,7 +964,7 @@ export function AllocationTimeline({
                         style={{ minHeight: manager.height }}
                       >
                         {manager.rdProjects.length > 0 && (
-                          <EmProjectRdSummaryRows projects={manager.rdProjects} />
+                          <EmProjectRdSummaryRows projects={manager.rdProjects} showTotals />
                         )}
                       </div>
                     ))}

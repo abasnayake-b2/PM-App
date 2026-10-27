@@ -1,18 +1,32 @@
 import { useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import {
   importAdminReferenceData,
   importAdminSkillsData,
+  importAdminWorkTypesData,
   type ReferenceDataImportResult,
 } from '@/api/referenceData.api';
 
+type ReferenceExcelVariant = 'reference' | 'skills' | 'work-types';
+
 interface ReferenceDataExcelUploadProps {
   onImported?: () => void;
-  variant?: 'reference' | 'skills';
+  variant?: ReferenceExcelVariant;
+  onDownload?: () => void | Promise<void>;
+  downloading?: boolean;
 }
 
-function formatSummary(result: ReferenceDataImportResult, variant: 'reference' | 'skills'): string {
+function formatSummary(result: ReferenceDataImportResult, variant: ReferenceExcelVariant): string {
+  if (variant === 'work-types') {
+    const created = result.workTypesCreated ?? 0;
+    const updated = result.workTypesUpdated ?? 0;
+    const skipped = result.workTypesSkipped ?? 0;
+    const parts = [`${created} NTP/GBL value${created !== 1 ? 's' : ''} created`];
+    if (updated > 0) parts.push(`${updated} updated`);
+    if (skipped > 0) parts.push(`${skipped} skipped`);
+    return `Imported from ${result.fileName}: ${parts.join(', ')}.`;
+  }
   if (variant === 'skills') {
     const created = result.skillsCreated ?? 0;
     const updated = result.skillsUpdated ?? 0;
@@ -51,15 +65,47 @@ function formatSummary(result: ReferenceDataImportResult, variant: 'reference' |
   return `Imported from ${result.fileName}: ${parts.join(', ')}.`;
 }
 
+const COPY: Record<ReferenceExcelVariant, { title: string; description: string; upload: string; download: string }> = {
+  reference: {
+    title: 'Import reference data from Excel',
+    description:
+      'Upload an Excel file with Departments, Streams, and Designations sheets. Designations may include an Is Management column (Yes/No). An optional Skills sheet (Name + Description) is also supported.',
+    upload: 'Upload reference data Excel',
+    download: 'Download Excel',
+  },
+  skills: {
+    title: 'Skills Excel',
+    description:
+      'Download Skill Excel to get the current list (Name and Description). Edit that file, then upload it with Upload Skill Excel. Matching names are updated; new names are added.',
+    upload: 'Upload Skill Excel',
+    download: 'Download Skill Excel',
+  },
+  'work-types': {
+    title: 'NTP/GBL Excel',
+    description:
+      'Download NTP/GBL Excel to get the current list (Name). Edit that file, then upload it with Upload NTP/GBL Excel. Matching names are updated; new names are added.',
+    upload: 'Upload NTP/GBL Excel',
+    download: 'Download NTP/GBL Excel',
+  },
+};
+
 export function ReferenceDataExcelUpload({
   onImported,
   variant = 'reference',
+  onDownload,
+  downloading = false,
 }: ReferenceDataExcelUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const copy = COPY[variant];
 
   const importMutation = useMutation({
-    mutationFn: variant === 'skills' ? importAdminSkillsData : importAdminReferenceData,
+    mutationFn:
+      variant === 'skills'
+        ? importAdminSkillsData
+        : variant === 'work-types'
+          ? importAdminWorkTypesData
+          : importAdminReferenceData,
     onSuccess: () => {
       onImported?.();
       if (fileRef.current) {
@@ -88,18 +134,26 @@ export function ReferenceDataExcelUpload({
     <div className="mb-6 rounded-xl border border-border bg-bg2 p-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold">
-            {variant === 'skills'
-              ? 'Import skills from Excel'
-              : 'Import reference data from Excel'}
-          </h3>
-          <p className="mt-1 text-xs text-text2">
-            {variant === 'skills'
-              ? 'Upload an Excel file with a Skills sheet (or a single sheet), Name column, and optional Description column.'
-              : 'Upload an Excel file with Departments, Streams, and Designations sheets. Designations may include an Is Management column (Yes/No). An optional Skills sheet (Name + Description) is also supported.'}
-          </p>
+          <h3 className="text-sm font-semibold">{copy.title}</h3>
+          <p className="mt-1 text-xs text-text2">{copy.description}</p>
         </div>
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onDownload && (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                void Promise.resolve(onDownload()).catch((err: unknown) => {
+                  setError(err instanceof Error ? err.message : 'Download failed');
+                });
+              }}
+              disabled={downloading || importMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-bg3 disabled:opacity-50"
+            >
+              <Download size={16} />
+              {downloading ? 'Preparing…' : copy.download}
+            </button>
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -115,11 +169,7 @@ export function ReferenceDataExcelUpload({
             style={{ color: 'var(--accent-fg)' }}
           >
             <Upload size={16} />
-            {importMutation.isPending
-              ? 'Importing…'
-              : variant === 'skills'
-                ? 'Upload skills Excel'
-                : 'Upload reference data Excel'}
+            {importMutation.isPending ? 'Importing…' : copy.upload}
           </button>
         </div>
       </div>

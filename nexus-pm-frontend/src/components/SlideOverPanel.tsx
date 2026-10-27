@@ -52,6 +52,8 @@ interface SlideOverPanelProps {
    * Set false for read-only panels (lists, detail views without forms).
    */
   protectUnsaved?: boolean;
+  /** Strong rule under the title row. */
+  thickTitleRule?: boolean;
 }
 
 /**
@@ -67,6 +69,7 @@ export function SlideOverPanel({
   size,
   accent,
   protectUnsaved = true,
+  thickTitleRule = false,
 }: SlideOverPanelProps) {
   const resolvedSize = size ?? (wide ? 'wide' : 'default');
   const widthClass =
@@ -180,7 +183,7 @@ export function SlideOverPanel({
       <button
         type="button"
         aria-label="Close panel"
-        className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-black/35"
         onClick={requestClose}
       />
       <aside
@@ -196,11 +199,12 @@ export function SlideOverPanel({
           />
         )}
         <div
-          className={`flex items-start justify-between gap-3 border-b border-border/60 ${
+          className={`flex items-start justify-between gap-3 ${thickTitleRule ? '' : 'border-b border-border/60'} ${
             accent
               ? 'bg-gradient-to-r from-[color:var(--accent-muted)]/35 to-transparent'
               : 'bg-transparent'
           } ${compactChrome ? 'px-3 py-2.5' : 'p-5'}`}
+          style={thickTitleRule ? { borderBottom: '3px solid var(--text)' } : undefined}
         >
           <div className="min-w-0">
             <h2

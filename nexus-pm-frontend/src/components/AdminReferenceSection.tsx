@@ -67,6 +67,7 @@ import {
   type RefTab,
 } from '@/components/AdminReferenceDetailPanel';
 import { ReferenceDataExcelUpload } from '@/components/ReferenceDataExcelUpload';
+import { downloadSkillsExcel, downloadWorkTypesExcel } from '@/utils/referenceLookupExcelExport';
 import { fetchTeamManagement } from '@/api/teamRoster.api';
 import {
   isCoeManagerTitle,
@@ -560,6 +561,7 @@ export function AdminReferenceSection() {
   const [tab, setTab] = useState<RefTab>('departments');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [selected, setSelected] = useState<ReferenceItem | null>(null);
   const [dialog, setDialog] = useState<'create' | 'edit' | null>(null);
   const [editing, setEditing] = useState<ReferenceItem | null>(null);
@@ -815,6 +817,7 @@ export function AdminReferenceSection() {
 
       {canImportReference &&
         tab !== 'skills' &&
+        tab !== 'work-types' &&
         tab !== 'task-types' &&
         tab !== 'task-categories' &&
         tab !== 'project-types' &&
@@ -823,7 +826,34 @@ export function AdminReferenceSection() {
         <ReferenceDataExcelUpload onImported={invalidate} />
       )}
       {canImportReference && tab === 'skills' && (
-        <ReferenceDataExcelUpload variant="skills" onImported={invalidate} />
+        <ReferenceDataExcelUpload
+          variant="skills"
+          onImported={invalidate}
+          downloading={downloadingExcel}
+          onDownload={async () => {
+            setDownloadingExcel(true);
+            try {
+              await downloadSkillsExcel(items ?? []);
+            } finally {
+              setDownloadingExcel(false);
+            }
+          }}
+        />
+      )}
+      {canImportReference && tab === 'work-types' && (
+        <ReferenceDataExcelUpload
+          variant="work-types"
+          onImported={invalidate}
+          downloading={downloadingExcel}
+          onDownload={async () => {
+            setDownloadingExcel(true);
+            try {
+              await downloadWorkTypesExcel(items ?? []);
+            } finally {
+              setDownloadingExcel(false);
+            }
+          }}
+        />
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
