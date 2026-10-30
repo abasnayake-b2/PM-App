@@ -23,6 +23,9 @@ public class ReferenceDataImportResult {
     private int skillsCreated;
     private int skillsUpdated;
     private int skillsSkipped;
+    private int workTypesCreated;
+    private int workTypesUpdated;
+    private int workTypesSkipped;
     private List<String> errors;
     private String importedByName;
     private Instant importedAt;

@@ -48,6 +48,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.nio.file.Path;
 import java.util.*;
@@ -267,6 +268,82 @@ public class TeamRosterService {
         importBatchRepository.save(batch);
 
         return toImportResult(batch);
+    }
+
+    /**
+     * Updates existing roster employees from a Team sheet. Rows are matched on Name.
+     * Rows that do not match a single employee, or whose reference values are unknown, are left unchanged.
+     */
+    @Transactional
+    public TeamImportResult updateMembersFromExcel(MultipartFile file) {
+        ExcelUploadValidator.validate(file, properties);
+        String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.xlsx";
+
+        TeamImportBatch batch = new TeamImportBatch();
+        batch.setId(UUID.randomUUID());
+        batch.setFileName(fileName);
+        List<MemberUpdateRow> memberRows = new ArrayList<>();
+        try (InputStream in = file.getInputStream(); Workbook workbook = WorkbookFactory.create(in)) {
+            parseMemberUpdateSheet(workbook, memberRows);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException("IMPORT_FAILED", "Failed to read Excel file: " + ex.getMessage(), 400);
+        }
+
+        DesignationLookup designationLookup = indexDesignations();
+        StreamLookup streamLookup = indexStreams();
+        List<TeamManagement> managementRoster = managementRepository.findAll();
+        Map<String, Skill> skillsByName = indexSkillsByName();
+        Map<String, WorkType> workTypesByName = indexWorkTypesByName();
+        Map<String, List<Employee>> employeesByName = indexRosterEmployeesByName();
+
+        List<TeamImportSkippedRow> notUpdated = new ArrayList<>();
+        List<Employee> updated = new ArrayList<>();
+        List<Employee> managerUpdates = new ArrayList<>();
+        for (MemberUpdateRow imported : memberRows) {
+            String reason = memberUpdateBlockReason(
+                    imported,
+                    employeesByName,
+                    managementRoster,
+                    designationLookup,
+                    streamLookup,
+                    skillsByName,
+                    workTypesByName);
+            if (reason != null) {
+                notUpdated.add(TeamImportSkippedRow.builder()
+                        .rowNumber(imported.rowNumber())
+                        .name(imported.name())
+                        .reason(reason)
+                        .build());
+                continue;
+            }
+            Employee existing = employeesByName.get(normalizeNameKey(imported.name())).get(0);
+            applyMemberUpdate(
+                    existing, imported, designationLookup, streamLookup, managementRoster, skillsByName, workTypesByName);
+            if (imported.updateManager()) {
+                managerUpdates.add(existing);
+            }
+            updated.add(existing);
+        }
+
+        employeeRepository.saveAll(updated);
+        employeeRepository.flush();
+        LocalDate importDay = LocalDate.now();
+        for (Employee employee : managerUpdates) {
+            recordManagerAssignment(employee, importDay, EmployeeManagerAssignmentService.SOURCE_IMPORT);
+        }
+
+        return TeamImportResult.builder()
+                .batchId(batch.getId())
+                .fileName(fileName)
+                .managementImported(0)
+                .membersImported(updated.size())
+                .usersCreated(0)
+                .provisionedUsers(List.of())
+                .notUpdated(notUpdated)
+                .importedAt(Instant.now())
+                .build();
     }
 
     private TeamImportBatch createImportBatch(MultipartFile file) {
@@ -877,6 +954,178 @@ public class TeamRosterService {
         }
     }
 
+    private record MemberUpdateColumns(
+            int headerRow,
+            int nameCol,
+            Integer skillsCol,
+            Integer workTypeCol,
+            Integer codeCol,
+            Integer designationCol,
+            Integer teamCol,
+            Integer managerCol,
+            Integer countryCol,
+            Integer productCol,
+            Integer emailCol,
+            Integer phoneCol,
+            Integer expTotalCol,
+            Integer dfnCol,
+            Integer employmentCol,
+            Integer statusCol) {}
+
+    private record MemberUpdateRow(
+            int rowNumber,
+            String name,
+            boolean updateSkills,
+            String skills,
+            boolean updateWorkType,
+            String workType,
+            boolean updateCode,
+            String designationCode,
+            boolean updateDesignation,
+            String designation,
+            boolean updateTeam,
+            String team,
+            boolean updateManager,
+            String engineeringManager,
+            boolean updateCountry,
+            String country,
+            boolean updateProduct,
+            String product,
+            boolean updateEmail,
+            String email,
+            boolean updatePhone,
+            String phone,
+            boolean updateExpTotal,
+            String expTotal,
+            boolean updateDfn,
+            String experienceInDfn,
+            boolean updateEmployment,
+            String employmentType,
+            boolean updateStatus,
+            String status) {}
+
+    private void parseMemberUpdateSheet(Workbook workbook, List<MemberUpdateRow> out) {
+        Sheet sheet = resolveSheet(workbook, "Team");
+        MemberUpdateColumns columns = resolveMemberUpdateColumns(sheet);
+        for (int rowIdx = columns.headerRow() + 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
+            Row row = sheet.getRow(rowIdx);
+            if (row == null) {
+                continue;
+            }
+            String name = trimOrNull(cellString(row.getCell(columns.nameCol())));
+            if (name == null) {
+                continue;
+            }
+            out.add(new MemberUpdateRow(
+                    rowIdx + 1,
+                    name,
+                    columns.skillsCol() != null,
+                    cellAt(row, columns.skillsCol()),
+                    columns.workTypeCol() != null,
+                    cellAt(row, columns.workTypeCol()),
+                    columns.codeCol() != null,
+                    cellAt(row, columns.codeCol()),
+                    columns.designationCol() != null,
+                    cellAt(row, columns.designationCol()),
+                    columns.teamCol() != null,
+                    cellAt(row, columns.teamCol()),
+                    columns.managerCol() != null,
+                    cellAt(row, columns.managerCol()),
+                    columns.countryCol() != null,
+                    cellAt(row, columns.countryCol()),
+                    columns.productCol() != null,
+                    cellAt(row, columns.productCol()),
+                    columns.emailCol() != null,
+                    cellAt(row, columns.emailCol()),
+                    columns.phoneCol() != null,
+                    cellAt(row, columns.phoneCol()),
+                    columns.expTotalCol() != null,
+                    cellAt(row, columns.expTotalCol()),
+                    columns.dfnCol() != null,
+                    cellAt(row, columns.dfnCol()),
+                    columns.employmentCol() != null,
+                    cellAt(row, columns.employmentCol()),
+                    columns.statusCol() != null,
+                    cellAt(row, columns.statusCol())));
+        }
+    }
+
+    private MemberUpdateColumns resolveMemberUpdateColumns(Sheet sheet) {
+        int lastHeader = Math.min(sheet.getLastRowNum(), 15);
+        for (int rowIdx = 0; rowIdx <= lastHeader; rowIdx++) {
+            Row header = sheet.getRow(rowIdx);
+            if (header == null) {
+                continue;
+            }
+            Integer name = null;
+            Integer skills = null;
+            Integer workType = null;
+            Integer code = null;
+            Integer designation = null;
+            Integer team = null;
+            Integer manager = null;
+            Integer country = null;
+            Integer product = null;
+            Integer email = null;
+            Integer phone = null;
+            Integer expTotal = null;
+            Integer dfn = null;
+            Integer employment = null;
+            Integer status = null;
+            short lastCell = header.getLastCellNum();
+            for (int col = 0; col < lastCell; col++) {
+                String label = normalizeHeaderLabel(cellString(header.getCell(col)));
+                if (label.isEmpty()) {
+                    continue;
+                }
+                if (name == null && (label.equals("name") || label.equals("fullname") || label.equals("employeename"))) {
+                    name = col;
+                } else if (skills == null && (label.equals("skill") || label.equals("skills"))) {
+                    skills = col;
+                } else if (workType == null && (label.equals("ntpgbl") || label.equals("worktype") || label.equals("worktypename"))) {
+                    workType = col;
+                } else if (code == null && (label.equals("code") || label.equals("designationcode"))) {
+                    code = col;
+                } else if (designation == null && label.equals("designation")) {
+                    designation = col;
+                } else if (team == null && label.equals("team")) {
+                    team = col;
+                } else if (manager == null && (label.equals("em") || label.equals("manager") || label.equals("engineeringmanager"))) {
+                    manager = col;
+                } else if (country == null && label.equals("country")) {
+                    country = col;
+                } else if (product == null && label.equals("product")) {
+                    product = col;
+                } else if (email == null && (label.equals("email") || label.equals("emailaddress"))) {
+                    email = col;
+                } else if (phone == null && (label.equals("tel") || label.equals("phone") || label.equals("telephone"))) {
+                    phone = col;
+                } else if (expTotal == null && (label.equals("exptotal") || label.equals("exp") || label.equals("totalexperience"))) {
+                    expTotal = col;
+                } else if (dfn == null && (label.equals("dfn") || label.equals("experienceindfn"))) {
+                    dfn = col;
+                } else if (employment == null && (label.equals("employment") || label.equals("employmenttype"))) {
+                    employment = col;
+                } else if (status == null && label.equals("status")) {
+                    status = col;
+                }
+            }
+            if (name != null) {
+                return new MemberUpdateColumns(
+                        rowIdx, name, skills, workType, code, designation, team, manager, country,
+                        product, email, phone, expTotal, dfn, employment, status);
+            }
+        }
+        throw new BusinessException("IMPORT_FAILED", "The Excel file needs a Name column", 400);
+    }
+
+    private static String cellAt(Row row, Integer column) {
+        if (column == null) {
+            return null;
+        }
+        return trimOrNull(cellString(row.getCell(column)));
+    }
+
     private void validateMembersAgainstManagementRoster(List<ImportedMemberRow> rows) {
         List<TeamManagement> managementRoster = managementRepository.findAll();
         if (managementRoster.isEmpty()) {
@@ -1235,6 +1484,252 @@ public class TeamRosterService {
         entity.getSkills().addAll(skills);
     }
 
+    private Map<String, List<Employee>> indexRosterEmployeesByName() {
+        Map<String, List<Employee>> byName = new LinkedHashMap<>();
+        for (Employee employee : employeeRepository.searchRosterMembers(null)) {
+            String key = normalizeNameKey(employee.getFullName());
+            List<Employee> matches = byName.computeIfAbsent(key, ignored -> new ArrayList<>());
+            if (matches.stream().noneMatch(existing -> existing.getId().equals(employee.getId()))) {
+                matches.add(employee);
+            }
+        }
+        return byName;
+    }
+
+    private String memberUpdateBlockReason(
+            MemberUpdateRow imported,
+            Map<String, List<Employee>> employeesByName,
+            List<TeamManagement> managementRoster,
+            DesignationLookup designationLookup,
+            StreamLookup streamLookup,
+            Map<String, Skill> skillsByName,
+            Map<String, WorkType> workTypesByName) {
+        List<Employee> matches = employeesByName.getOrDefault(normalizeNameKey(imported.name()), List.of());
+        if (matches.isEmpty()) {
+            return "No employee with this name";
+        }
+        if (matches.size() > 1) {
+            return "More than one employee has this name";
+        }
+        if (imported.updateManager()
+                && !isBlank(imported.engineeringManager())
+                && resolveEngineeringManager(imported.engineeringManager(), managementRoster) == null) {
+            return "Engineering manager \"" + imported.engineeringManager().trim() + "\" was not found";
+        }
+        if ((imported.updateCode() || imported.updateDesignation())
+                && !designationResolves(
+                        imported.designationCode(),
+                        imported.designation(),
+                        imported.team(),
+                        designationLookup)) {
+            return "Designation was not found";
+        }
+        if (imported.updateTeam() && !isBlank(imported.team()) && streamLookup.resolve(imported.team()) == null) {
+            return "Team \"" + imported.team().trim() + "\" was not found";
+        }
+        if (imported.updateWorkType()) {
+            String workTypeProblem = workTypeUpdateProblem(imported.workType(), workTypesByName);
+            if (workTypeProblem != null) {
+                return workTypeProblem;
+            }
+        }
+        if (imported.updateCountry() && !isBlank(imported.country()) && resolveCountry(imported.country()).isEmpty()) {
+            return "Country \"" + imported.country().trim() + "\" was not found";
+        }
+        if (imported.updateSkills()) {
+            List<String> unknownSkills = unknownImportedSkills(imported.skills(), skillsByName);
+            if (!unknownSkills.isEmpty()) {
+                return "Skills not found: " + String.join(", ", unknownSkills);
+            }
+        }
+        if (imported.updateExpTotal() && !isBlank(imported.expTotal()) && parseDecimal(imported.expTotal()) == null) {
+            return "Exp. total is not a number";
+        }
+        if (imported.updateDfn()
+                && !isBlank(imported.experienceInDfn())
+                && parseDecimal(imported.experienceInDfn()) == null) {
+            return "DFN experience is not a number";
+        }
+        return null;
+    }
+
+    private void applyMemberUpdate(
+            Employee existing,
+            MemberUpdateRow imported,
+            DesignationLookup designationLookup,
+            StreamLookup streamLookup,
+            List<TeamManagement> managementRoster,
+            Map<String, Skill> skillsByName,
+            Map<String, WorkType> workTypesByName) {
+        if (imported.updateProduct()) {
+            existing.setProduct(trimOrNull(imported.product()));
+        }
+        if (imported.updateEmail()) {
+            existing.setEmail(trimOrNull(imported.email()));
+        }
+        if (imported.updatePhone()) {
+            existing.setPhone(trimOrNull(imported.phone()));
+        }
+        if (imported.updateSkills()) {
+            applyImportedSkills(existing, imported.skills(), skillsByName);
+        }
+        WorkType intendedWorkType = imported.updateWorkType()
+                ? resolveSingleWorkType(imported.workType(), workTypesByName)
+                : existing.getWorkType();
+        if (imported.updateEmployment()) {
+            existing.setEmploymentType(trimOrNull(imported.employmentType()));
+        }
+        if (imported.updateExpTotal()) {
+            existing.setTotalYearsOfExperience(parseDecimal(imported.expTotal()));
+        }
+        if (imported.updateDfn()) {
+            existing.setExperienceInDfn(parseDecimal(imported.experienceInDfn()));
+        }
+        if (imported.updateStatus() && !isBlank(imported.status())) {
+            existing.setStatus(imported.status().trim().toUpperCase(Locale.ROOT));
+        }
+        boolean updateRosterLink = imported.updateCode()
+                || imported.updateDesignation()
+                || imported.updateTeam()
+                || imported.updateManager()
+                || imported.updateCountry();
+        if (!updateRosterLink) {
+            if (imported.updateWorkType()) {
+                existing.setWorkType(intendedWorkType);
+            }
+            return;
+        }
+        TeamManagement previousManager = existing.getEngineeringManagerManagement();
+        Country previousCountry = existing.getCountry();
+        applyRosterReferences(
+                existing,
+                RosterLinkInput.fromImport(new RosterImportFields(
+                        imported.updateCode() ? imported.designationCode() : null,
+                        imported.updateDesignation() ? imported.designation() : null,
+                        imported.updateTeam() ? imported.team() : null,
+                        imported.updateManager() ? imported.engineeringManager() : null,
+                        null,
+                        imported.updateCountry() ? imported.country() : null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)),
+                designationLookup,
+                streamLookup,
+                managementRoster);
+        if (!imported.updateManager()) {
+            existing.setEngineeringManagerManagement(previousManager);
+        }
+        existing.setWorkType(intendedWorkType);
+        if (!imported.updateCountry()) {
+            existing.setCountry(previousCountry);
+        }
+    }
+
+    private String workTypeUpdateProblem(String raw, Map<String, WorkType> workTypesByName) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        List<String> unknown = new ArrayList<>();
+        List<WorkType> matched = new ArrayList<>();
+        for (String part : raw.split("[,;|]")) {
+            String token = part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            WorkType found = findIndexedWorkType(token, workTypesByName);
+            if (found == null) {
+                unknown.add(token);
+            } else if (matched.stream().noneMatch(item -> item.getId().equals(found.getId()))) {
+                matched.add(found);
+            }
+        }
+        if (!unknown.isEmpty()) {
+            return "NTP/GBL not found: " + String.join(", ", unknown);
+        }
+        if (matched.size() > 1) {
+            return "NTP/GBL has more than one value: " + raw.trim();
+        }
+        if (matched.isEmpty()) {
+            return "NTP/GBL \"" + raw.trim() + "\" was not found";
+        }
+        return null;
+    }
+
+    private WorkType resolveSingleWorkType(String raw, Map<String, WorkType> workTypesByName) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        WorkType resolved = null;
+        for (String part : raw.split("[,;|]")) {
+            String token = part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            WorkType found = findIndexedWorkType(token, workTypesByName);
+            if (found != null) {
+                resolved = found;
+            }
+        }
+        return resolved;
+    }
+
+    private WorkType findIndexedWorkType(String token, Map<String, WorkType> workTypesByName) {
+        WorkType exact = workTypesByName.get(token.trim().toLowerCase(Locale.ROOT));
+        if (exact != null) {
+            return exact;
+        }
+        return workTypesByName.get(compactLookupKey(token));
+    }
+
+    private Map<String, WorkType> indexWorkTypesByName() {
+        Map<String, WorkType> index = new LinkedHashMap<>();
+        for (WorkType workType : workTypeRepository.findAll()) {
+            if (workType.getName() == null || workType.getName().isBlank()) {
+                continue;
+            }
+            index.putIfAbsent(workType.getName().trim().toLowerCase(Locale.ROOT), workType);
+            index.putIfAbsent(compactLookupKey(workType.getName()), workType);
+        }
+        return index;
+    }
+
+    private boolean designationResolves(
+            String code, String title, String teamName, DesignationLookup designationLookup) {
+        if (isBlank(code) && isBlank(title)) {
+            return true;
+        }
+        if (title != null && code != null && title.equalsIgnoreCase(code)) {
+            title = null;
+        }
+        Designation match = null;
+        if (!isBlank(title)) {
+            match = designationLookup.resolve(null, title, teamName);
+        }
+        if (match == null && !isBlank(code)) {
+            match = designationLookup.resolve(code, null, teamName);
+        }
+        return match != null;
+    }
+
+    private List<String> unknownImportedSkills(String skillsCsv, Map<String, Skill> skillsByName) {
+        if (isBlank(skillsCsv)) {
+            return List.of();
+        }
+        List<String> unknown = new ArrayList<>();
+        for (String part : skillsCsv.split("[,;|]")) {
+            String raw = part.trim();
+            if (raw.isEmpty()) {
+                continue;
+            }
+            if (findIndexedSkill(raw, skillsByName) == null) {
+                unknown.add(raw);
+            }
+        }
+        return unknown;
+    }
+
     private Map<String, Skill> indexSkillsByName() {
         Map<String, Skill> index = new LinkedHashMap<>();
         for (Skill skill : skillRepository.findAll()) {
@@ -1242,8 +1737,21 @@ public class TeamRosterService {
                 continue;
             }
             index.putIfAbsent(skill.getName().trim().toLowerCase(Locale.ROOT), skill);
+            index.putIfAbsent(compactLookupKey(skill.getName()), skill);
         }
         return index;
+    }
+
+    private Skill findIndexedSkill(String token, Map<String, Skill> skillsByName) {
+        Skill exact = skillsByName.get(token.trim().toLowerCase(Locale.ROOT));
+        if (exact != null) {
+            return exact;
+        }
+        return skillsByName.get(compactLookupKey(token));
+    }
+
+    private static String compactLookupKey(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     private void applyImportedMemberExtras(
@@ -1264,11 +1772,11 @@ public class TeamRosterService {
         }
         LinkedHashSet<Skill> matched = new LinkedHashSet<>();
         for (String part : skillsCsv.split("[,;|]")) {
-            String name = part.trim().toLowerCase(Locale.ROOT);
+            String name = part.trim();
             if (name.isEmpty()) {
                 continue;
             }
-            Skill skill = skillsByName.get(name);
+            Skill skill = findIndexedSkill(name, skillsByName);
             if (skill != null) {
                 matched.add(skill);
             }

@@ -192,6 +192,12 @@ public class TeamRosterController {
         return teamRosterService.importMembersExcel(file);
     }
 
+    @PostMapping(value = "/import/members/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@perm.can('IMPORT_CREATE')")
+    public TeamImportResult updateMembersExcel(@RequestParam("file") MultipartFile file) {
+        return teamRosterService.updateMembersFromExcel(file);
+    }
+
     @GetMapping("/import/management/latest")
     @PreAuthorize("@perm.can('TEAM_VIEW')")
     public TeamImportResult latestManagementImport() {

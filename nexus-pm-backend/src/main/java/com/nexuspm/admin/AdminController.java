@@ -122,6 +122,12 @@ public class AdminController {
         return referenceDataImportService.importSkillsExcel(file);
     }
 
+    @PostMapping("/reference/work-types/import")
+    @PreAuthorize("@perm.can('REFERENCE_CREATE')")
+    public ReferenceDataImportResult importWorkTypes(@RequestParam("file") MultipartFile file) {
+        return referenceDataImportService.importWorkTypesExcel(file);
+    }
+
     @GetMapping("/reference/departments")
     @PreAuthorize("@perm.can('REFERENCE_VIEW')")
     public List<Department> listReferenceDepartments() {

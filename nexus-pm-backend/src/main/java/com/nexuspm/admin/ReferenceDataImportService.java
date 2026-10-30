@@ -12,11 +12,13 @@ import com.nexuspm.user.entity.Designation;
 import com.nexuspm.user.entity.Employee;
 import com.nexuspm.user.entity.Skill;
 import com.nexuspm.user.entity.Stream;
+import com.nexuspm.user.entity.WorkType;
 import com.nexuspm.user.repository.DepartmentRepository;
 import com.nexuspm.user.repository.DesignationRepository;
 import com.nexuspm.user.repository.EmployeeRepository;
 import com.nexuspm.user.repository.SkillRepository;
 import com.nexuspm.user.repository.StreamRepository;
+import com.nexuspm.user.repository.WorkTypeRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class ReferenceDataImportService {
     private final StreamRepository streamRepository;
     private final DesignationRepository designationRepository;
     private final SkillRepository skillRepository;
+    private final WorkTypeRepository workTypeRepository;
     private final EmployeeRepository employeeRepository;
     private final DfnPmProperties properties;
     private final CacheEvictionService cacheEvictionService;
@@ -119,6 +122,99 @@ public class ReferenceDataImportService {
                 .importedByName(importedByName)
                 .importedAt(Instant.now())
                 .build();
+    }
+
+    @Transactional
+    public ReferenceDataImportResult importWorkTypesExcel(MultipartFile file) {
+        ExcelUploadValidator.validate(file, properties);
+
+        String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.xlsx";
+        String importedByName = resolveImporterName();
+        ImportStats workTypes = new ImportStats();
+        List<String> errors = new ArrayList<>();
+        Map<String, WorkType> workTypeByName = indexWorkTypes();
+
+        try (InputStream in = file.getInputStream(); Workbook workbook = WorkbookFactory.create(in)) {
+            importWorkTypesSheet(workbook, workTypeByName, workTypes);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException("IMPORT_FAILED", "Failed to read Excel file: " + ex.getMessage(), 400);
+        }
+
+        cacheEvictionService.evict(CacheNames.WORK_TYPES);
+
+        return ReferenceDataImportResult.builder()
+                .fileName(fileName)
+                .workTypesCreated(workTypes.created)
+                .workTypesUpdated(workTypes.updated)
+                .workTypesSkipped(workTypes.skipped)
+                .errors(errors)
+                .importedByName(importedByName)
+                .importedAt(Instant.now())
+                .build();
+    }
+
+    private void importWorkTypesSheet(
+            Workbook workbook,
+            Map<String, WorkType> workTypeByName,
+            ImportStats stats) {
+        Sheet sheet = resolveSheet(workbook, "NTP/GBL", "NTP-GBL", "Work Types", "Work Type", "WorkTypes");
+        if (sheet == null) {
+            throw new BusinessException("IMPORT_FAILED", "NTP/GBL sheet is required", 400);
+        }
+        Row header = sheet.getRow(0);
+        if (header == null) {
+            throw new BusinessException("IMPORT_FAILED", "NTP/GBL sheet header row is missing", 400);
+        }
+        Map<String, Integer> columns = parseHeader(header);
+        if (!columns.containsKey("name")
+                && !columns.containsKey("ntpgbl")
+                && !columns.containsKey("worktype")
+                && !columns.containsKey("worktypename")) {
+            throw new BusinessException(
+                    "IMPORT_FAILED",
+                    "NTP/GBL sheet requires a Name column",
+                    400);
+        }
+
+        for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
+            Row row = sheet.getRow(rowIdx);
+            if (row == null) {
+                continue;
+            }
+            String name = firstCell(row, columns, "name", "ntpgbl", "worktype", "worktypename");
+            if (isBlank(name)) {
+                continue;
+            }
+            String key = normalizeNameKey(name);
+            WorkType existing = workTypeByName.get(key);
+            if (existing == null) {
+                WorkType workType = new WorkType();
+                workType.setId(UUID.randomUUID());
+                workType.setName(name.trim());
+                workTypeRepository.save(workType);
+                workTypeByName.put(key, workType);
+                stats.created++;
+            } else {
+                String trimmedName = name.trim();
+                if (!existing.getName().equals(trimmedName)) {
+                    existing.setName(trimmedName);
+                    workTypeRepository.save(existing);
+                    stats.updated++;
+                } else {
+                    stats.skipped++;
+                }
+            }
+        }
+    }
+
+    private Map<String, WorkType> indexWorkTypes() {
+        Map<String, WorkType> byName = new HashMap<>();
+        for (WorkType workType : workTypeRepository.findAll()) {
+            byName.put(normalizeNameKey(workType.getName()), workType);
+        }
+        return byName;
     }
 
     private void importSkillsSheet(

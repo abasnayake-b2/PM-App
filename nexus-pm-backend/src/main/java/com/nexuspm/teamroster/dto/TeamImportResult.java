@@ -16,6 +16,7 @@ public class TeamImportResult {
     private int membersImported;
     private int usersCreated;
     private List<ManagementUserProvisioned> provisionedUsers;
+    private List<TeamImportSkippedRow> notUpdated;
     private String importedByName;
     private Instant importedAt;
 }
